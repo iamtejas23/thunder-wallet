@@ -21,11 +21,6 @@ Run the App:
 npm start
 ```
 
-## License 📄
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-
-
 
 ## Contributing 👩‍💻👨‍💻
 
@@ -37,3 +32,8 @@ Contributions are welcome! Feel free to open issues or submit pull requests to i
 - **Android:** Available (https://github.com/iamtejas23/thunder-wallet/releases/tag/1.0.0).
 
 Enjoy tracking your expenses with the Expense Tracker app! 💰📊
+
+## License 📄
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+
