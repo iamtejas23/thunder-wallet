@@ -4,7 +4,16 @@
 Expense Tracker App 📊💸 Expense Tracker is a mobile app built with React Native that helps you manage your expenses effectively. Keep track of your transactions, categorize them, and monitor your balance on-the-go!
 
 
-## Installation
+## Features 🚀
+
+- Add Transactions: Easily add new transactions, specifying the category and amount.
+- Transaction Details: View detailed information about each transaction, including the date.
+- Sort Transactions: Toggle between sorting transactions by date or month.
+- Delete Transactions: Remove unwanted transactions with a simple tap.
+
+
+## Getting Started 🛠️ 
+Installation
 
 Install thunder-wallet with npm
 
