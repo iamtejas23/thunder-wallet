@@ -7,19 +7,28 @@ Transaction Details: View detailed information about each transaction, including
 Sort Transactions: Toggle between sorting transactions by date or month.
 Delete Transactions: Remove unwanted transactions with a simple tap.
 Getting Started 🛠️
+
+
 Clone the repository:
 bash
 Copy code
 git clone https://github.com/your-username/expense-tracker-app.git
 cd expense-tracker-app
+
+
 Install Dependencies:
 bash
 Copy code
+
+
 npm install
 Run the App:
 bash
+
 Copy code
 npm start
+
+
 Start Tracking Expenses! 📅💰
 Technologies Used 🛠️
 React Native
