@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Thunder Wallet",
+    "slug": "thunder-wallet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.tejas8787.thunderwallet"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "20973568-e0e6-48b1-a5ee-2c55cd8b6f39"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/20973568-e0e6-48b1-a5ee-2c55cd8b6f39"
+    },
+    "runtimeVersion": "49.0.0"
+  }
+}
