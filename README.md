@@ -46,6 +46,33 @@ android/app/build/outputs/apk/release/app-release.apk
 
 This build keeps the APK lightweight by building only `arm64-v8a`, using Hermes, enabling Proguard/resource shrinking, disabling extra GIF/WebP support, and compressing native libraries.
 
+## GitHub Actions Release APK
+
+Yes, GitHub Actions can build the lightweight APK and attach it to GitHub Releases automatically.
+
+Release plan:
+
+1. Update the app version in `package.json`, `app.json`, and `android/app/build.gradle`.
+2. Commit and push your changes.
+3. Create and push a version tag:
+
+```bash
+git tag v1.0.4
+git push origin v1.0.4
+```
+
+4. GitHub Actions runs `.github/workflows/android-release.yml`.
+5. The workflow builds the same lightweight `arm64-v8a` release APK.
+6. The APK is uploaded to the matching GitHub Release as:
+
+```bash
+thunder-wallet-v1.0.4.apk
+```
+
+The workflow can also be run manually from the Actions tab. Manual runs upload the APK as a workflow artifact; tag pushes publish the APK directly to GitHub Releases.
+
+Note: this project currently signs release APKs with the checked-in debug keystore, which is okay for direct testing/sharing. For Play Store or production signing, add a real release keystore through GitHub Secrets and update the Gradle signing config.
+
 
 ## Contributing 👩‍💻👨‍💻
 

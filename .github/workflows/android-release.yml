@@ -1,0 +1,74 @@
+name: Android Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-apk:
+    name: Build lightweight release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build lightweight APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean assembleRelease \
+            -PreactNativeArchitectures=arm64-v8a \
+            -Pandroid.enableProguardInReleaseBuilds=true \
+            -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
+            -Pexpo.useLegacyPackaging=true
+
+      - name: Prepare APK asset
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-manual}"
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk "release/thunder-wallet-${TAG_NAME}.apk"
+          ls -lh release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thunder-wallet-release-apk
+          path: release/*.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          APK_PATH="release/thunder-wallet-${TAG_NAME}.apk"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$APK_PATH" --clobber
+          else
+            gh release create "$TAG_NAME" "$APK_PATH" \
+              --title "Thunder Wallet ${TAG_NAME}" \
+              --notes "Lightweight Android release APK built automatically from ${GITHUB_SHA}."
+          fi
