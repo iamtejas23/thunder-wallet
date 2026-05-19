@@ -1,89 +1,269 @@
-import React from 'react';
-import { View, FlatList, TouchableOpacity, Text, StyleSheet, Share } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  Alert,
+  FlatList,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
-const TransactionList = ({ transactions, deleteTransaction }) => {
+const currency = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 2,
+});
+
+const filters = [
+  { key: 'all', label: 'All' },
+  { key: 'income', label: 'Income' },
+  { key: 'expense', label: 'Expense' },
+];
+
+const categoryIcons = {
+  Food: 'fast-food-outline',
+  Travel: 'car-outline',
+  Shopping: 'bag-outline',
+  Bills: 'receipt-outline',
+  Salary: 'cash-outline',
+  Health: 'fitness-outline',
+  Other: 'sparkles-outline',
+};
+
+const TransactionList = ({
+  transactions,
+  deleteTransaction,
+  activeFilter,
+  setActiveFilter,
+  searchQuery,
+  setSearchQuery,
+}) => {
   const formatTimestamp = (date) => {
     const options = {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'numeric',
       day: 'numeric',
       hour: 'numeric',
       minute: 'numeric',
+      month: 'short',
+      year: 'numeric',
     };
-    return new Date(date).toLocaleString('en-US', options);
+    return new Date(date).toLocaleString('en-IN', options);
   };
 
-  const generateCSV = async () => {
-    const csvContent = transactions.map(item => {
-      return `${item.id},${item.category},${item.amount},${formatTimestamp(item.date)}`;
-    }).join('\n');
+  const visibleTransactions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
 
-    const fileUri = FileSystem.documentDirectory + 'transactions.csv';
-    await FileSystem.writeAsStringAsync(fileUri, csvContent);
+    return transactions.filter((transaction) => {
+      const matchesFilter =
+        activeFilter === 'all' ||
+        (activeFilter === 'income' && transaction.amount >= 0) ||
+        (activeFilter === 'expense' && transaction.amount < 0);
+      const matchesSearch =
+        !normalizedQuery ||
+        transaction.category.toLowerCase().includes(normalizedQuery) ||
+        (transaction.note || '').toLowerCase().includes(normalizedQuery);
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [activeFilter, searchQuery, transactions]);
+
+  const visibleSummary = useMemo(
+    () =>
+      visibleTransactions.reduce(
+        (summary, transaction) => {
+          if (transaction.amount >= 0) {
+            summary.income += transaction.amount;
+          } else {
+            summary.expense += Math.abs(transaction.amount);
+          }
+          return summary;
+        },
+        { income: 0, expense: 0 },
+      ),
+    [visibleTransactions],
+  );
+  const visibleNet = visibleSummary.income - visibleSummary.expense;
+
+  const escapeCSV = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+  const generateCSV = async () => {
+    if (!transactions.length) {
+      Alert.alert('Nothing to export', 'Add a transaction first.');
+      return;
+    }
+
+    const csvRows = [
+      ['ID', 'Type', 'Category', 'Amount', 'Note', 'Date'].map(escapeCSV).join(','),
+      ...transactions.map((item) =>
+        [
+          item.id,
+          item.amount >= 0 ? 'Income' : 'Expense',
+          item.category,
+          item.amount,
+          item.note,
+          formatTimestamp(item.date),
+        ]
+          .map(escapeCSV)
+          .join(','),
+      ),
+    ];
+
+    const fileUri = `${FileSystem.documentDirectory}thunder-wallet-transactions.csv`;
+    await FileSystem.writeAsStringAsync(fileUri, csvRows.join('\n'));
 
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(fileUri);
     } else {
-      alert("Sharing is not available on this device");
+      Alert.alert('Sharing unavailable', 'CSV export is saved in the app document directory.');
     }
   };
 
   const shareSummary = async () => {
-    const summary = transactions.map(item => {
-      return `Category: ${item.category}, Amount: ₹${item.amount}, Date: ${formatTimestamp(item.date)}`;
-    }).join('\n');
+    if (!transactions.length) {
+      Alert.alert('Nothing to share', 'Add a transaction first.');
+      return;
+    }
+
+    const total = transactions.reduce((sum, item) => sum + item.amount, 0);
+    const summary = transactions
+      .slice(0, 12)
+      .map((item) => {
+        const sign = item.amount >= 0 ? '+' : '-';
+        return `${item.category}: ${sign}${currency.format(Math.abs(item.amount))} on ${formatTimestamp(item.date)}`;
+      })
+      .join('\n');
 
     try {
       await Share.share({
-        message: `Transaction Summary:\n\n${summary}`,
+        message: `Thunder Wallet Summary\nBalance: ${currency.format(total)}\n\n${summary}`,
       });
     } catch (error) {
-      alert(error.message);
+      Alert.alert('Could not share summary', error.message);
     }
+  };
+
+  const confirmDelete = (transactionId) => {
+    Alert.alert('Delete transaction?', 'This entry will be removed from your local wallet.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteTransaction(transactionId) },
+    ]);
+  };
+
+  const renderTransaction = ({ item }) => {
+    const isIncome = item.amount >= 0;
+    const iconName = categoryIcons[item.category] || categoryIcons.Other;
+
+    return (
+      <View style={styles.transactionItem}>
+        <View style={[styles.transactionIcon, isIncome ? styles.incomeIcon : styles.expenseIcon]}>
+          <Ionicons name={iconName} size={21} color={isIncome ? '#0f6f4e' : '#a43e22'} />
+        </View>
+
+        <View style={styles.transactionDetails}>
+          <View style={styles.transactionTopRow}>
+            <Text style={styles.transactionCategory} numberOfLines={1}>
+              {item.category}
+            </Text>
+            <Text style={[styles.transactionAmount, isIncome ? styles.incomeAmount : styles.expenseAmount]}>
+              {isIncome ? '+' : '-'}{currency.format(Math.abs(item.amount))}
+            </Text>
+          </View>
+          {!!item.note && (
+            <Text style={styles.transactionNote} numberOfLines={1}>
+              {item.note}
+            </Text>
+          )}
+          <Text style={styles.transactionDate}>{formatTimestamp(item.date)}</Text>
+        </View>
+
+        <TouchableOpacity
+          accessibilityLabel="Delete transaction"
+          onPress={() => confirmDelete(item.id)}
+          style={styles.deleteButton}
+        >
+          <Ionicons name="trash-outline" size={19} color="#8f9892" />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   return (
     <View style={styles.transactionsContainer}>
       <View style={styles.header}>
-        <Text style={styles.transactionsTitle}>Transactions</Text>
+        <View>
+          <Text style={styles.eyebrow}>Activity</Text>
+          <Text style={styles.transactionsTitle}>Transactions</Text>
+        </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={generateCSV} style={styles.iconButton}>
-            <Ionicons name="download-outline" size={24} color="#007bff" />
-            <Text style={styles.iconButtonText}>CSV</Text>
+          <TouchableOpacity accessibilityLabel="Export CSV" onPress={generateCSV} style={styles.iconButton}>
+            <Ionicons name="download-outline" size={20} color="#11342d" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={shareSummary} style={styles.iconButton}>
-            <Ionicons name="share-outline" size={24} color="#28a745" />
-            <Text style={styles.iconButtonText}>Share</Text>
+          <TouchableOpacity accessibilityLabel="Share summary" onPress={shareSummary} style={styles.iconButton}>
+            <Ionicons name="share-social-outline" size={20} color="#11342d" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <FlatList
-        data={transactions}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.transactionItem}>
-            <View style={styles.transactionDetails}>
-              <Text style={styles.transactionCategory}>{item.category}</Text>
-              <Text style={styles.transactionAmount}>
-                ₹{item.amount > 0 ? '+' : '-'} {Math.abs(item.amount).toFixed(2)}
-              </Text>
-              <Text style={styles.transactionDate}>
-                {formatTimestamp(item.date)}
-              </Text>
-            </View>
+      <View style={styles.searchBox}>
+        <Ionicons name="search-outline" size={18} color="#7d867f" />
+        <TextInput
+          placeholder="Search category or note"
+          placeholderTextColor="#8a928c"
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
 
-            <View style={styles.transactionIcons}>
-              <TouchableOpacity onPress={() => deleteTransaction(item.id)}>
-                <Ionicons name="trash-bin" size={24} color="#FF5733" />
-              </TouchableOpacity>
-            </View>
+      <View style={styles.filterRow}>
+        {filters.map((filter) => (
+          <TouchableOpacity
+            key={filter.key}
+            style={[styles.filterChip, activeFilter === filter.key && styles.activeFilterChip]}
+            onPress={() => setActiveFilter(filter.key)}
+          >
+            <Text style={[styles.filterText, activeFilter === filter.key && styles.activeFilterText]}>
+              {filter.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.resultSummary}>
+        <View style={styles.summaryPill}>
+          <Ionicons name="list-outline" size={16} color="#11342d" />
+          <Text style={styles.summaryText}>{visibleTransactions.length} shown</Text>
+        </View>
+        <View style={styles.summaryPill}>
+          <Ionicons name="arrow-down-circle-outline" size={16} color="#0f6f4e" />
+          <Text style={styles.summaryText}>{currency.format(visibleSummary.income)}</Text>
+        </View>
+        <View style={styles.summaryPill}>
+          <Ionicons name="arrow-up-circle-outline" size={16} color="#a43e22" />
+          <Text style={styles.summaryText}>{currency.format(visibleSummary.expense)}</Text>
+        </View>
+        <View style={styles.summaryPill}>
+          <Ionicons name={visibleNet >= 0 ? 'trending-up-outline' : 'trending-down-outline'} size={16} color="#11342d" />
+          <Text style={styles.summaryText}>Net {currency.format(visibleNet)}</Text>
+        </View>
+      </View>
+
+      <FlatList
+        data={visibleTransactions}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTransaction}
+        scrollEnabled={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="wallet-outline" size={40} color="#b9a889" />
+            <Text style={styles.emptyTitle}>No transactions yet</Text>
+            <Text style={styles.emptyText}>Add income or expenses to see your wallet story here.</Text>
           </View>
-        )}
+        }
       />
     </View>
   );
@@ -91,64 +271,187 @@ const TransactionList = ({ transactions, deleteTransaction }) => {
 
 const styles = StyleSheet.create({
   transactionsContainer: {
-    flex: 1,
     backgroundColor: '#ffffff',
+    borderColor: '#e5ddd1',
     borderRadius: 8,
+    borderWidth: 1,
     padding: 16,
-    marginTop: 12,
   },
   header: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
+  },
+  eyebrow: {
+    color: '#938872',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
   },
   transactionsTitle: {
-    fontSize: 24,
-    color: '#000000',
-    fontWeight: 'bold',
+    color: '#1d2528',
+    fontSize: 23,
+    fontWeight: '900',
+    marginTop: 2,
   },
   headerIcons: {
     flexDirection: 'row',
+    gap: 8,
   },
   iconButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 15,
+    backgroundColor: '#edf6e1',
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
-  iconButtonText: {
-    marginLeft: 5,
-    fontSize: 16,
-    color: '#007bff',
+  searchBox: {
+    alignItems: 'center',
+    backgroundColor: '#f7f4ef',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    color: '#1d2528',
+    flex: 1,
+    fontSize: 15,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  filterChip: {
+    alignItems: 'center',
+    backgroundColor: '#f7f4ef',
+    borderRadius: 18,
+    flex: 1,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  activeFilterChip: {
+    backgroundColor: '#11342d',
+  },
+  filterText: {
+    color: '#626b65',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  activeFilterText: {
+    color: '#ffffff',
+  },
+  resultSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 12,
+  },
+  summaryPill: {
+    alignItems: 'center',
+    backgroundColor: '#f7f4ef',
+    borderColor: '#e5ddd1',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    minHeight: 34,
+    paddingHorizontal: 10,
+  },
+  summaryText: {
+    color: '#3d4842',
+    fontSize: 12,
+    fontWeight: '900',
   },
   transactionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    paddingVertical: 8,
+    borderTopColor: '#eee7dc',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    minHeight: 74,
+    paddingVertical: 12,
+  },
+  transactionIcon: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 44,
+  },
+  incomeIcon: {
+    backgroundColor: '#e5f6df',
+  },
+  expenseIcon: {
+    backgroundColor: '#fff0e9',
   },
   transactionDetails: {
     flex: 1,
   },
+  transactionTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
   transactionCategory: {
+    color: '#1d2528',
+    flex: 1,
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#333',
+    fontWeight: '900',
   },
   transactionAmount: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  incomeAmount: {
+    color: '#0f6f4e',
+  },
+  expenseAmount: {
+    color: '#a43e22',
+  },
+  transactionNote: {
+    color: '#646e67',
+    fontSize: 13,
+    marginTop: 4,
   },
   transactionDate: {
+    color: '#959d97',
     fontSize: 12,
-    color: '#888',
+    marginTop: 4,
   },
-  transactionIcons: {
+  deleteButton: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
     marginLeft: 8,
+    width: 34,
+  },
+  emptyState: {
+    alignItems: 'center',
+    borderTopColor: '#eee7dc',
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 34,
+  },
+  emptyTitle: {
+    color: '#1d2528',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 12,
+  },
+  emptyText: {
+    color: '#7d867f',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    textAlign: 'center',
   },
 });
 

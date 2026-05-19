@@ -30,6 +30,22 @@ Run the App:
 npm start
 ```
 
+## Build Lightweight Release APK
+
+Use this magic command from the project root to build a small Android release APK:
+
+```bash
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a -Pandroid.enableProguardInReleaseBuilds=true -Pandroid.enableShrinkResourcesInReleaseBuilds=true -Pexpo.useLegacyPackaging=true
+```
+
+APK output path:
+
+```bash
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+This build keeps the APK lightweight by building only `arm64-v8a`, using Hermes, enabling Proguard/resource shrinking, disabling extra GIF/WebP support, and compressing native libraries.
+
 
 ## Contributing 👩‍💻👨‍💻
 
