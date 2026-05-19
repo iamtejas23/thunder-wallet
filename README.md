@@ -43,6 +43,13 @@ APK output path:
 ```bash
 android/app/build/outputs/apk/release/app-release.apk
 ```
+```
+git add .
+geminicommit
+git push origin master
+git tag 1.0.24
+git push origin 1.0.24
+```
 
 This build keeps the APK lightweight by building only `arm64-v8a`, using Hermes, enabling Proguard/resource shrinking, disabling extra GIF/WebP support, and compressing native libraries.
 
