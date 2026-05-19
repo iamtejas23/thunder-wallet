@@ -57,8 +57,8 @@ Release plan:
 3. Create and push a version tag:
 
 ```bash
-git tag v1.0.4
-git push origin v1.0.4
+git tag 1.0.24
+git push origin 1.0.24
 ```
 
 4. GitHub Actions runs `.github/workflows/android-release.yml`.
@@ -66,10 +66,10 @@ git push origin v1.0.4
 6. The APK is uploaded to the matching GitHub Release as:
 
 ```bash
-thunder-wallet-v1.0.4.apk
+thunder-wallet-1.0.24.apk
 ```
 
-The workflow can also be run manually from the Actions tab. Manual runs upload the APK as a workflow artifact; tag pushes publish the APK directly to GitHub Releases.
+The workflow can also be run manually from the Actions tab. To publish a manual build to GitHub Releases, enter a `release_tag` value such as `1.0.24`; without a `release_tag`, the APK is uploaded only as a workflow artifact.
 
 Note: this project currently signs release APKs with the checked-in debug keystore, which is okay for direct testing/sharing. For Play Store or production signing, add a real release keystore through GitHub Secrets and update the Gradle signing config.
 

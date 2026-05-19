@@ -3,8 +3,13 @@ name: Android Release APK
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional GitHub Release tag to publish, for example 1.0.24'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -13,10 +18,14 @@ jobs:
   build-release-apk:
     name: Build lightweight release APK
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,11 +53,25 @@ jobs:
             -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
             -Pexpo.useLegacyPackaging=true
 
+      - name: Resolve release name
+        id: release
+        run: |
+          MANUAL_TAG="${{ inputs.release_tag }}"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+          elif [[ -n "$MANUAL_TAG" ]]; then
+            RELEASE_TAG="$MANUAL_TAG"
+          else
+            RELEASE_TAG="manual-${GITHUB_RUN_NUMBER}"
+          fi
+
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=thunder-wallet-${RELEASE_TAG}.apk" >> "$GITHUB_OUTPUT"
+
       - name: Prepare APK asset
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-manual}"
           mkdir -p release
-          cp android/app/build/outputs/apk/release/app-release.apk "release/thunder-wallet-${TAG_NAME}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "release/${{ steps.release.outputs.apk_name }}"
           ls -lh release
 
       - name: Upload APK artifact
@@ -59,16 +82,25 @@ jobs:
           if-no-files-found: error
 
       - name: Publish APK to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
-          APK_PATH="release/thunder-wallet-${TAG_NAME}.apk"
+          TAG_NAME="${{ steps.release.outputs.tag }}"
+          APK_PATH="release/${{ steps.release.outputs.apk_name }}"
+
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG_NAME" "$GITHUB_SHA"
+            git push origin "$TAG_NAME"
+          fi
+
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             gh release upload "$TAG_NAME" "$APK_PATH" --clobber
           else
             gh release create "$TAG_NAME" "$APK_PATH" \
+              --target "$GITHUB_SHA" \
               --title "Thunder Wallet ${TAG_NAME}" \
               --notes "Lightweight Android release APK built automatically from ${GITHUB_SHA}."
           fi
