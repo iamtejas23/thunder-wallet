@@ -273,9 +273,14 @@ const styles = StyleSheet.create({
   transactionsContainer: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
+    elevation: 3,
     padding: 16,
+    shadowColor: '#1d2528',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
   },
   header: {
     alignItems: 'center',
@@ -303,15 +308,15 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: 'center',
     backgroundColor: '#edf6e1',
-    borderRadius: 20,
+    borderRadius: 18,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#f7f4ef',
-    borderRadius: 8,
+    backgroundColor: '#f8f6f1',
+    borderRadius: 12,
     flexDirection: 'row',
     gap: 8,
     minHeight: 46,
@@ -329,7 +334,7 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     alignItems: 'center',
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#f8f6f1',
     borderRadius: 18,
     flex: 1,
     minHeight: 36,
@@ -355,7 +360,7 @@ const styles = StyleSheet.create({
   },
   summaryPill: {
     alignItems: 'center',
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#fbfaf7',
     borderColor: '#e5ddd1',
     borderRadius: 18,
     borderWidth: 1,
@@ -379,11 +384,11 @@ const styles = StyleSheet.create({
   },
   transactionIcon: {
     alignItems: 'center',
-    borderRadius: 22,
-    height: 44,
+    borderRadius: 20,
+    height: 40,
     justifyContent: 'center',
     marginRight: 12,
-    width: 44,
+    width: 40,
   },
   incomeIcon: {
     backgroundColor: '#e5f6df',

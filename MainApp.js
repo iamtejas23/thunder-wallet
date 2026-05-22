@@ -116,13 +116,13 @@ function DashboardScreen({ wallet }) {
         </View>
 
         <View style={styles.quickDock}>
-          <TouchableOpacity style={[styles.quickButton, styles.primaryQuickButton]} onPress={() => openTransactionModal('expense')}>
-            <Ionicons name="remove-circle-outline" size={21} color="#ffffff" />
-            <Text style={styles.primaryQuickText}>Expense</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickButton} onPress={() => openTransactionModal('income')}>
+          <TouchableOpacity style={[styles.quickButton, styles.incomeQuickButton]} onPress={() => openTransactionModal('income')}>
             <Ionicons name="add-circle-outline" size={21} color="#11342d" />
             <Text style={styles.quickText}>Income</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.quickButton, styles.expenseQuickButton]} onPress={() => openTransactionModal('expense')}>
+            <Ionicons name="remove-circle-outline" size={21} color="#d9391e" />
+            <Text style={styles.expenseQuickText}>Expense</Text>
           </TouchableOpacity>
         </View>
 
@@ -719,16 +719,16 @@ function CompareBar({ label, amount, max, color }) {
 
 const styles = StyleSheet.create({
   appShell: {
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#f8f6f1',
     flex: 1,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#f8f6f1',
   },
   scrollContent: {
-    padding: 18,
-    paddingBottom: 110,
+    padding: 16,
+    paddingBottom: 104,
   },
   header: {
     alignItems: 'center',
@@ -742,14 +742,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoImage: {
-    borderRadius: 16,
-    height: 48,
-    width: 48,
+    borderRadius: 13,
+    height: 42,
+    width: 42,
   },
   greeting: {
     color: '#1d2528',
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '900',
   },
   subGreeting: {
     color: '#6f7770',
@@ -758,16 +758,23 @@ const styles = StyleSheet.create({
   },
   headerChip: {
     alignItems: 'center',
-    backgroundColor: '#d8f7a6',
-    borderRadius: 22,
-    height: 44,
+    backgroundColor: '#edf6e1',
+    borderRadius: 20,
+    height: 40,
     justifyContent: 'center',
-    width: 44,
+    width: 40,
   },
   balanceCard: {
-    backgroundColor: '#1d2528',
-    borderRadius: 8,
+    backgroundColor: '#1f6a3d',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 10,
     padding: 20,
+    shadowColor: '#0b3627',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
   },
   cardTopRow: {
     alignItems: 'center',
@@ -796,13 +803,13 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     color: '#ffffff',
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: '900',
     marginTop: 18,
   },
   metricRow: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.11)',
+    borderRadius: 12,
     flexDirection: 'row',
     marginTop: 20,
     padding: 14,
@@ -839,7 +846,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
@@ -847,12 +854,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 50,
   },
+  incomeQuickButton: {
+    backgroundColor: '#f7fbf4',
+    borderColor: '#d6e8ce',
+  },
+  expenseQuickButton: {
+    backgroundColor: '#fff9f6',
+    borderColor: '#f1d8cf',
+  },
   primaryQuickButton: {
     backgroundColor: '#11342d',
     borderColor: '#11342d',
   },
   quickText: {
     color: '#11342d',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  expenseQuickText: {
+    color: '#d9391e',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -865,7 +885,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
     width: 52,
@@ -873,9 +893,14 @@ const styles = StyleSheet.create({
   statsCard: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
+    elevation: 3,
     padding: 16,
+    shadowColor: '#1d2528',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -921,9 +946,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statTile: {
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#fcfbf8',
     borderColor: '#eee7dc',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flexBasis: '47%',
     flexGrow: 1,
@@ -947,7 +972,7 @@ const styles = StyleSheet.create({
   budgetPanel: {
     backgroundColor: '#f4fbef',
     borderColor: '#d7e9c7',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     marginTop: 12,
     padding: 12,
@@ -1046,7 +1071,7 @@ const styles = StyleSheet.create({
   forecastTile: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flex: 1,
     minHeight: 86,
@@ -1067,7 +1092,7 @@ const styles = StyleSheet.create({
   trendPanel: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     marginTop: 12,
     padding: 12,
@@ -1121,9 +1146,14 @@ const styles = StyleSheet.create({
   chartCard: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
+    elevation: 3,
     padding: 16,
+    shadowColor: '#1d2528',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
   },
   chartWrap: {
     alignItems: 'center',
@@ -1188,7 +1218,7 @@ const styles = StyleSheet.create({
   insightCard: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flexBasis: '47%',
     flexGrow: 1,
@@ -1210,7 +1240,7 @@ const styles = StyleSheet.create({
   compareCard: {
     backgroundColor: '#ffffff',
     borderColor: '#e5ddd1',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     marginTop: 12,
     padding: 16,
@@ -1267,9 +1297,16 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#ffffff',
     borderTopColor: '#e5ddd1',
-    height: 72,
-    paddingBottom: 10,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    elevation: 12,
+    height: 76,
+    paddingBottom: 12,
     paddingTop: 8,
+    shadowColor: '#1d2528',
+    shadowOffset: { height: -6, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
   },
   tabLabel: {
     fontSize: 11,

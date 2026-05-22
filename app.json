@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f7f4ef"
+      "backgroundColor": "#f8f6f1"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f7f4ef"
+        "backgroundColor": "#0d1518"
       },
       "package": "com.tejas8787.thunderwallet",
       "versionCode": 2

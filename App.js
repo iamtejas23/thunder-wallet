@@ -105,28 +105,28 @@ function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     alignItems: 'center',
-    backgroundColor: '#f7f4ef',
+    backgroundColor: '#f8f6f1',
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
   splashMarkWrap: {
     alignItems: 'center',
-    height: 172,
+    height: 150,
     justifyContent: 'center',
-    width: 172,
+    width: 150,
   },
   splashRing: {
     backgroundColor: '#d8f7a6',
-    borderRadius: 86,
-    height: 172,
+    borderRadius: 75,
+    height: 150,
     position: 'absolute',
-    width: 172,
+    width: 150,
   },
   splashLogo: {
-    borderRadius: 34,
-    height: 116,
-    width: 116,
+    borderRadius: 25,
+    height: 92,
+    width: 92,
   },
   splashTitle: {
     color: '#1d2528',
