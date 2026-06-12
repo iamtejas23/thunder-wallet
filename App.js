@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Animated, Easing, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './ThemeContext';
 import MainApp from './MainApp';
 
@@ -57,11 +58,13 @@ function App() {
   if (showSplash) return <SplashScreen />;
 
   return (
-    <ThemeProvider>
-      <NavigationContainer>
-        <MainApp />
-      </NavigationContainer>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <NavigationContainer>
+          <MainApp />
+        </NavigationContainer>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
