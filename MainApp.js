@@ -21,7 +21,29 @@ const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
 const BUDGET_KEY = 'monthlyBudget';
 const DEFAULT_MONTHLY_BUDGET = 30000;
-const chartColors = ['#83c85a', '#ffb199', '#21b7a8', '#f5c542', '#7c83fd', '#e96b4c'];
+const chartColors = ['#00C853', '#FF4757', '#64B5F6', '#FFB300', '#B388FF', '#4ECDC4'];
+
+const C = {
+  bg: '#0B0F1A',
+  card: '#131929',
+  cardInner: '#192235',
+  border: '#1E2D45',
+  text1: '#EEF2FF',
+  text2: '#8892B0',
+  text3: '#4A5570',
+  green: '#00C853',
+  greenBright: '#00E676',
+  greenBg: 'rgba(0, 200, 83, 0.12)',
+  red: '#FF4757',
+  redBg: 'rgba(255, 71, 87, 0.12)',
+  amber: '#FFB300',
+  amberBg: 'rgba(255, 179, 0, 0.12)',
+  blue: '#64B5F6',
+  blueBg: 'rgba(100, 181, 246, 0.12)',
+  purple: '#B388FF',
+  purpleBg: 'rgba(179, 136, 255, 0.12)',
+  tab: '#0D1526',
+};
 
 const currency = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -41,7 +63,6 @@ const normalizeTransaction = (transaction) => {
   const type = hasType ? transaction.type : 'expense';
   const rawAmount = Number.parseFloat(transaction.amount) || 0;
   const amount = type === 'expense' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
-
   return {
     ...transaction,
     id: String(transaction.id || Date.now()),
@@ -64,7 +85,6 @@ const describeArc = (center, radius, startAngle, endAngle) => {
   const start = polarToCartesian(center, radius, endAngle);
   const end = polarToCartesian(center, radius, startAngle);
   const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
 };
 
@@ -72,14 +92,16 @@ function AppHeader() {
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <Image source={require('./assets/logo.png')} style={styles.logoImage} />
+        <View style={styles.logoWrap}>
+          <Image source={require('./assets/logo.png')} style={styles.logoImage} />
+        </View>
         <View>
           <Text style={styles.greeting}>Thunder Wallet</Text>
           <Text style={styles.subGreeting}>Track money with clarity</Text>
         </View>
       </View>
       <View style={styles.headerChip}>
-        <Ionicons name="flash" size={15} color="#11342d" />
+        <Ionicons name="flash" size={16} color={C.green} />
       </View>
     </View>
   );
@@ -87,6 +109,7 @@ function AppHeader() {
 
 function DashboardScreen({ wallet }) {
   const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal } = wallet;
+  const healthScore = calculateHealthScore(stats, monthlyBudget);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -94,34 +117,65 @@ function DashboardScreen({ wallet }) {
         <AppHeader />
 
         <View style={styles.balanceCard}>
+          <View style={styles.balanceAccentBar} />
           <View style={styles.cardTopRow}>
             <Text style={styles.cardLabel}>Current balance</Text>
-            <View style={styles.healthBadge}>
-              <Ionicons name={stats.balance >= 0 ? 'trending-up' : 'warning'} size={14} color="#0f3d31" />
-              <Text style={styles.healthText}>{stats.balance >= 0 ? 'Healthy' : 'Needs review'}</Text>
+            <View style={[styles.healthBadge, stats.balance >= 0 ? styles.healthBadgeGood : styles.healthBadgeBad]}>
+              <Ionicons
+                name={stats.balance >= 0 ? 'trending-up' : 'warning'}
+                size={13}
+                color={stats.balance >= 0 ? C.green : C.red}
+              />
+              <Text style={[styles.healthText, stats.balance >= 0 ? styles.healthTextGood : styles.healthTextBad]}>
+                {stats.balance >= 0 ? 'Healthy' : 'Overspent'}
+              </Text>
             </View>
           </View>
           <Text style={styles.balanceAmount}>{currency.format(stats.balance)}</Text>
           <View style={styles.metricRow}>
             <View style={styles.metric}>
-              <Text style={styles.metricLabel}>Income</Text>
+              <View style={styles.metricIconRow}>
+                <View style={[styles.metricDot, { backgroundColor: C.green }]} />
+                <Text style={styles.metricLabel}>Income</Text>
+              </View>
               <Text style={styles.incomeText}>{currency.format(stats.income)}</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
-              <Text style={styles.metricLabel}>Expenses</Text>
+              <View style={styles.metricIconRow}>
+                <View style={[styles.metricDot, { backgroundColor: C.red }]} />
+                <Text style={styles.metricLabel}>Expenses</Text>
+              </View>
               <Text style={styles.expenseText}>{currency.format(stats.expense)}</Text>
             </View>
           </View>
         </View>
 
+        <View style={styles.healthScoreRow}>
+          <View style={styles.healthScoreCard}>
+            <Ionicons name="shield-checkmark" size={20} color={C.green} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.healthScoreLabel}>Financial Health Score</Text>
+              <View style={styles.healthScoreTrack}>
+                <View style={[styles.healthScoreFill, {
+                  width: `${healthScore}%`,
+                  backgroundColor: healthScore >= 70 ? C.green : healthScore >= 40 ? C.amber : C.red,
+                }]} />
+              </View>
+            </View>
+            <Text style={[styles.healthScoreValue, {
+              color: healthScore >= 70 ? C.green : healthScore >= 40 ? C.amber : C.red,
+            }]}>{healthScore}</Text>
+          </View>
+        </View>
+
         <View style={styles.quickDock}>
           <TouchableOpacity style={[styles.quickButton, styles.incomeQuickButton]} onPress={() => openTransactionModal('income')}>
-            <Ionicons name="add-circle-outline" size={21} color="#11342d" />
+            <Ionicons name="add-circle" size={20} color={C.green} />
             <Text style={styles.quickText}>Income</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.quickButton, styles.expenseQuickButton]} onPress={() => openTransactionModal('expense')}>
-            <Ionicons name="remove-circle-outline" size={21} color="#d9391e" />
+            <Ionicons name="remove-circle" size={20} color={C.red} />
             <Text style={styles.expenseQuickText}>Expense</Text>
           </TouchableOpacity>
         </View>
@@ -129,39 +183,47 @@ function DashboardScreen({ wallet }) {
         <View style={styles.statsCard}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionEyebrow}>Stats</Text>
-              <Text style={styles.sectionTitle}>Money pulse</Text>
+              <Text style={styles.sectionEyebrow}>This Month</Text>
+              <Text style={styles.sectionTitle}>Money Pulse</Text>
             </View>
             <View style={styles.statIconBubble}>
-              <Ionicons name="analytics-outline" size={21} color="#11342d" />
+              <Ionicons name="analytics" size={20} color={C.blue} />
             </View>
           </View>
 
           <View style={styles.statsGrid}>
-            <StatTile label="Month in" value={compactCurrency.format(stats.monthIncome)} />
-            <StatTile label="Month out" value={compactCurrency.format(stats.monthExpense)} tone="expense" />
-            <StatTile label="Daily spend" value={compactCurrency.format(stats.dailyAverageExpense)} />
-            <StatTile label="Savings" value={`${Math.round(stats.savingsRate)}%`} tone={stats.savingsRate < 0 ? 'expense' : 'normal'} />
+            <StatTile icon="arrow-down-circle" iconColor={C.green} label="Month In" value={compactCurrency.format(stats.monthIncome)} />
+            <StatTile icon="arrow-up-circle" iconColor={C.red} label="Month Out" value={compactCurrency.format(stats.monthExpense)} tone="expense" />
+            <StatTile icon="time" iconColor={C.blue} label="Daily Avg" value={compactCurrency.format(stats.dailyAverageExpense)} />
+            <StatTile
+              icon="trending-up"
+              iconColor={stats.savingsRate >= 0 ? C.green : C.red}
+              label="Savings Rate"
+              value={`${Math.round(stats.savingsRate)}%`}
+              tone={stats.savingsRate < 0 ? 'expense' : 'normal'}
+            />
           </View>
 
           <View style={styles.budgetPanel}>
             <View style={styles.budgetHeader}>
               <View>
-                <Text style={styles.budgetLabel}>Monthly budget</Text>
+                <Text style={styles.budgetLabel}>Monthly Budget</Text>
                 <Text style={styles.budgetAmount}>{currency.format(monthlyBudget)}</Text>
               </View>
               <View style={styles.budgetControls}>
                 <TouchableOpacity style={styles.budgetControlButton} onPress={() => adjustMonthlyBudget(-1000)}>
-                  <Ionicons name="remove" size={18} color="#11342d" />
+                  <Ionicons name="remove" size={18} color={C.text2} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.budgetControlButton} onPress={() => adjustMonthlyBudget(1000)}>
-                  <Ionicons name="add" size={18} color="#11342d" />
+                <TouchableOpacity style={[styles.budgetControlButton, styles.budgetAddButton]} onPress={() => adjustMonthlyBudget(1000)}>
+                  <Ionicons name="add" size={18} color={C.green} />
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.budgetStatus, stats.remainingBudget < 0 && styles.overBudgetStatus]}>
-                {stats.remainingBudget >= 0 ? `${currency.format(stats.remainingBudget)} left` : 'Over budget'}
-              </Text>
             </View>
+            <Text style={[styles.budgetStatus, stats.remainingBudget < 0 && styles.overBudgetStatus]}>
+              {stats.remainingBudget >= 0
+                ? `${currency.format(stats.remainingBudget)} remaining`
+                : `${currency.format(Math.abs(stats.remainingBudget))} over budget`}
+            </Text>
             <View style={styles.budgetTrack}>
               <View
                 style={[
@@ -171,9 +233,10 @@ function DashboardScreen({ wallet }) {
                 ]}
               />
             </View>
+            <Text style={styles.budgetPercent}>{Math.round(stats.budgetUsedPercent)}% used</Text>
             <View style={styles.insightRow}>
               <View style={styles.insightIcon}>
-                <Ionicons name={insight.icon} size={18} color="#11342d" />
+                <Ionicons name={insight.icon} size={18} color={C.green} />
               </View>
               <View style={styles.insightCopy}>
                 <Text style={styles.insightTitle}>{insight.title}</Text>
@@ -184,14 +247,15 @@ function DashboardScreen({ wallet }) {
         </View>
 
         <View style={styles.forecastGrid}>
-          <ForecastTile icon="calendar-outline" label="Days left" value={stats.daysLeft} />
+          <ForecastTile icon="calendar" label="Days Left" value={stats.daysLeft} iconColor={C.blue} />
           <ForecastTile
-            icon="speedometer-outline"
+            icon="speedometer"
             label="Projected"
             value={compactCurrency.format(stats.projectedExpense)}
             danger={stats.projectedExpense > monthlyBudget}
+            iconColor={stats.projectedExpense > monthlyBudget ? C.red : C.amber}
           />
-          <ForecastTile icon="wallet-outline" label="This week" value={compactCurrency.format(stats.weekSpend)} />
+          <ForecastTile icon="wallet" label="This Week" value={compactCurrency.format(stats.weekSpend)} iconColor={C.purple} />
         </View>
 
         <TrendPanel stats={stats} />
@@ -201,23 +265,39 @@ function DashboardScreen({ wallet }) {
 }
 
 function AnalyticsScreen({ wallet }) {
-  const { monthlyBudget, stats } = wallet;
+  const { monthlyBudget, stats, transactions } = wallet;
   const pieData = stats.topCategories.map((item, index) => ({
     ...item,
     color: chartColors[index % chartColors.length],
   }));
   const hasPieData = pieData.length > 0;
 
+  const monthlyBreakdown = useMemo(() => {
+    const groups = {};
+    transactions.forEach((t) => {
+      if (t.amount < 0) {
+        const d = new Date(t.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+        if (!groups[key]) groups[key] = { key, label, total: 0 };
+        groups[key].total += Math.abs(t.amount);
+      }
+    });
+    return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6);
+  }, [transactions]);
+
+  const maxMonthSpend = Math.max(...monthlyBreakdown.map((m) => m.total), 1);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ScreenTitle eyebrow="Analytics" title="Spending map" icon="pie-chart-outline" />
+        <ScreenTitle eyebrow="Analytics" title="Spending Map" icon="pie-chart" iconColor={C.purple} />
 
         <View style={styles.chartCard}>
           <View style={styles.chartWrap}>
             <DonutChart data={pieData} total={stats.expense} />
             <View style={styles.chartCenter}>
-              <Text style={styles.chartCenterLabel}>Spent</Text>
+              <Text style={styles.chartCenterLabel}>Total Spent</Text>
               <Text style={styles.chartCenterValue}>{compactCurrency.format(stats.expense)}</Text>
             </View>
           </View>
@@ -227,38 +307,52 @@ function AnalyticsScreen({ wallet }) {
                 <View key={item.category} style={styles.legendRow}>
                   <View style={[styles.legendDot, { backgroundColor: item.color }]} />
                   <Text style={styles.legendLabel} numberOfLines={1}>{item.category}</Text>
-                  <Text style={styles.legendValue}>{Math.round(item.percentage)}%</Text>
+                  <Text style={styles.legendPercent}>{Math.round(item.percentage)}%</Text>
+                  <Text style={styles.legendValue}>{compactCurrency.format(item.amount)}</Text>
                 </View>
               ))
             ) : (
               <View style={styles.emptyAnalytics}>
-                <Ionicons name="pie-chart-outline" size={34} color="#b9a889" />
-                <Text style={styles.emptyAnalyticsText}>Add expenses to draw your pie chart.</Text>
+                <Ionicons name="pie-chart-outline" size={36} color={C.text3} />
+                <Text style={styles.emptyAnalyticsText}>Add expenses to see your spending chart.</Text>
               </View>
             )}
           </View>
         </View>
 
         <View style={styles.analysisGrid}>
-          <InsightCard icon="flame-outline" label="Top category" value={stats.topCategory?.category || 'None'} />
-          <InsightCard icon="cash-outline" label="Top amount" value={stats.topCategory ? compactCurrency.format(stats.topCategory.amount) : compactCurrency.format(0)} />
-          <InsightCard icon="shield-checkmark-outline" label="Budget used" value={`${Math.round(stats.budgetUsedPercent)}%`} />
-          <InsightCard icon="trail-sign-outline" label="Runway" value={`${stats.daysLeft} days`} />
+          <InsightCard icon="flame" iconColor="#FF6B6B" label="Top Category" value={stats.topCategory?.category || 'None'} />
+          <InsightCard icon="cash" iconColor={C.green} label="Top Spend" value={stats.topCategory ? compactCurrency.format(stats.topCategory.amount) : '₹0'} />
+          <InsightCard icon="shield-checkmark" iconColor={C.blue} label="Budget Used" value={`${Math.round(stats.budgetUsedPercent)}%`} />
+          <InsightCard icon="trail-sign" iconColor={C.amber} label="Runway" value={`${stats.daysLeft} days`} />
         </View>
 
         <View style={styles.compareCard}>
-          <Text style={styles.compareTitle}>Income vs expense</Text>
-          <CompareBar label="Income" amount={stats.monthIncome} max={Math.max(stats.monthIncome, stats.monthExpense, 1)} color="#83c85a" />
-          <CompareBar label="Expense" amount={stats.monthExpense} max={Math.max(stats.monthIncome, stats.monthExpense, 1)} color="#e96b4c" />
-          <View style={styles.compareFooter}>
-            <Ionicons name={stats.projectedExpense > monthlyBudget ? 'alert-circle-outline' : 'sparkles-outline'} size={18} color="#11342d" />
+          <Text style={styles.compareTitle}>Income vs Expense</Text>
+          <CompareBar label="Income" amount={stats.monthIncome} max={Math.max(stats.monthIncome, stats.monthExpense, 1)} color={C.green} />
+          <CompareBar label="Expense" amount={stats.monthExpense} max={Math.max(stats.monthIncome, stats.monthExpense, 1)} color={C.red} />
+          <View style={[styles.compareFooter, stats.projectedExpense > monthlyBudget ? styles.compareFooterWarn : styles.compareFooterOk]}>
+            <Ionicons
+              name={stats.projectedExpense > monthlyBudget ? 'alert-circle' : 'checkmark-circle'}
+              size={18}
+              color={stats.projectedExpense > monthlyBudget ? C.amber : C.green}
+            />
             <Text style={styles.compareFooterText}>
               {stats.projectedExpense > monthlyBudget
-                ? 'Projected spend is above budget. Slow down for the rest of the month.'
-                : 'Your projected spend is inside budget right now.'}
+                ? `Projected ${compactCurrency.format(stats.projectedExpense)} — above budget. Slow down spending.`
+                : 'Projected spend is within budget. Great pace!'}
             </Text>
           </View>
         </View>
+
+        {monthlyBreakdown.length > 1 && (
+          <View style={styles.monthlyCard}>
+            <Text style={styles.compareTitle}>Monthly Spending</Text>
+            {monthlyBreakdown.map((m) => (
+              <CompareBar key={m.key} label={m.label} amount={m.total} max={maxMonthSpend} color={C.blue} />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -279,18 +373,18 @@ function ActivityScreen({ wallet }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ScreenTitle eyebrow="Activity" title="All entries" icon="receipt-outline" />
+        <ScreenTitle eyebrow="Activity" title="All Entries" icon="receipt" iconColor={C.amber} />
         <View style={styles.quickDock}>
           <TouchableOpacity style={[styles.quickButton, styles.primaryQuickButton]} onPress={() => openTransactionModal('expense')}>
-            <Ionicons name="remove-circle-outline" size={21} color="#ffffff" />
+            <Ionicons name="remove-circle" size={20} color="#ffffff" />
             <Text style={styles.primaryQuickText}>Expense</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickButton} onPress={() => openTransactionModal('income')}>
-            <Ionicons name="add-circle-outline" size={21} color="#11342d" />
+          <TouchableOpacity style={[styles.quickButton, styles.incomeQuickButton]} onPress={() => openTransactionModal('income')}>
+            <Ionicons name="add-circle" size={20} color={C.green} />
             <Text style={styles.quickText}>Income</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconQuickButton} onPress={clearTransactions}>
-            <Ionicons name="refresh-outline" size={21} color="#11342d" />
+            <Ionicons name="trash-outline" size={20} color={C.red} />
           </TouchableOpacity>
         </View>
         <TransactionList
@@ -324,22 +418,19 @@ function MainApp() {
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(BUDGET_KEY),
         ]);
-
         if (savedTransactions) {
-          const parsedTransactions = JSON.parse(savedTransactions).map(normalizeTransaction);
-          setTransactions(parsedTransactions);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsedTransactions));
+          const parsed = JSON.parse(savedTransactions).map(normalizeTransaction);
+          setTransactions(parsed);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         }
-
         const parsedBudget = Number.parseFloat(savedBudget);
         if (Number.isFinite(parsedBudget) && parsedBudget > 0) {
           setMonthlyBudget(parsedBudget);
         }
-      } catch (error) {
-        Alert.alert('Could not load wallet data', 'Please restart the app and try again.');
+      } catch {
+        Alert.alert('Load error', 'Could not load wallet data. Please restart the app.');
       }
     };
-
     loadWalletData();
   }, []);
 
@@ -358,32 +449,29 @@ function MainApp() {
     setModalVisible(true);
   };
 
-  const persistTransactions = async (nextTransactions) => {
-    setTransactions(nextTransactions);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextTransactions));
+  const persistTransactions = async (next) => {
+    setTransactions(next);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
 
   const adjustMonthlyBudget = async (delta) => {
-    const nextBudget = Math.max(1000, monthlyBudget + delta);
-    setMonthlyBudget(nextBudget);
-    await AsyncStorage.setItem(BUDGET_KEY, String(nextBudget));
+    const next = Math.max(1000, monthlyBudget + delta);
+    setMonthlyBudget(next);
+    await AsyncStorage.setItem(BUDGET_KEY, String(next));
   };
 
   const addTransaction = async () => {
     const amount = Number.parseFloat(transactionAmount);
-
     if (!transactionCategory.trim()) {
-      Alert.alert('Add a category', 'Choose a quick category or type your own.');
+      Alert.alert('Missing category', 'Choose a quick category or type your own.');
       return;
     }
-
     if (!Number.isFinite(amount) || amount <= 0) {
-      Alert.alert('Enter a valid amount', 'Amount should be greater than zero.');
+      Alert.alert('Invalid amount', 'Amount must be greater than zero.');
       return;
     }
-
     const signedAmount = transactionType === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-    const newTransaction = {
+    const newTx = {
       id: `${Date.now()}`,
       category: transactionCategory.trim(),
       amount: signedAmount,
@@ -391,41 +479,35 @@ function MainApp() {
       type: transactionType,
       date: new Date().toISOString(),
     };
-
     try {
-      await persistTransactions([newTransaction, ...transactions]);
+      await persistTransactions([newTx, ...transactions]);
       resetForm();
       setModalVisible(false);
-    } catch (error) {
-      Alert.alert('Could not save transaction', 'Please try again.');
+    } catch {
+      Alert.alert('Save error', 'Could not save transaction. Please try again.');
     }
   };
 
-  const deleteTransaction = async (transactionId) => {
-    const nextTransactions = transactions.filter((transaction) => transaction.id !== transactionId);
-
+  const deleteTransaction = async (id) => {
     try {
-      await persistTransactions(nextTransactions);
-    } catch (error) {
-      Alert.alert('Could not delete transaction', 'Please try again.');
+      await persistTransactions(transactions.filter((t) => t.id !== id));
+    } catch {
+      Alert.alert('Delete error', 'Could not delete transaction. Please try again.');
     }
   };
 
   const clearTransactions = () => {
-    if (!transactions.length) {
-      return;
-    }
-
-    Alert.alert('Clear all transactions?', 'This will remove your local wallet history.', [
+    if (!transactions.length) return;
+    Alert.alert('Clear all transactions?', 'This will permanently remove your local wallet history.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Clear',
+        text: 'Clear All',
         style: 'destructive',
         onPress: async () => {
           try {
             await persistTransactions([]);
-          } catch (error) {
-            Alert.alert('Could not clear transactions', 'Please try again.');
+          } catch {
+            Alert.alert('Clear error', 'Could not clear transactions. Please try again.');
           }
         },
       },
@@ -452,8 +534,8 @@ function MainApp() {
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarActiveTintColor: '#11342d',
-          tabBarInactiveTintColor: '#8a928c',
+          tabBarActiveTintColor: C.green,
+          tabBarInactiveTintColor: C.text3,
           tabBarLabelStyle: styles.tabLabel,
           tabBarStyle: styles.tabBar,
           tabBarIcon: ({ color, focused }) => {
@@ -504,65 +586,55 @@ function buildStats(transactions, monthlyBudget) {
   const daysElapsed = now.getDate();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const expenseCategories = {};
-  const weekDays = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(currentYear, currentMonth, now.getDate() - (6 - index));
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(currentYear, currentMonth, now.getDate() - (6 - i));
     return {
-      key: date.toISOString().slice(0, 10),
-      label: date.toLocaleDateString('en-IN', { weekday: 'short' }),
+      key: d.toISOString().slice(0, 10),
+      label: d.toLocaleDateString('en-IN', { weekday: 'short' }),
       total: 0,
     };
   });
-  const weekMap = weekDays.reduce((map, day) => {
-    map[day.key] = day;
-    return map;
-  }, {});
+  const weekMap = weekDays.reduce((m, d) => { m[d.key] = d; return m; }, {});
 
   const totals = transactions.reduce(
-    (summary, transaction) => {
-      const date = new Date(transaction.date);
-      const isThisMonth = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-      const dateKey = date.toISOString().slice(0, 10);
-
-      if (transaction.amount >= 0) {
-        summary.income += transaction.amount;
-        if (isThisMonth) {
-          summary.monthIncome += transaction.amount;
-        }
+    (s, t) => {
+      const d = new Date(t.date);
+      const isThisMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      const dateKey = d.toISOString().slice(0, 10);
+      if (t.amount >= 0) {
+        s.income += t.amount;
+        if (isThisMonth) s.monthIncome += t.amount;
       } else {
-        const expenseAmount = Math.abs(transaction.amount);
-        summary.expense += expenseAmount;
-        expenseCategories[transaction.category] = (expenseCategories[transaction.category] || 0) + expenseAmount;
-
-        if (weekMap[dateKey]) {
-          weekMap[dateKey].total += expenseAmount;
-        }
-        if (isThisMonth) {
-          summary.monthExpense += expenseAmount;
-        }
+        const abs = Math.abs(t.amount);
+        s.expense += abs;
+        expenseCategories[t.category] = (expenseCategories[t.category] || 0) + abs;
+        if (weekMap[dateKey]) weekMap[dateKey].total += abs;
+        if (isThisMonth) s.monthExpense += abs;
       }
-      return summary;
+      return s;
     },
     { income: 0, expense: 0, monthExpense: 0, monthIncome: 0 },
   );
 
   const topCategories = Object.entries(expenseCategories)
-    .sort(([, firstAmount], [, secondAmount]) => secondAmount - firstAmount)
+    .sort(([, a], [, b]) => b - a)
     .slice(0, 6)
     .map(([category, amount]) => ({
       amount,
       category,
       percentage: totals.expense ? Math.max((amount / totals.expense) * 100, 4) : 0,
     }));
+
   const projectedExpense = totals.monthExpense ? (totals.monthExpense / daysElapsed) * daysInMonth : 0;
   const remainingBudget = monthlyBudget - totals.monthExpense;
-  const weekMaxSpend = Math.max(...weekDays.map((day) => day.total), 1);
+  const weekMaxSpend = Math.max(...weekDays.map((d) => d.total), 1);
 
   return {
     ...totals,
     balance: totals.income - totals.expense,
     budgetUsedPercent: Math.min((totals.monthExpense / monthlyBudget) * 100, 100),
     count: transactions.length,
-    dailyAverageExpense: totals.monthExpense / daysElapsed,
+    dailyAverageExpense: totals.monthExpense / Math.max(daysElapsed, 1),
     dailyBudgetLeft: Math.max(remainingBudget, 0) / Math.max(daysInMonth - daysElapsed + 1, 1),
     daysLeft: Math.max(daysInMonth - daysElapsed + 1, 1),
     projectedExpense,
@@ -572,19 +644,18 @@ function buildStats(transactions, monthlyBudget) {
     topCategory: topCategories[0],
     weekDays,
     weekMaxSpend,
-    weekSpend: weekDays.reduce((sum, day) => sum + day.total, 0),
+    weekSpend: weekDays.reduce((s, d) => s + d.total, 0),
   };
 }
 
-function buildInsight(stats, monthlyBudget, transactionCount) {
-  if (!transactionCount) {
+function buildInsight(stats, monthlyBudget, count) {
+  if (!count) {
     return {
       icon: 'sparkles-outline',
       title: 'Ready for your first entry',
       body: 'Add income and expenses to unlock budget guidance.',
     };
   }
-
   if (stats.projectedExpense > monthlyBudget) {
     return {
       icon: 'alert-circle-outline',
@@ -592,35 +663,47 @@ function buildInsight(stats, monthlyBudget, transactionCount) {
       body: `Projected spend is ${currency.format(stats.projectedExpense)} this month.`,
     };
   }
-
   if (stats.savingsRate >= 25) {
     return {
       icon: 'shield-checkmark-outline',
       title: 'Strong savings pace',
-      body: `You are saving about ${Math.round(stats.savingsRate)}% of this month's income.`,
+      body: `Saving ${Math.round(stats.savingsRate)}% of this month's income.`,
     };
   }
-
   return {
     icon: 'flash-outline',
     title: 'Daily room left',
-    body: `${currency.format(stats.dailyBudgetLeft)} can be spent per day to stay near budget.`,
+    body: `${currency.format(stats.dailyBudgetLeft)} per day to stay on budget.`,
   };
 }
 
-function StatTile({ label, value, tone = 'normal' }) {
+function calculateHealthScore(stats, monthlyBudget) {
+  let score = 40;
+  score += Math.min(Math.max(stats.savingsRate, 0), 30);
+  if (stats.budgetUsedPercent <= 100) score += Math.max(0, 20 - stats.budgetUsedPercent / 10);
+  if (stats.count > 0) score += 5;
+  if (stats.balance > 0) score += 5;
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+function StatTile({ icon, iconColor, label, value, tone = 'normal' }) {
   return (
     <View style={styles.statTile}>
+      <View style={[styles.statTileIcon, { backgroundColor: `${iconColor}18` }]}>
+        <Ionicons name={icon} size={16} color={iconColor} />
+      </View>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={[styles.statValue, tone === 'expense' && styles.statExpense]}>{value}</Text>
     </View>
   );
 }
 
-function ForecastTile({ icon, label, value, danger }) {
+function ForecastTile({ icon, iconColor, label, value, danger }) {
   return (
     <View style={styles.forecastTile}>
-      <Ionicons name={icon} size={18} color="#11342d" />
+      <View style={[styles.forecastIcon, { backgroundColor: `${iconColor}18` }]}>
+        <Ionicons name={icon} size={16} color={iconColor} />
+      </View>
       <Text style={styles.forecastLabel}>{label}</Text>
       <Text style={[styles.forecastValue, danger && styles.statExpense]}>{value}</Text>
     </View>
@@ -631,7 +714,10 @@ function TrendPanel({ stats }) {
   return (
     <View style={styles.trendPanel}>
       <View style={styles.trendHeader}>
-        <Text style={styles.trendTitle}>7-day spend</Text>
+        <View style={styles.trendTitleRow}>
+          <Ionicons name="bar-chart" size={16} color={C.blue} />
+          <Text style={styles.trendTitle}>7-day Spending</Text>
+        </View>
         <Text style={styles.trendAmount}>{compactCurrency.format(stats.weekSpend)}</Text>
       </View>
       <View style={styles.trendBars}>
@@ -641,7 +727,7 @@ function TrendPanel({ stats }) {
               <View
                 style={[
                   styles.trendBarFill,
-                  { height: `${Math.max((day.total / stats.weekMaxSpend) * 100, day.total ? 14 : 4)}%` },
+                  { height: `${Math.max((day.total / stats.weekMaxSpend) * 100, day.total ? 12 : 3)}%` },
                 ]}
               />
             </View>
@@ -657,46 +743,46 @@ function DonutChart({ data, total }) {
   const center = 95;
   const radius = 66;
   let startAngle = 0;
-
   if (!data.length || total <= 0) {
     return (
       <Svg width={190} height={190}>
-        <Circle cx={center} cy={center} r={radius} stroke="#edf1ec" strokeWidth={34} fill="none" />
+        <Circle cx={center} cy={center} r={radius} stroke={C.border} strokeWidth={30} fill="none" />
       </Svg>
     );
   }
-
   return (
     <Svg width={190} height={190}>
-      <Circle cx={center} cy={center} r={radius} stroke="#edf1ec" strokeWidth={34} fill="none" />
+      <Circle cx={center} cy={center} r={radius} stroke={C.border} strokeWidth={30} fill="none" />
       {data.map((item) => {
         const endAngle = startAngle + (item.amount / total) * 360;
         const path = describeArc(center, radius, startAngle, Math.min(endAngle, 359.99));
         startAngle = endAngle;
-        return <Path key={item.category} d={path} stroke={item.color} strokeWidth={34} strokeLinecap="butt" fill="none" />;
+        return <Path key={item.category} d={path} stroke={item.color} strokeWidth={30} strokeLinecap="butt" fill="none" />;
       })}
     </Svg>
   );
 }
 
-function ScreenTitle({ eyebrow, title, icon }) {
+function ScreenTitle({ eyebrow, title, icon, iconColor }) {
   return (
     <View style={styles.screenTitleRow}>
       <View>
         <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
         <Text style={styles.screenTitle}>{title}</Text>
       </View>
-      <View style={styles.statIconBubble}>
-        <Ionicons name={icon} size={21} color="#11342d" />
+      <View style={[styles.statIconBubble, { backgroundColor: `${iconColor}18` }]}>
+        <Ionicons name={icon} size={21} color={iconColor} />
       </View>
     </View>
   );
 }
 
-function InsightCard({ icon, label, value }) {
+function InsightCard({ icon, iconColor, label, value }) {
   return (
     <View style={styles.insightCard}>
-      <Ionicons name={icon} size={20} color="#11342d" />
+      <View style={[styles.insightCardIcon, { backgroundColor: `${iconColor}18` }]}>
+        <Ionicons name={icon} size={18} color={iconColor} />
+      </View>
       <Text style={styles.insightCardLabel}>{label}</Text>
       <Text style={styles.insightCardValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -711,7 +797,7 @@ function CompareBar({ label, amount, max, color }) {
         <Text style={styles.compareAmount}>{compactCurrency.format(amount)}</Text>
       </View>
       <View style={styles.compareTrack}>
-        <View style={[styles.compareFill, { backgroundColor: color, width: `${Math.max((amount / max) * 100, amount ? 8 : 0)}%` }]} />
+        <View style={[styles.compareFill, { backgroundColor: color, width: `${Math.max((amount / max) * 100, amount ? 6 : 0)}%` }]} />
       </View>
     </View>
   );
@@ -719,123 +805,208 @@ function CompareBar({ label, amount, max, color }) {
 
 const styles = StyleSheet.create({
   appShell: {
-    backgroundColor: '#f8f6f1',
+    backgroundColor: C.bg,
     flex: 1,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f6f1',
+    backgroundColor: C.bg,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 104,
+    paddingBottom: 110,
   },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   brandRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
+  },
+  logoWrap: {
+    backgroundColor: C.cardInner,
+    borderRadius: 14,
+    padding: 2,
   },
   logoImage: {
-    borderRadius: 13,
+    borderRadius: 12,
     height: 42,
     width: 42,
   },
   greeting: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 20,
     fontWeight: '900',
   },
   subGreeting: {
-    color: '#6f7770',
-    fontSize: 13,
+    color: C.text2,
+    fontSize: 12,
     marginTop: 2,
   },
   headerChip: {
     alignItems: 'center',
-    backgroundColor: '#edf6e1',
+    backgroundColor: C.greenBg,
+    borderColor: `${C.green}30`,
     borderRadius: 20,
+    borderWidth: 1,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   balanceCard: {
-    backgroundColor: '#1f6a3d',
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 16,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 20,
     borderWidth: 1,
     elevation: 10,
+    overflow: 'hidden',
     padding: 20,
-    shadowColor: '#0b3627',
+    shadowColor: '#000',
     shadowOffset: { height: 10, width: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+  },
+  balanceAccentBar: {
+    backgroundColor: C.green,
+    borderRadius: 2,
+    height: 3,
+    left: 20,
+    position: 'absolute',
+    right: 20,
+    top: 0,
   },
   cardTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 6,
   },
   cardLabel: {
-    color: '#dfe7df',
-    fontSize: 13,
+    color: C.text2,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   healthBadge: {
     alignItems: 'center',
-    backgroundColor: '#d8f7a6',
     borderRadius: 18,
     flexDirection: 'row',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+  },
+  healthBadgeGood: {
+    backgroundColor: C.greenBg,
+    borderColor: `${C.green}30`,
+    borderWidth: 1,
+  },
+  healthBadgeBad: {
+    backgroundColor: C.redBg,
+    borderColor: `${C.red}30`,
+    borderWidth: 1,
   },
   healthText: {
-    color: '#0f3d31',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
+  healthTextGood: {
+    color: C.green,
+  },
+  healthTextBad: {
+    color: C.red,
+  },
   balanceAmount: {
-    color: '#ffffff',
-    fontSize: 36,
+    color: C.text1,
+    fontSize: 38,
     fontWeight: '900',
-    marginTop: 18,
+    marginTop: 16,
+    letterSpacing: -0.5,
   },
   metricRow: {
-    backgroundColor: 'rgba(255, 255, 255, 0.11)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: C.border,
+    borderRadius: 14,
+    borderWidth: 1,
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: 18,
     padding: 14,
   },
   metric: {
     flex: 1,
   },
+  metricIconRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  metricDot: {
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
   metricDivider: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    marginHorizontal: 12,
+    backgroundColor: C.border,
+    marginHorizontal: 14,
     width: 1,
   },
   metricLabel: {
-    color: '#c1cac1',
-    fontSize: 12,
-    marginBottom: 5,
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   incomeText: {
-    color: '#d8f7a6',
+    color: C.greenBright,
     fontSize: 17,
     fontWeight: '800',
   },
   expenseText: {
-    color: '#ffb199',
+    color: C.red,
     fontSize: 17,
     fontWeight: '800',
+  },
+  healthScoreRow: {
+    marginTop: 12,
+  },
+  healthScoreCard: {
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 14,
+    gap: 2,
+  },
+  healthScoreLabel: {
+    color: C.text2,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  healthScoreTrack: {
+    backgroundColor: C.cardInner,
+    borderRadius: 4,
+    height: 6,
+    overflow: 'hidden',
+  },
+  healthScoreFill: {
+    borderRadius: 4,
+    height: 6,
+  },
+  healthScoreValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    marginLeft: 10,
+    minWidth: 38,
+    textAlign: 'right',
   },
   quickDock: {
     flexDirection: 'row',
@@ -844,78 +1015,79 @@ const styles = StyleSheet.create({
   },
   quickButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 12,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 14,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 7,
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 52,
   },
   incomeQuickButton: {
-    backgroundColor: '#f7fbf4',
-    borderColor: '#d6e8ce',
+    backgroundColor: C.greenBg,
+    borderColor: `${C.green}30`,
   },
   expenseQuickButton: {
-    backgroundColor: '#fff9f6',
-    borderColor: '#f1d8cf',
+    backgroundColor: C.redBg,
+    borderColor: `${C.red}30`,
   },
   primaryQuickButton: {
-    backgroundColor: '#11342d',
-    borderColor: '#11342d',
+    backgroundColor: C.green,
+    borderColor: C.green,
   },
   quickText: {
-    color: '#11342d',
+    color: C.green,
     fontSize: 14,
     fontWeight: '900',
   },
   expenseQuickText: {
-    color: '#d9391e',
+    color: C.red,
     fontSize: 14,
     fontWeight: '900',
   },
   primaryQuickText: {
-    color: '#ffffff',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '900',
   },
   iconQuickButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 12,
+    backgroundColor: C.redBg,
+    borderColor: `${C.red}30`,
+    borderRadius: 14,
     borderWidth: 1,
     justifyContent: 'center',
     width: 52,
   },
   statsCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 14,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 18,
     borderWidth: 1,
-    elevation: 3,
+    elevation: 4,
     padding: 16,
-    shadowColor: '#1d2528',
-    shadowOffset: { height: 5, width: 0 },
-    shadowOpacity: 0.06,
+    shadowColor: '#000',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.2,
     shadowRadius: 14,
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sectionEyebrow: {
-    color: '#938872',
-    fontSize: 12,
+    color: C.text3,
+    fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   sectionTitle: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 22,
     fontWeight: '900',
     marginTop: 2,
@@ -924,21 +1096,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   screenTitle: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 28,
     fontWeight: '900',
     marginTop: 2,
   },
   statIconBubble: {
     alignItems: 'center',
-    backgroundColor: '#edf6e1',
+    backgroundColor: C.cardInner,
     borderRadius: 20,
-    height: 40,
+    height: 42,
     justifyContent: 'center',
-    width: 40,
+    width: 42,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -946,51 +1118,62 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statTile: {
-    backgroundColor: '#fcfbf8',
-    borderColor: '#eee7dc',
-    borderRadius: 12,
+    backgroundColor: C.cardInner,
+    borderColor: C.border,
+    borderRadius: 14,
     borderWidth: 1,
     flexBasis: '47%',
     flexGrow: 1,
-    minHeight: 82,
+    minHeight: 88,
     padding: 12,
   },
-  statLabel: {
-    color: '#6f7770',
-    fontSize: 12,
-    fontWeight: '800',
+  statTileIcon: {
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 30,
+    justifyContent: 'center',
     marginBottom: 8,
+    width: 30,
+  },
+  statLabel: {
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statValue: {
-    color: '#11342d',
-    fontSize: 21,
+    color: C.text1,
+    fontSize: 20,
     fontWeight: '900',
   },
   statExpense: {
-    color: '#a43e22',
+    color: C.red,
   },
   budgetPanel: {
-    backgroundColor: '#f4fbef',
-    borderColor: '#d7e9c7',
-    borderRadius: 12,
+    backgroundColor: C.cardInner,
+    borderColor: C.border,
+    borderRadius: 14,
     borderWidth: 1,
-    marginTop: 12,
-    padding: 12,
+    marginTop: 14,
+    padding: 14,
   },
   budgetHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
   },
   budgetLabel: {
-    color: '#617064',
-    fontSize: 12,
-    fontWeight: '800',
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   budgetAmount: {
-    color: '#11342d',
+    color: C.text1,
     fontSize: 22,
     fontWeight: '900',
     marginTop: 2,
@@ -1002,48 +1185,62 @@ const styles = StyleSheet.create({
   },
   budgetControlButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#d7e9c7',
+    backgroundColor: C.card,
+    borderColor: C.border,
     borderRadius: 18,
     borderWidth: 1,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
+  budgetAddButton: {
+    borderColor: `${C.green}40`,
+  },
   budgetStatus: {
-    color: '#0f6f4e',
-    flexBasis: '100%',
+    color: C.green,
     fontSize: 13,
-    fontWeight: '900',
-    marginTop: -2,
+    fontWeight: '800',
+    marginTop: 10,
   },
   overBudgetStatus: {
-    color: '#a43e22',
+    color: C.red,
   },
   budgetTrack: {
-    backgroundColor: '#dfeadb',
+    backgroundColor: C.card,
     borderRadius: 6,
-    height: 12,
-    marginTop: 12,
+    height: 10,
+    marginTop: 8,
     overflow: 'hidden',
   },
   budgetFill: {
-    backgroundColor: '#83c85a',
+    backgroundColor: C.green,
     borderRadius: 6,
-    height: 12,
+    height: 10,
   },
   overBudgetFill: {
-    backgroundColor: '#e96b4c',
+    backgroundColor: C.red,
+  },
+  budgetPercent: {
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 5,
+    textAlign: 'right',
   },
   insightRow: {
     alignItems: 'center',
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 12,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
     marginTop: 12,
+    padding: 12,
   },
   insightIcon: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: C.greenBg,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
@@ -1053,13 +1250,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   insightTitle: {
-    color: '#1d2528',
-    fontSize: 14,
-    fontWeight: '900',
+    color: C.text1,
+    fontSize: 13,
+    fontWeight: '800',
   },
   insightBody: {
-    color: '#617064',
-    fontSize: 13,
+    color: C.text2,
+    fontSize: 12,
     lineHeight: 18,
     marginTop: 2,
   },
@@ -1069,48 +1266,62 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   forecastTile: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 86,
-    padding: 10,
-  },
-  forecastLabel: {
-    color: '#6f7770',
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 8,
-  },
-  forecastValue: {
-    color: '#11342d',
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  trendPanel: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
+    backgroundColor: C.card,
+    borderColor: C.border,
     borderRadius: 14,
     borderWidth: 1,
-    marginTop: 12,
+    flex: 1,
+    minHeight: 90,
     padding: 12,
+  },
+  forecastIcon: {
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 28,
+    justifyContent: 'center',
+    marginBottom: 8,
+    width: 28,
+  },
+  forecastLabel: {
+    color: C.text2,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  forecastValue: {
+    color: C.text1,
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  trendPanel: {
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 16,
   },
   trendHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
+  },
+  trendTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   trendTitle: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 15,
     fontWeight: '900',
   },
   trendAmount: {
-    color: '#617064',
-    fontSize: 13,
+    color: C.blue,
+    fontSize: 14,
     fontWeight: '900',
   },
   trendBars: {
@@ -1125,7 +1336,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   trendBarTrack: {
-    backgroundColor: '#edf1ec',
+    backgroundColor: C.cardInner,
     borderRadius: 6,
     flex: 1,
     justifyContent: 'flex-end',
@@ -1133,26 +1344,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   trendBarFill: {
-    backgroundColor: '#83c85a',
+    backgroundColor: C.green,
     borderRadius: 6,
-    minHeight: 4,
+    minHeight: 3,
     width: '100%',
   },
   trendBarLabel: {
-    color: '#7d867f',
+    color: C.text2,
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   chartCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 14,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 18,
     borderWidth: 1,
-    elevation: 3,
+    elevation: 4,
     padding: 16,
-    shadowColor: '#1d2528',
-    shadowOffset: { height: 5, width: 0 },
-    shadowOpacity: 0.06,
+    shadowColor: '#000',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.2,
     shadowRadius: 14,
   },
   chartWrap: {
@@ -1164,50 +1375,62 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   chartCenterLabel: {
-    color: '#7d867f',
-    fontSize: 12,
-    fontWeight: '900',
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   chartCenterValue: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 20,
     fontWeight: '900',
     marginTop: 2,
   },
   legendList: {
     gap: 10,
-    marginTop: 14,
+    marginTop: 16,
   },
   legendRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   legendDot: {
     borderRadius: 6,
-    height: 12,
-    width: 12,
+    height: 10,
+    width: 10,
   },
   legendLabel: {
-    color: '#39443e',
+    color: C.text1,
     flex: 1,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
+  },
+  legendPercent: {
+    color: C.text2,
+    fontSize: 12,
+    fontWeight: '700',
+    minWidth: 34,
+    textAlign: 'right',
   },
   legendValue: {
-    color: '#617064',
+    color: C.text1,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
+    minWidth: 54,
+    textAlign: 'right',
   },
   emptyAnalytics: {
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 24,
   },
   emptyAnalyticsText: {
-    color: '#7d867f',
+    color: C.text2,
     fontSize: 14,
-    fontWeight: '800',
-    marginTop: 8,
+    fontWeight: '600',
+    marginTop: 10,
+    textAlign: 'center',
   },
   analysisGrid: {
     flexDirection: 'row',
@@ -1216,43 +1439,60 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   insightCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 12,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 14,
     borderWidth: 1,
     flexBasis: '47%',
     flexGrow: 1,
-    minHeight: 104,
-    padding: 12,
+    minHeight: 108,
+    padding: 14,
+  },
+  insightCardIcon: {
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 32,
+    justifyContent: 'center',
+    marginBottom: 8,
+    width: 32,
   },
   insightCardLabel: {
-    color: '#6f7770',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 10,
+    color: C.text2,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   insightCardValue: {
-    color: '#11342d',
-    fontSize: 18,
+    color: C.text1,
+    fontSize: 17,
     fontWeight: '900',
-    marginTop: 3,
   },
   compareCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5ddd1',
-    borderRadius: 14,
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 16,
+  },
+  monthlyCard: {
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderRadius: 18,
     borderWidth: 1,
     marginTop: 12,
     padding: 16,
   },
   compareTitle: {
-    color: '#1d2528',
-    fontSize: 18,
+    color: C.text1,
+    fontSize: 17,
     fontWeight: '900',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   compareRow: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   compareLabelRow: {
     flexDirection: 'row',
@@ -1260,67 +1500,79 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   compareLabel: {
-    color: '#617064',
+    color: C.text2,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   compareAmount: {
-    color: '#1d2528',
+    color: C.text1,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   compareTrack: {
-    backgroundColor: '#edf1ec',
+    backgroundColor: C.cardInner,
     borderRadius: 6,
-    height: 12,
+    height: 10,
     overflow: 'hidden',
   },
   compareFill: {
     borderRadius: 6,
-    height: 12,
+    height: 10,
   },
   compareFooter: {
     alignItems: 'center',
-    backgroundColor: '#f4fbef',
-    borderRadius: 8,
+    borderRadius: 10,
     flexDirection: 'row',
-    gap: 9,
-    padding: 10,
+    gap: 10,
+    padding: 12,
+    marginTop: 4,
+  },
+  compareFooterOk: {
+    backgroundColor: C.greenBg,
+    borderColor: `${C.green}25`,
+    borderWidth: 1,
+  },
+  compareFooterWarn: {
+    backgroundColor: C.amberBg,
+    borderColor: `${C.amber}25`,
+    borderWidth: 1,
   },
   compareFooterText: {
-    color: '#617064',
+    color: C.text2,
     flex: 1,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 18,
   },
   tabBar: {
-    backgroundColor: '#ffffff',
-    borderTopColor: '#e5ddd1',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    elevation: 12,
+    backgroundColor: C.tab,
+    borderTopColor: C.border,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    elevation: 14,
     height: 76,
     paddingBottom: 12,
     paddingTop: 8,
-    shadowColor: '#1d2528',
+    shadowColor: '#000',
     shadowOffset: { height: -6, width: 0 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 18,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   tabIconWrap: {
     alignItems: 'center',
     borderRadius: 18,
     height: 34,
     justifyContent: 'center',
-    width: 42,
+    width: 44,
   },
   activeTabIconWrap: {
-    backgroundColor: '#edf6e1',
+    backgroundColor: C.greenBg,
   },
 });
 

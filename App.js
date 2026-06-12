@@ -3,83 +3,60 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import MainApp from './MainApp';
 
-const MIN_SPLASH_MS = 5000;
+const MIN_SPLASH_MS = 3000;
 
 function SplashScreen() {
   const pulse = React.useRef(new Animated.Value(0)).current;
+  const fadeIn = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    const animation = Animated.loop(
+    Animated.timing(fadeIn, {
+      toValue: 1,
+      duration: 700,
+      useNativeDriver: true,
+    }).start();
+
+    const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.quad),
+          duration: 1600,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulse, {
           toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.quad),
+          duration: 1600,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ]),
     );
+    anim.start();
+    return () => anim.stop();
+  }, [pulse, fadeIn]);
 
-    animation.start();
-    return () => animation.stop();
-  }, [pulse]);
-
-  const logoScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.06],
-  });
-  const ringScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.88, 1.22],
-  });
-  const ringOpacity = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.32, 0.08],
-  });
+  const logoScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.09] });
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.32] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.0] });
+  const progressWidth = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.08, 1] });
 
   return (
-    <View style={styles.splashContainer}>
+    <Animated.View style={[styles.splashContainer, { opacity: fadeIn }]}>
       <View style={styles.splashMarkWrap}>
-        <Animated.View
-          style={[
-            styles.splashRing,
-            {
-              opacity: ringOpacity,
-              transform: [{ scale: ringScale }],
-            },
-          ]}
-        />
+        <Animated.View style={[styles.splashRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
+        <Animated.View style={styles.splashRingInner} />
         <Animated.Image
           source={require('./assets/logo.png')}
           style={[styles.splashLogo, { transform: [{ scale: logoScale }] }]}
         />
       </View>
       <Text style={styles.splashTitle}>Thunder Wallet</Text>
-      <Text style={styles.splashSubtitle}>Loading your money dashboard</Text>
+      <Text style={styles.splashSubtitle}>Smart money tracking</Text>
       <View style={styles.progressTrack}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              transform: [
-                {
-                  scaleX: pulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.38, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
+        <Animated.View style={[styles.progressFill, { transform: [{ scaleX: progressWidth }] }]} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -91,9 +68,7 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (showSplash) {
-    return <SplashScreen />;
-  }
+  if (showSplash) return <SplashScreen />;
 
   return (
     <NavigationContainer>
@@ -105,56 +80,64 @@ function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     alignItems: 'center',
-    backgroundColor: '#f8f6f1',
+    backgroundColor: '#0B0F1A',
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 32,
   },
   splashMarkWrap: {
     alignItems: 'center',
-    height: 150,
+    height: 160,
     justifyContent: 'center',
-    width: 150,
+    width: 160,
   },
   splashRing: {
-    backgroundColor: '#d8f7a6',
-    borderRadius: 75,
-    height: 150,
+    backgroundColor: 'rgba(0, 200, 83, 0.22)',
+    borderRadius: 80,
+    height: 160,
     position: 'absolute',
-    width: 150,
+    width: 160,
+  },
+  splashRingInner: {
+    backgroundColor: 'rgba(0, 200, 83, 0.08)',
+    borderRadius: 60,
+    height: 120,
+    position: 'absolute',
+    width: 120,
   },
   splashLogo: {
-    borderRadius: 25,
-    height: 92,
-    width: 92,
+    borderRadius: 28,
+    height: 100,
+    width: 100,
   },
   splashTitle: {
-    color: '#1d2528',
-    fontSize: 32,
+    color: '#EEF2FF',
+    fontSize: 36,
     fontWeight: '900',
-    marginTop: 22,
+    letterSpacing: 0.5,
+    marginTop: 28,
     textAlign: 'center',
   },
   splashSubtitle: {
-    color: '#626b65',
+    color: '#8892B0',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     marginTop: 8,
     textAlign: 'center',
   },
   progressTrack: {
-    backgroundColor: '#e5ddd1',
-    borderRadius: 6,
-    height: 6,
-    marginTop: 30,
+    backgroundColor: '#1E2D45',
+    borderRadius: 4,
+    height: 4,
+    marginTop: 44,
     overflow: 'hidden',
-    width: 168,
+    width: 180,
   },
   progressFill: {
-    backgroundColor: '#11342d',
-    borderRadius: 6,
-    height: 6,
-    width: 168,
+    backgroundColor: '#00C853',
+    borderRadius: 4,
+    height: 4,
+    width: 180,
   },
 });
 
