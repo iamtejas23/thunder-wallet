@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { ThemeProvider } from './ThemeContext';
 import MainApp from './MainApp';
 
 const MIN_SPLASH_MS = 3000;
@@ -10,26 +11,11 @@ function SplashScreen() {
   const fadeIn = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    Animated.timing(fadeIn, {
-      toValue: 1,
-      duration: 700,
-      useNativeDriver: true,
-    }).start();
-
+    Animated.timing(fadeIn, { toValue: 1, duration: 700, useNativeDriver: true }).start();
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulse, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ]),
     );
     anim.start();
@@ -38,14 +24,14 @@ function SplashScreen() {
 
   const logoScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.09] });
   const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.32] });
-  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.0] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.0] });
   const progressWidth = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.08, 1] });
 
   return (
     <Animated.View style={[styles.splashContainer, { opacity: fadeIn }]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <View style={styles.splashMarkWrap}>
         <Animated.View style={[styles.splashRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
-        <Animated.View style={styles.splashRingInner} />
         <Animated.Image
           source={require('./assets/logo.png')}
           style={[styles.splashLogo, { transform: [{ scale: logoScale }] }]}
@@ -71,16 +57,18 @@ function App() {
   if (showSplash) return <SplashScreen />;
 
   return (
-    <NavigationContainer>
-      <MainApp />
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <MainApp />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
   splashContainer: {
     alignItems: 'center',
-    backgroundColor: '#0B0F1A',
+    backgroundColor: '#0A0E1A',
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -92,18 +80,11 @@ const styles = StyleSheet.create({
     width: 160,
   },
   splashRing: {
-    backgroundColor: 'rgba(0, 200, 83, 0.22)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 80,
     height: 160,
     position: 'absolute',
     width: 160,
-  },
-  splashRingInner: {
-    backgroundColor: 'rgba(0, 200, 83, 0.08)',
-    borderRadius: 60,
-    height: 120,
-    position: 'absolute',
-    width: 120,
   },
   splashLogo: {
     borderRadius: 28,
@@ -111,7 +92,7 @@ const styles = StyleSheet.create({
     width: 100,
   },
   splashTitle: {
-    color: '#EEF2FF',
+    color: '#F9FAFB',
     fontSize: 36,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -119,24 +100,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   splashSubtitle: {
-    color: '#8892B0',
+    color: 'rgba(249,250,251,0.5)',
     fontSize: 15,
     fontWeight: '600',
     marginTop: 8,
     textAlign: 'center',
   },
   progressTrack: {
-    backgroundColor: '#1E2D45',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 4,
-    height: 4,
+    height: 3,
     marginTop: 44,
     overflow: 'hidden',
     width: 180,
   },
   progressFill: {
-    backgroundColor: '#00C853',
+    backgroundColor: '#FFFFFF',
     borderRadius: 4,
-    height: 4,
+    height: 3,
     width: 180,
   },
 });
