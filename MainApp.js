@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -17,17 +18,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
 import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
+import { scheduleDailyReview } from './NotificationService';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
 const BUDGET_KEY = 'monthlyBudget';
 const GOALS_KEY = 'savingsGoals';
+const CAT_BUDGETS_KEY = 'categoryBudgets';
 const DEFAULT_MONTHLY_BUDGET = 30000;
 const CHART_COLORS = ['#F87171', '#60A5FA', '#FCD34D', '#34D399', '#A78BFA', '#FB923C'];
 
@@ -52,7 +56,15 @@ const normalizeTransaction = (t) => {
   const type = hasType ? t.type : 'expense';
   const raw = Number.parseFloat(t.amount) || 0;
   const amount = type === 'expense' ? -Math.abs(raw) : Math.abs(raw);
-  return { ...t, id: String(t.id || Date.now()), amount, type, date: t.date || new Date().toISOString(), note: t.note || '' };
+  return {
+    ...t,
+    id: String(t.id || Date.now()),
+    amount,
+    type,
+    date: t.date || new Date().toISOString(),
+    note: t.note || '',
+    recurring: t.recurring || null,
+  };
 };
 
 const polarToCartesian = (c, r, deg) => {
@@ -67,7 +79,7 @@ const describeArc = (c, r, s, e) => {
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${flag} 0 ${end.x} ${end.y}`;
 };
 
-// ─── Streak Calculation ───────────────────────────────────────────────────────
+// ─── Streak ───────────────────────────────────────────────────────────────────
 function calculateStreak(transactions, monthlyBudget) {
   const now = new Date();
   const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -88,59 +100,143 @@ function calculateStreak(transactions, monthlyBudget) {
 
 // ─── Smart Insights ───────────────────────────────────────────────────────────
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
 function generateSmartInsights(transactions) {
   if (!transactions.length) return [];
-  const insights = [];
   const expenses = transactions.filter((t) => t.amount < 0);
   if (!expenses.length) return [];
+  const insights = [];
 
-  // Peak spending day
   const dowSpend = {};
-  expenses.forEach((t) => {
-    const dow = new Date(t.date).getDay();
-    dowSpend[dow] = (dowSpend[dow] || 0) + Math.abs(t.amount);
-  });
+  expenses.forEach((t) => { const dow = new Date(t.date).getDay(); dowSpend[dow] = (dowSpend[dow] || 0) + Math.abs(t.amount); });
   const [peakDow] = Object.entries(dowSpend).sort(([, a], [, b]) => b - a);
-  if (peakDow) {
-    insights.push({
-      icon: 'calendar',
-      color: '#60A5FA',
-      title: 'Peak Spending Day',
-      body: `${DAY_NAMES[+peakDow[0]]}s are your biggest spending days. Plan ahead!`,
-    });
-  }
+  if (peakDow) insights.push({ icon: 'calendar', color: '#60A5FA', title: 'Peak Spending Day', body: `${DAY_NAMES[+peakDow[0]]}s are your biggest spending days. Plan ahead!` });
 
-  // Weekend vs weekday
   const wEnd = expenses.filter((t) => [0, 6].includes(new Date(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
   const wDay = expenses.filter((t) => ![0, 6].includes(new Date(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
-  if (wEnd > wDay * 0.6) {
-    insights.push({ icon: 'sunny', color: '#FB923C', title: 'Weekend Spender', body: 'You spend more on weekends. Consider setting a weekend limit.' });
-  } else if (expenses.length > 5) {
-    insights.push({ icon: 'briefcase', color: '#A78BFA', title: 'Disciplined Weekends', body: 'Great job — your weekend spending stays controlled.' });
-  }
+  if (wEnd > wDay * 0.6) insights.push({ icon: 'sunny', color: '#FB923C', title: 'Weekend Spender', body: 'You spend more on weekends. Consider setting a weekend limit.' });
+  else if (expenses.length > 5) insights.push({ icon: 'briefcase', color: '#A78BFA', title: 'Disciplined Weekends', body: 'Great job — your weekend spending stays controlled.' });
 
-  // Average transaction
   if (expenses.length >= 3) {
     const avg = expenses.reduce((s, t) => s + Math.abs(t.amount), 0) / expenses.length;
     insights.push({ icon: 'receipt', color: '#34D399', title: 'Avg Transaction', body: `Your average expense is ${currency.format(avg)} per transaction.` });
   }
 
-  // Income tracking reminder
   const incomeRatio = transactions.filter((t) => t.amount >= 0).length / transactions.length;
-  if (incomeRatio < 0.15 && transactions.length >= 8) {
-    insights.push({ icon: 'alert-circle', color: '#FCD34D', title: 'Add Income Entries', body: 'Most entries are expenses. Log your income for accurate balance tracking.' });
-  }
+  if (incomeRatio < 0.15 && transactions.length >= 8) insights.push({ icon: 'alert-circle', color: '#FCD34D', title: 'Add Income Entries', body: 'Most entries are expenses. Log your income for accurate balance tracking.' });
 
   return insights.slice(0, 4);
+}
+
+// ─── Confetti Overlay ─────────────────────────────────────────────────────────
+function ConfettiOverlay({ visible, goalName, onDismiss }) {
+  const particles = useRef(
+    Array.from({ length: 22 }, (_, i) => ({
+      x: new Animated.Value(0.1 + Math.random() * 0.8),
+      y: new Animated.Value(-0.1),
+      opacity: new Animated.Value(1),
+      rotate: new Animated.Value(0),
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      size: 8 + Math.random() * 8,
+    }))
+  ).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Animated.parallel([
+      Animated.spring(fadeAnim, { toValue: 1, useNativeDriver: true, bounciness: 10 }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, bounciness: 12 }),
+    ]).start();
+
+    particles.forEach((p) => {
+      p.y.setValue(-0.1);
+      p.opacity.setValue(1);
+      p.rotate.setValue(0);
+      Animated.parallel([
+        Animated.timing(p.y, { toValue: 1.1, duration: 1800 + Math.random() * 800, useNativeDriver: false }),
+        Animated.timing(p.rotate, { toValue: 1, duration: 1800 + Math.random() * 800, useNativeDriver: false }),
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(p.opacity, { toValue: 0, duration: 600, useNativeDriver: false }),
+        ]),
+      ]).start();
+    });
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onDismiss}>
+      <View style={confettiStyles.overlay}>
+        {particles.map((p, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: p.x.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              top: p.y.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              opacity: p.opacity,
+              width: p.size,
+              height: p.size,
+              borderRadius: p.size / 4,
+              backgroundColor: p.color,
+              transform: [{ rotate: p.rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
+            }}
+          />
+        ))}
+        <Animated.View style={[confettiStyles.card, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+          <Text style={confettiStyles.trophy}>🏆</Text>
+          <Text style={confettiStyles.heading}>Goal Reached!</Text>
+          <Text style={confettiStyles.goalName}>{goalName}</Text>
+          <Text style={confettiStyles.sub}>Incredible discipline. You earned this.</Text>
+          <TouchableOpacity style={confettiStyles.btn} onPress={onDismiss}>
+            <Text style={confettiStyles.btnText}>Celebrate 🎉</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const confettiStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: '#111827', borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', padding: 32, alignItems: 'center', marginHorizontal: 32, gap: 8 },
+  trophy: { fontSize: 64 },
+  heading: { color: '#F9FAFB', fontSize: 28, fontWeight: '900' },
+  goalName: { color: '#FCD34D', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  sub: { color: 'rgba(249,250,251,0.5)', fontSize: 14, textAlign: 'center', marginTop: 4 },
+  btn: { backgroundColor: '#FCD34D', borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14, marginTop: 16 },
+  btnText: { color: '#000', fontSize: 16, fontWeight: '900' },
+});
+
+// ─── Animated Balance Number ──────────────────────────────────────────────────
+function AnimatedBalance({ value, color, fontSize = 38 }) {
+  const animVal = useRef(new Animated.Value(value)).current;
+  const displayVal = useRef(value);
+  const [displayed, setDisplayed] = useState(value);
+
+  useEffect(() => {
+    Animated.timing(animVal, { toValue: value, duration: 600, useNativeDriver: false }).start();
+    animVal.addListener(({ value: v }) => {
+      displayVal.current = v;
+      setDisplayed(v);
+    });
+    return () => animVal.removeAllListeners();
+  }, [value]);
+
+  const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(displayed);
+  return <Text style={{ color, fontSize, fontWeight: '900', letterSpacing: -0.5 }}>{formatted}</Text>;
 }
 
 // ─── AppHeader ────────────────────────────────────────────────────────────────
 function AppHeader({ streak }) {
   const { C } = useTheme();
-  const pulse = React.useRef(new Animated.Value(1)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (streak >= 3) {
       Animated.loop(
         Animated.sequence([
@@ -159,27 +255,22 @@ function AppHeader({ streak }) {
         </View>
         <View>
           <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900' }}>Thunder Wallet</Text>
-          <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Track money with clarity</Text>
+          <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Your money, under control</Text>
         </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {streak > 0 && (
-          <Animated.View style={[{ alignItems: 'center', backgroundColor: streak >= 7 ? 'rgba(251,146,60,0.15)' : C.accentBg, borderColor: streak >= 7 ? '#FB923C' : C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingVertical: 6 }, streak >= 3 && { transform: [{ scale: pulse }] }]}>
-            <Text style={{ fontSize: 14 }}>{streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '✨'}</Text>
-            <Text style={{ color: streak >= 7 ? '#FB923C' : C.text1, fontSize: 12, fontWeight: '900' }}>{streak}d</Text>
-          </Animated.View>
-        )}
-        <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 }}>
-          <Ionicons name="flash" size={16} color={C.accent} />
-        </View>
-      </View>
+      {streak > 0 && (
+        <Animated.View style={[{ alignItems: 'center', backgroundColor: streak >= 7 ? 'rgba(251,146,60,0.15)' : C.accentBg, borderColor: streak >= 7 ? '#FB923C' : C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingVertical: 6 }, streak >= 3 && { transform: [{ scale: pulse }] }]}>
+          <Text style={{ fontSize: 14 }}>{streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '✨'}</Text>
+          <Text style={{ color: streak >= 7 ? '#FB923C' : C.text1, fontSize: 12, fontWeight: '900' }}>{streak}d</Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
 
 // ─── Goal Card ────────────────────────────────────────────────────────────────
-function GoalCard({ goal, balance, onDelete, C }) {
-  const progress = Math.min((balance / goal.target) * 100, 100);
+function GoalCard({ goal, onDelete, C }) {
+  const progress = Math.min((goal.savedAmount / goal.target) * 100, 100);
   const isComplete = progress >= 100;
   const daysLeft = goal.deadline
     ? Math.max(Math.ceil((new Date(goal.deadline) - new Date()) / 86400000), 0)
@@ -204,7 +295,7 @@ function GoalCard({ goal, balance, onDelete, C }) {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ color: C.text2, fontSize: 11, fontWeight: '600' }}>
-            {compactCurrency.format(Math.min(balance, goal.target))} / {compactCurrency.format(goal.target)} · {Math.round(progress)}%
+            {compactCurrency.format(Math.min(goal.savedAmount, goal.target))} / {compactCurrency.format(goal.target)} · {Math.round(progress)}%
           </Text>
           {daysLeft !== null && (
             <Text style={{ color: daysLeft < 7 ? C.expense : C.text3, fontSize: 11, fontWeight: '700' }}>
@@ -226,9 +317,10 @@ function AddGoalModal({ visible, onClose, onAdd }) {
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [savedAmount, setSavedAmount] = useState('');
   const [selectedPreset, setSelectedPreset] = useState(0);
 
-  const reset = () => { setName(''); setTarget(''); setDeadline(''); setSelectedPreset(0); };
+  const reset = () => { setName(''); setTarget(''); setDeadline(''); setSavedAmount(''); setSelectedPreset(0); };
 
   const handleAdd = () => {
     if (!name.trim()) { Alert.alert('Name required', 'Enter a goal name.'); return; }
@@ -242,7 +334,9 @@ function AddGoalModal({ visible, onClose, onAdd }) {
         if (!Number.isNaN(d.getTime())) deadlineISO = d.toISOString();
       }
     }
-    onAdd({ id: `${Date.now()}`, name: name.trim(), icon: GOAL_PRESETS[selectedPreset].icon, color: GOAL_PRESETS[selectedPreset].color, target: t, deadline: deadlineISO, createdAt: new Date().toISOString() });
+    const saved = Number.parseFloat(savedAmount) || 0;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onAdd({ id: `${Date.now()}`, name: name.trim(), icon: GOAL_PRESETS[selectedPreset].icon, color: GOAL_PRESETS[selectedPreset].color, target: t, savedAmount: saved, deadline: deadlineISO, createdAt: new Date().toISOString() });
     reset();
     onClose();
   };
@@ -256,15 +350,10 @@ function AddGoalModal({ visible, onClose, onAdd }) {
           <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Goal</Text>
           <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 20, marginTop: 2 }}>Add Savings Goal</Text>
 
-          {/* Icon Picker */}
           <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Icon & Color</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
             {GOAL_PRESETS.map((p, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => setSelectedPreset(i)}
-                style={{ alignItems: 'center', gap: 4 }}
-              >
+              <TouchableOpacity key={i} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedPreset(i); }} style={{ alignItems: 'center', gap: 4 }}>
                 <View style={{ alignItems: 'center', backgroundColor: selectedPreset === i ? `${p.color}25` : C.cardInner, borderColor: selectedPreset === i ? p.color : C.border, borderRadius: 14, borderWidth: selectedPreset === i ? 2 : 1, height: 52, justifyContent: 'center', width: 52 }}>
                   <Ionicons name={p.icon} size={24} color={selectedPreset === i ? p.color : C.text2} />
                 </View>
@@ -273,7 +362,6 @@ function AddGoalModal({ visible, onClose, onAdd }) {
             ))}
           </ScrollView>
 
-          {/* Name */}
           <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Goal Name</Text>
           <TextInput style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 15, marginBottom: 14, minHeight: 48, paddingHorizontal: 14 }} placeholder="e.g. New iPhone, Goa Trip…" placeholderTextColor={C.text3} value={name} onChangeText={setName} />
 
@@ -286,10 +374,16 @@ function AddGoalModal({ visible, onClose, onAdd }) {
               </View>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Deadline</Text>
-              <TextInput style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 14, minHeight: 50, paddingHorizontal: 12 }} placeholder="DD/MM/YYYY" placeholderTextColor={C.text3} value={deadline} onChangeText={setDeadline} />
+              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Already Saved</Text>
+              <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', minHeight: 50, paddingHorizontal: 12 }}>
+                <Text style={{ color: C.text3, fontSize: 18, fontWeight: '900', marginRight: 6 }}>₹</Text>
+                <TextInput style={{ color: C.text1, flex: 1, fontSize: 18, fontWeight: '800' }} placeholder="0" placeholderTextColor={C.text3} keyboardType="decimal-pad" value={savedAmount} onChangeText={setSavedAmount} />
+              </View>
             </View>
           </View>
+
+          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginTop: 14, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Deadline (optional)</Text>
+          <TextInput style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 14, minHeight: 48, paddingHorizontal: 12 }} placeholder="DD/MM/YYYY" placeholderTextColor={C.text3} value={deadline} onChangeText={setDeadline} />
 
           <TouchableOpacity
             style={{ alignItems: 'center', backgroundColor: GOAL_PRESETS[selectedPreset].color, borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 20, minHeight: 54, shadowColor: GOAL_PRESETS[selectedPreset].color, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 6 }}
@@ -304,12 +398,100 @@ function AddGoalModal({ visible, onClose, onAdd }) {
   );
 }
 
+// ─── Category Budget Modal ────────────────────────────────────────────────────
+const BUDGET_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Rent', 'Health', 'Entertainment', 'Groceries', 'Education', 'Other'];
+
+function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
+  const [budgets, setBudgets] = useState({ ...categoryBudgets });
+
+  const handleSave = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onSave(budgets);
+    onClose();
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' }} onPress={onClose} />
+        <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20, paddingBottom: 36, maxHeight: '85%' }}>
+          <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginBottom: 16, width: 40 }} />
+          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Budgets</Text>
+          <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 4, marginTop: 2 }}>Category Limits</Text>
+          <Text style={{ color: C.text2, fontSize: 13, marginBottom: 20 }}>Set monthly limits per category. Leave blank for no limit.</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {BUDGET_CATEGORIES.map((cat) => (
+              <View key={cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <Text style={{ color: C.text1, fontSize: 14, fontWeight: '700', width: 100 }}>{cat}</Text>
+                <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, flex: 1, flexDirection: 'row', minHeight: 44, paddingHorizontal: 10 }}>
+                  <Text style={{ color: C.text3, fontSize: 16, fontWeight: '800', marginRight: 4 }}>₹</Text>
+                  <TextInput
+                    style={{ color: C.text1, flex: 1, fontSize: 16, fontWeight: '700' }}
+                    placeholder="No limit"
+                    placeholderTextColor={C.text3}
+                    keyboardType="decimal-pad"
+                    value={budgets[cat] ? String(budgets[cat]) : ''}
+                    onChangeText={(v) => setBudgets((b) => ({ ...b, [cat]: Number.parseFloat(v) || 0 }))}
+                  />
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.accent, borderRadius: 14, minHeight: 52, justifyContent: 'center', marginTop: 16 }} onPress={handleSave}>
+            <Text style={{ color: C.isDark ? '#000' : '#fff', fontSize: 16, fontWeight: '900' }}>Save Limits</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Interactive Donut Chart ──────────────────────────────────────────────────
+function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, C }) {
+  const CX = 120, R = 82, SW = 32, EXPLODE = 20;
+  let startAngle = 0;
+  if (!data.length || total <= 0) {
+    return <Svg width={240} height={240}><Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" /></Svg>;
+  }
+  return (
+    <Svg width={240} height={240}>
+      <Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" />
+      {data.map((item, i) => {
+        const segAngle = (item.amount / total) * 360;
+        const endAngle = startAngle + segAngle;
+        const midRad = (((startAngle + segAngle / 2) - 90) * Math.PI) / 180;
+        const isSel = selectedSegment === i;
+        const dx = isSel ? (Math.cos(midRad) * EXPLODE).toFixed(2) : 0;
+        const dy = isSel ? (Math.sin(midRad) * EXPLODE).toFixed(2) : 0;
+        const arcPath = describeArc(CX, R, startAngle, Math.min(endAngle, 359.99));
+        startAngle = endAngle;
+        return (
+          <G key={i} transform={`translate(${dx}, ${dy})`}>
+            <Path d={arcPath} stroke={item.color} strokeWidth={isSel ? SW + 10 : SW - 2} strokeOpacity={selectedSegment !== null && !isSel ? 0.3 : 1} strokeLinecap="butt" fill="none" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectSegment(isSel ? null : i); }} />
+          </G>
+        );
+      })}
+    </Svg>
+  );
+}
+
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 function DashboardScreen({ wallet }) {
   const { C } = useTheme();
-  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, streak } = wallet;
+  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, streak, categoryBudgets, openCategoryBudgetModal } = wallet;
   const healthScore = calculateHealthScore(stats, monthlyBudget);
   const scoreColor = healthScore >= 70 ? C.income : healthScore >= 40 ? C.amber : C.expense;
+  const scoreLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Work';
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState(String(monthlyBudget));
+
+  const commitBudget = async () => {
+    const val = Number.parseFloat(budgetInput);
+    if (Number.isFinite(val) && val > 0) adjustMonthlyBudget(val);
+    setEditingBudget(false);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -323,12 +505,10 @@ function DashboardScreen({ wallet }) {
             <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Current Balance</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: stats.balance >= 0 ? C.incomeBg : C.expenseBg, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 5 }}>
               <Ionicons name={stats.balance >= 0 ? 'trending-up' : 'warning'} size={12} color={stats.balance >= 0 ? C.income : C.expense} />
-              <Text style={{ color: stats.balance >= 0 ? C.income : C.expense, fontSize: 11, fontWeight: '800' }}>
-                {stats.balance >= 0 ? 'Healthy' : 'Overspent'}
-              </Text>
+              <Text style={{ color: stats.balance >= 0 ? C.income : C.expense, fontSize: 11, fontWeight: '800' }}>{stats.balance >= 0 ? 'Healthy' : 'Overspent'}</Text>
             </View>
           </View>
-          <Text style={{ color: C.text1, fontSize: 38, fontWeight: '900', marginTop: 14, letterSpacing: -0.5 }}>{currency.format(stats.balance)}</Text>
+          <AnimatedBalance value={stats.balance} color={C.text1} fontSize={38} />
           <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 18, padding: 14 }}>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
@@ -354,7 +534,10 @@ function DashboardScreen({ wallet }) {
             <Ionicons name="shield-checkmark" size={18} color={scoreColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>Financial Health Score</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700' }}>Financial Health</Text>
+              <Text style={{ color: scoreColor, fontSize: 11, fontWeight: '800' }}>{scoreLabel}</Text>
+            </View>
             <View style={{ backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
               <View style={{ borderRadius: 4, height: 6, width: `${healthScore}%`, backgroundColor: scoreColor }} />
             </View>
@@ -379,18 +562,18 @@ function DashboardScreen({ wallet }) {
 
         {/* Quick Actions */}
         <View style={{ flexDirection: 'row', gap: 10, marginVertical: 14 }}>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => openTransactionModal('income')}>
+          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}>
             <Ionicons name="add-circle" size={20} color={C.income} />
             <Text style={{ color: C.income, fontSize: 14, fontWeight: '900' }}>Income</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.expenseBg, borderColor: `${C.expense}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => openTransactionModal('expense')}>
+          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.expenseBg, borderColor: `${C.expense}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}>
             <Ionicons name="remove-circle" size={20} color={C.expense} />
             <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>Expense</Text>
           </TouchableOpacity>
         </View>
 
         {/* This Month Stats */}
-        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, padding: 16, elevation: 4, shadowColor: '#000', shadowOffset: { height: 6, width: 0 }, shadowOpacity: 0.12, shadowRadius: 14 }}>
+        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, padding: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <View>
               <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
@@ -418,21 +601,38 @@ function DashboardScreen({ wallet }) {
             ))}
           </View>
 
-          {/* Budget */}
+          {/* Budget — tap to edit */}
           <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 14, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 }}>Monthly Budget</Text>
-                <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{currency.format(monthlyBudget)}</Text>
+                {editingBudget ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <Text style={{ color: C.accent, fontSize: 22, fontWeight: '900' }}>₹</Text>
+                    <TextInput
+                      style={{ color: C.text1, fontSize: 22, fontWeight: '900', flex: 1 }}
+                      value={budgetInput}
+                      onChangeText={setBudgetInput}
+                      keyboardType="number-pad"
+                      autoFocus
+                      onBlur={commitBudget}
+                      onSubmitEditing={commitBudget}
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => { setBudgetInput(String(monthlyBudget)); setEditingBudget(true); }}>
+                    <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{currency.format(monthlyBudget)}</Text>
+                    <Text style={{ color: C.text3, fontSize: 10, marginTop: 2 }}>Tap to edit</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 }} onPress={() => adjustMonthlyBudget(-1000)}>
-                  <Ionicons name="remove" size={16} color={C.text2} />
-                </TouchableOpacity>
-                <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 }} onPress={() => adjustMonthlyBudget(1000)}>
-                  <Ionicons name="add" size={16} color={C.accent} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingVertical: 7 }}
+                onPress={openCategoryBudgetModal}
+              >
+                <Ionicons name="options" size={14} color={C.accent} />
+                <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>By Category</Text>
+              </TouchableOpacity>
             </View>
             <Text style={{ color: stats.remainingBudget >= 0 ? C.income : C.expense, fontSize: 13, fontWeight: '800', marginTop: 10 }}>
               {stats.remainingBudget >= 0 ? `${currency.format(stats.remainingBudget)} remaining` : `${currency.format(Math.abs(stats.remainingBudget))} over budget`}
@@ -452,22 +652,43 @@ function DashboardScreen({ wallet }) {
           </View>
         </View>
 
-        {/* ── Savings Goals ──────────────────────────────── */}
+        {/* Category Budget Progress */}
+        {Object.keys(categoryBudgets).length > 0 && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginBottom: 14 }}>Category Limits</Text>
+            {Object.entries(categoryBudgets).filter(([, limit]) => limit > 0).map(([cat, limit]) => {
+              const spent = stats.categorySpend?.[cat] || 0;
+              const pct = Math.min((spent / limit) * 100, 100);
+              const over = spent > limit;
+              return (
+                <View key={cat} style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{cat}</Text>
+                    <Text style={{ color: over ? C.expense : C.text2, fontSize: 12, fontWeight: '800' }}>
+                      {compactCurrency.format(spent)} / {compactCurrency.format(limit)}
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: over ? C.expense : C.income, borderRadius: 4, height: 6, width: `${pct}%` }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Savings Goals */}
         <View style={{ marginTop: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View>
               <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Savings</Text>
               <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>Goals</Text>
             </View>
-            <TouchableOpacity
-              style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10 }}
-              onPress={openGoalModal}
-            >
+            <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10 }} onPress={openGoalModal}>
               <Ionicons name="add" size={16} color={C.accent} />
               <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>New Goal</Text>
             </TouchableOpacity>
           </View>
-
           {goals.length === 0 ? (
             <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1.5, padding: 28 }} onPress={openGoalModal}>
               <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 24, height: 56, justifyContent: 'center', marginBottom: 12, width: 56 }}>
@@ -478,7 +699,7 @@ function DashboardScreen({ wallet }) {
             </TouchableOpacity>
           ) : (
             <>
-              {goals.map((g) => <GoalCard key={g.id} goal={g} balance={stats.balance} onDelete={deleteGoal} C={C} />)}
+              {goals.map((g) => <GoalCard key={g.id} goal={g} onDelete={wallet.deleteGoal} C={C} />)}
               <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', paddingVertical: 14 }} onPress={openGoalModal}>
                 <Ionicons name="add-circle-outline" size={18} color={C.text3} />
                 <Text style={{ color: C.text3, fontSize: 13, fontWeight: '700' }}>Add another goal</Text>
@@ -487,7 +708,7 @@ function DashboardScreen({ wallet }) {
           )}
         </View>
 
-        {/* Forecast */}
+        {/* Forecast row */}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
           {[
             { icon: 'calendar', color: C.blue, label: 'Days Left', value: stats.daysLeft },
@@ -534,6 +755,8 @@ function AnalyticsScreen({ wallet }) {
   const { C } = useTheme();
   const { monthlyBudget, stats, transactions } = wallet;
   const [selectedSegment, setSelectedSegment] = useState(null);
+  const [simulateMode, setSimulateMode] = useState(false);
+  const [simOverrides, setSimOverrides] = useState({});
 
   const pieData = stats.topCategories.map((item, i) => ({ ...item, color: CHART_COLORS[i % CHART_COLORS.length] }));
   const hasPieData = pieData.length > 0;
@@ -555,6 +778,16 @@ function AnalyticsScreen({ wallet }) {
 
   const maxMonthSpend = Math.max(...monthlyBreakdown.map((m) => m.total), 1);
 
+  const simSavings = useMemo(() => {
+    if (!simulateMode) return null;
+    let saved = 0;
+    pieData.forEach((item) => {
+      const override = simOverrides[item.category];
+      if (override !== undefined) saved += Math.max(item.amount - override, 0);
+    });
+    return saved;
+  }, [simulateMode, simOverrides, pieData]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
@@ -568,7 +801,7 @@ function AnalyticsScreen({ wallet }) {
           </View>
         </View>
 
-        {/* Interactive Pie Chart */}
+        {/* Donut */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 22, borderWidth: 1, padding: 20 }}>
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <InteractiveDonutChart data={pieData} total={stats.expense} selectedSegment={selectedSegment} onSelectSegment={setSelectedSegment} C={C} />
@@ -581,7 +814,6 @@ function AnalyticsScreen({ wallet }) {
             )}
           </View>
 
-          {/* Segment Detail */}
           {selectedSegment !== null && pieData[selectedSegment] && (
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.cardInner, borderColor: `${pieData[selectedSegment].color}45`, borderLeftColor: pieData[selectedSegment].color, borderLeftWidth: 3, borderRadius: 14, borderWidth: 1, marginTop: 4, padding: 16 }}>
               <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: pieData[selectedSegment].color, marginRight: 12 }} />
@@ -598,11 +830,10 @@ function AnalyticsScreen({ wallet }) {
             </View>
           )}
 
-          {/* Legend */}
           {hasPieData ? (
             <View style={{ gap: 10, marginTop: 16 }}>
               {pieData.map((item, i) => (
-                <TouchableOpacity key={item.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 }} onPress={() => setSelectedSegment(selectedSegment === i ? null : i)}>
+                <TouchableOpacity key={item.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedSegment(selectedSegment === i ? null : i); }}>
                   <View style={{ borderRadius: 5, height: 10, width: 10, backgroundColor: item.color, opacity: selectedSegment === i ? 1 : 0.7 }} />
                   <Text style={{ color: selectedSegment === i ? C.text1 : C.text2, flex: 1, fontSize: 14, fontWeight: selectedSegment === i ? '800' : '600' }} numberOfLines={1}>{item.category}</Text>
                   <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600', minWidth: 32, textAlign: 'right' }}>{Math.round(item.percentage)}%</Text>
@@ -618,7 +849,61 @@ function AnalyticsScreen({ wallet }) {
           )}
         </View>
 
-        {/* ── Smart Insights ──────────────────────────────── */}
+        {/* What-If Projector */}
+        {hasPieData && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: simulateMode ? 14 : 0 }}>
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Simulator</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginTop: 2 }}>What If…</Text>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: simulateMode ? C.accentBg : C.cardInner, borderColor: simulateMode ? C.accentBorder : C.border, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 }}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSimulateMode((v) => !v); setSimOverrides({}); }}
+              >
+                <Text style={{ color: simulateMode ? C.accent : C.text2, fontSize: 12, fontWeight: '800' }}>{simulateMode ? 'Reset' : 'Simulate'}</Text>
+              </TouchableOpacity>
+            </View>
+            {simulateMode && (
+              <>
+                <Text style={{ color: C.text2, fontSize: 13, marginBottom: 16 }}>Drag each category to see how much you'd save.</Text>
+                {pieData.map((item) => {
+                  const override = simOverrides[item.category] ?? item.amount;
+                  const diff = item.amount - override;
+                  return (
+                    <View key={item.category} style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{item.category}</Text>
+                        <Text style={{ color: diff > 0 ? C.income : C.text2, fontSize: 12, fontWeight: '800' }}>
+                          {compactCurrency.format(override)} {diff > 0 ? `(save ${compactCurrency.format(diff)})` : ''}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <TouchableOpacity onPress={() => setSimOverrides((o) => ({ ...o, [item.category]: Math.max((o[item.category] ?? item.amount) - 500, 0) }))}>
+                          <Ionicons name="remove-circle" size={24} color={C.expense} />
+                        </TouchableOpacity>
+                        <View style={{ flex: 1, backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
+                          <View style={{ backgroundColor: item.color, borderRadius: 4, height: 6, width: `${Math.min((override / item.amount) * 100, 100)}%` }} />
+                        </View>
+                        <TouchableOpacity onPress={() => setSimOverrides((o) => ({ ...o, [item.category]: Math.min((o[item.category] ?? item.amount) + 500, item.amount) }))}>
+                          <Ionicons name="add-circle" size={24} color={C.income} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+                {simSavings !== null && simSavings > 0 && (
+                  <View style={{ backgroundColor: C.incomeBg, borderColor: `${C.income}30`, borderRadius: 12, borderWidth: 1, padding: 14, marginTop: 4 }}>
+                    <Text style={{ color: C.income, fontSize: 16, fontWeight: '900' }}>Save {currency.format(simSavings)}/month</Text>
+                    <Text style={{ color: C.text2, fontSize: 12, marginTop: 4 }}>That's {currency.format(simSavings * 12)} per year with this plan.</Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Smart Insights */}
         {smartInsights.length > 0 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -626,7 +911,7 @@ function AnalyticsScreen({ wallet }) {
                 <Text style={{ fontSize: 16 }}>🧠</Text>
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>AI-Style</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
                 <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Smart Insights</Text>
               </View>
             </View>
@@ -644,25 +929,7 @@ function AnalyticsScreen({ wallet }) {
           </View>
         )}
 
-        {/* Insight Grid */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
-          {[
-            { icon: 'flame', color: C.expense, label: 'Top Category', value: stats.topCategory?.category || 'None' },
-            { icon: 'cash', color: C.income, label: 'Top Spend', value: stats.topCategory ? compactCurrency.format(stats.topCategory.amount) : '₹0' },
-            { icon: 'shield-checkmark', color: C.blue, label: 'Budget Used', value: `${Math.round(stats.budgetUsedPercent)}%` },
-            { icon: 'trail-sign', color: C.amber, label: 'Runway', value: `${stats.daysLeft} days` },
-          ].map((card) => (
-            <View key={card.label} style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flexBasis: '47%', flexGrow: 1, minHeight: 108, padding: 14 }}>
-              <View style={{ alignItems: 'center', backgroundColor: `${card.color}18`, borderRadius: 10, height: 32, justifyContent: 'center', marginBottom: 8, width: 32 }}>
-                <Ionicons name={card.icon} size={16} color={card.color} />
-              </View>
-              <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>{card.label}</Text>
-              <Text style={{ color: C.text1, fontSize: 17, fontWeight: '900' }} numberOfLines={1}>{card.value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Income vs Expense bars */}
+        {/* Income vs Expense */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
           <Text style={{ color: C.text1, fontSize: 17, fontWeight: '900', marginBottom: 14 }}>Income vs Expense</Text>
           {[{ label: 'Income', amount: stats.monthIncome, color: C.income }, { label: 'Expense', amount: stats.monthExpense, color: C.expense }].map((bar) => {
@@ -681,7 +948,7 @@ function AnalyticsScreen({ wallet }) {
           })}
         </View>
 
-        {/* Monthly Spend History */}
+        {/* Monthly History */}
         {monthlyBreakdown.length > 1 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <Text style={{ color: C.text1, fontSize: 17, fontWeight: '900', marginBottom: 14 }}>Monthly History</Text>
@@ -706,11 +973,11 @@ function AnalyticsScreen({ wallet }) {
 // ─── Activity Screen ──────────────────────────────────────────────────────────
 function ActivityScreen({ wallet }) {
   const { C } = useTheme();
-  const { activeFilter, clearTransactions, deleteTransaction, openTransactionModal, searchQuery, setActiveFilter, setSearchQuery, transactions } = wallet;
+  const { activeFilter, clearTransactions, deleteTransaction, editTransaction, openTransactionModal, searchQuery, setActiveFilter, setSearchQuery, transactions } = wallet;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+      <View style={{ padding: 16, paddingBottom: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
             <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Activity</Text>
@@ -721,11 +988,11 @@ function ActivityScreen({ wallet }) {
           </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => openTransactionModal('expense')}>
+          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.expenseBg, borderColor: `${C.expense}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}>
             <Ionicons name="remove-circle" size={20} color={C.expense} />
             <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>Expense</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => openTransactionModal('income')}>
+          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}>
             <Ionicons name="add-circle" size={20} color={C.income} />
             <Text style={{ color: C.income, fontSize: 14, fontWeight: '900' }}>Income</Text>
           </TouchableOpacity>
@@ -733,42 +1000,17 @@ function ActivityScreen({ wallet }) {
             <Ionicons name="trash-outline" size={19} color={C.expense} />
           </TouchableOpacity>
         </View>
-        <TransactionList transactions={transactions} deleteTransaction={deleteTransaction} activeFilter={activeFilter} setActiveFilter={setActiveFilter} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-      </ScrollView>
+      </View>
+      <TransactionList
+        transactions={transactions}
+        deleteTransaction={deleteTransaction}
+        editTransaction={editTransaction}
+        activeFilter={activeFilter}
+        setActiveFilter={setActiveFilter}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
     </SafeAreaView>
-  );
-}
-
-// ─── Interactive Donut Chart ──────────────────────────────────────────────────
-function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, C }) {
-  const CX = 120, R = 82, SW = 32, EXPLODE = 20;
-  let startAngle = 0;
-  if (!data.length || total <= 0) {
-    return (
-      <Svg width={240} height={240}>
-        <Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" />
-      </Svg>
-    );
-  }
-  return (
-    <Svg width={240} height={240}>
-      <Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" />
-      {data.map((item, i) => {
-        const segAngle = (item.amount / total) * 360;
-        const endAngle = startAngle + segAngle;
-        const midRad = (((startAngle + segAngle / 2) - 90) * Math.PI) / 180;
-        const isSel = selectedSegment === i;
-        const dx = isSel ? (Math.cos(midRad) * EXPLODE).toFixed(2) : 0;
-        const dy = isSel ? (Math.sin(midRad) * EXPLODE).toFixed(2) : 0;
-        const arcPath = describeArc(CX, R, startAngle, Math.min(endAngle, 359.99));
-        startAngle = endAngle;
-        return (
-          <G key={i} transform={`translate(${dx}, ${dy})`}>
-            <Path d={arcPath} stroke={item.color} strokeWidth={isSel ? SW + 10 : SW - 2} strokeOpacity={selectedSegment !== null && !isSel ? 0.3 : 1} strokeLinecap="butt" fill="none" onPress={() => onSelectSegment(isSel ? null : i)} />
-          </G>
-        );
-      })}
-    </Svg>
   );
 }
 
@@ -777,32 +1019,39 @@ function MainApp() {
   const { C } = useTheme();
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [categoryBudgets, setCategoryBudgets] = useState({});
   const [isModalVisible, setModalVisible] = useState(false);
   const [isGoalModalVisible, setGoalModalVisible] = useState(false);
+  const [isCategoryBudgetModalVisible, setCategoryBudgetModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState('expense');
   const [transactionCategory, setTransactionCategory] = useState('');
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionNote, setTransactionNote] = useState('');
+  const [transactionDate, setTransactionDate] = useState(new Date().toISOString());
+  const [transactionRecurring, setTransactionRecurring] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState(DEFAULT_MONTHLY_BUDGET);
+  const [confettiGoal, setConfettiGoal] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [savedTx, savedBudget, savedGoals] = await Promise.all([
+        const [savedTx, savedBudget, savedGoals, savedCatBudgets] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(BUDGET_KEY),
           AsyncStorage.getItem(GOALS_KEY),
+          AsyncStorage.getItem(CAT_BUDGETS_KEY),
         ]);
         if (savedTx) {
           const parsed = JSON.parse(savedTx).map(normalizeTransaction);
           setTransactions(parsed);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         }
         const b = Number.parseFloat(savedBudget);
         if (Number.isFinite(b) && b > 0) setMonthlyBudget(b);
         if (savedGoals) setGoals(JSON.parse(savedGoals));
+        if (savedCatBudgets) setCategoryBudgets(JSON.parse(savedCatBudgets));
       } catch { Alert.alert('Load error', 'Could not load wallet data. Please restart the app.'); }
     };
     load();
@@ -812,26 +1061,82 @@ function MainApp() {
   const insight = useMemo(() => buildInsight(stats, monthlyBudget, transactions.length), [monthlyBudget, stats, transactions.length]);
   const streak = useMemo(() => calculateStreak(transactions, monthlyBudget), [transactions, monthlyBudget]);
 
-  const resetForm = () => { setTransactionType('expense'); setTransactionCategory(''); setTransactionAmount(''); setTransactionNote(''); };
+  useEffect(() => {
+    scheduleDailyReview(stats).catch(() => {});
+  }, [stats]);
+
+  const resetForm = () => {
+    setTransactionType('expense');
+    setTransactionCategory('');
+    setTransactionAmount('');
+    setTransactionNote('');
+    setTransactionDate(new Date().toISOString());
+    setTransactionRecurring(null);
+    setEditingTransaction(null);
+  };
+
   const openTransactionModal = (type) => { setTransactionType(type); setModalVisible(true); };
+
+  const editTransaction = (tx) => {
+    setEditingTransaction(tx);
+    setTransactionType(tx.type);
+    setTransactionCategory(tx.category);
+    setTransactionAmount(String(Math.abs(tx.amount)));
+    setTransactionNote(tx.note || '');
+    setTransactionDate(tx.date);
+    setTransactionRecurring(tx.recurring || null);
+    setModalVisible(true);
+  };
+
   const openGoalModal = () => setGoalModalVisible(true);
+  const openCategoryBudgetModal = () => setCategoryBudgetModalVisible(true);
 
-  const persistTransactions = async (next) => { setTransactions(next); await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); };
-  const persistGoals = async (next) => { setGoals(next); await AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next)); };
+  const persistTransactions = async (next) => {
+    setTransactions(next);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  };
+  const persistGoals = async (next) => {
+    setGoals(next);
+    await AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next));
+  };
 
-  const adjustMonthlyBudget = async (delta) => {
-    const next = Math.max(1000, monthlyBudget + delta);
+  const adjustMonthlyBudget = async (val) => {
+    const next = Math.max(500, val);
     setMonthlyBudget(next);
     await AsyncStorage.setItem(BUDGET_KEY, String(next));
+  };
+
+  const saveCategoryBudgets = async (budgets) => {
+    setCategoryBudgets(budgets);
+    await AsyncStorage.setItem(CAT_BUDGETS_KEY, JSON.stringify(budgets));
   };
 
   const addTransaction = async () => {
     const amount = Number.parseFloat(transactionAmount);
     if (!transactionCategory.trim()) { Alert.alert('Missing category', 'Choose or type a category.'); return; }
     if (!Number.isFinite(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Amount must be greater than zero.'); return; }
-    const newTx = { id: `${Date.now()}`, category: transactionCategory.trim(), amount: transactionType === 'expense' ? -Math.abs(amount) : Math.abs(amount), note: transactionNote.trim(), type: transactionType, date: new Date().toISOString() };
-    try { await persistTransactions([newTx, ...transactions]); resetForm(); setModalVisible(false); }
-    catch { Alert.alert('Save error', 'Could not save transaction.'); }
+
+    const txData = {
+      id: editingTransaction ? editingTransaction.id : `${Date.now()}`,
+      category: transactionCategory.trim(),
+      amount: transactionType === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+      note: transactionNote.trim(),
+      type: transactionType,
+      date: transactionDate,
+      recurring: transactionRecurring,
+    };
+
+    try {
+      let next;
+      if (editingTransaction) {
+        next = transactions.map((t) => t.id === editingTransaction.id ? txData : t);
+      } else {
+        next = [txData, ...transactions];
+      }
+      await persistTransactions(next);
+      resetForm();
+      setModalVisible(false);
+    } catch { Alert.alert('Save error', 'Could not save transaction.'); }
   };
 
   const deleteTransaction = async (id) => {
@@ -853,20 +1158,39 @@ function MainApp() {
   };
 
   const deleteGoal = (id) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Remove goal?', 'This goal will be deleted.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => { await persistGoals(goals.filter((g) => g.id !== id)); } },
     ]);
   };
 
+  // Check if any goal just hit completion
+  useEffect(() => {
+    goals.forEach((g) => {
+      if (g.savedAmount >= g.target && !g.celebratedAt) {
+        setConfettiGoal(g);
+        persistGoals(goals.map((goal) => goal.id === g.id ? { ...goal, celebratedAt: new Date().toISOString() } : goal));
+      }
+    });
+  }, [goals]);
+
   const resetAllData = async () => {
     try {
-      await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(BUDGET_KEY), AsyncStorage.removeItem(GOALS_KEY)]);
-      setTransactions([]); setMonthlyBudget(DEFAULT_MONTHLY_BUDGET); setGoals([]);
+      await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(BUDGET_KEY), AsyncStorage.removeItem(GOALS_KEY), AsyncStorage.removeItem(CAT_BUDGETS_KEY)]);
+      setTransactions([]);
+      setMonthlyBudget(DEFAULT_MONTHLY_BUDGET);
+      setGoals([]);
+      setCategoryBudgets({});
     } catch { Alert.alert('Reset error', 'Could not reset data.'); }
   };
 
-  const wallet = { activeFilter, adjustMonthlyBudget, clearTransactions, deleteTransaction, deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal, searchQuery, setActiveFilter, setSearchQuery, stats, streak, transactions };
+  const wallet = {
+    activeFilter, adjustMonthlyBudget, clearTransactions, deleteTransaction, editTransaction,
+    deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal,
+    openCategoryBudgetModal, categoryBudgets, searchQuery, setActiveFilter, setSearchQuery,
+    stats, streak, transactions,
+  };
 
   return (
     <View style={{ backgroundColor: C.bg, flex: 1 }}>
@@ -893,9 +1217,40 @@ function MainApp() {
         <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} />}</Tab.Screen>
       </Tab.Navigator>
 
-      <TransactionModal isModalVisible={isModalVisible} toggleModal={() => { resetForm(); setModalVisible(false); }} transactionType={transactionType} setTransactionType={setTransactionType} transactionCategory={transactionCategory} setTransactionCategory={setTransactionCategory} transactionAmount={transactionAmount} setTransactionAmount={setTransactionAmount} transactionNote={transactionNote} setTransactionNote={setTransactionNote} addTransaction={addTransaction} />
+      <TransactionModal
+        isModalVisible={isModalVisible}
+        toggleModal={() => { resetForm(); setModalVisible(false); }}
+        transactionType={transactionType}
+        setTransactionType={setTransactionType}
+        transactionCategory={transactionCategory}
+        setTransactionCategory={setTransactionCategory}
+        transactionAmount={transactionAmount}
+        setTransactionAmount={setTransactionAmount}
+        transactionNote={transactionNote}
+        setTransactionNote={setTransactionNote}
+        transactionDate={transactionDate}
+        setTransactionDate={setTransactionDate}
+        transactionRecurring={transactionRecurring}
+        setTransactionRecurring={setTransactionRecurring}
+        addTransaction={addTransaction}
+        editingTransaction={editingTransaction}
+      />
 
       <AddGoalModal visible={isGoalModalVisible} onClose={() => setGoalModalVisible(false)} onAdd={addGoal} />
+
+      <CategoryBudgetModal
+        visible={isCategoryBudgetModalVisible}
+        onClose={() => setCategoryBudgetModalVisible(false)}
+        categoryBudgets={categoryBudgets}
+        onSave={saveCategoryBudgets}
+        C={C}
+      />
+
+      <ConfettiOverlay
+        visible={!!confettiGoal}
+        goalName={confettiGoal?.name || ''}
+        onDismiss={() => setConfettiGoal(null)}
+      />
     </View>
   );
 }
@@ -906,6 +1261,7 @@ function buildStats(transactions, monthlyBudget) {
   const cm = now.getMonth(), cy = now.getFullYear(), de = now.getDate();
   const dim = new Date(cy, cm + 1, 0).getDate();
   const expCats = {};
+  const categorySpend = {};
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(cy, cm, de - (6 - i));
     return { key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('en-IN', { weekday: 'short' }), total: 0 };
@@ -914,13 +1270,43 @@ function buildStats(transactions, monthlyBudget) {
   const totals = transactions.reduce((s, t) => {
     const d = new Date(t.date), itm = d.getMonth() === cm && d.getFullYear() === cy, dk = d.toISOString().slice(0, 10);
     if (t.amount >= 0) { s.income += t.amount; if (itm) s.monthIncome += t.amount; }
-    else { const abs = Math.abs(t.amount); s.expense += abs; expCats[t.category] = (expCats[t.category] || 0) + abs; if (weekMap[dk]) weekMap[dk].total += abs; if (itm) s.monthExpense += abs; }
+    else {
+      const abs = Math.abs(t.amount);
+      s.expense += abs;
+      expCats[t.category] = (expCats[t.category] || 0) + abs;
+      if (itm) { s.monthExpense += abs; categorySpend[t.category] = (categorySpend[t.category] || 0) + abs; }
+      if (weekMap[dk]) weekMap[dk].total += abs;
+    }
     return s;
   }, { income: 0, expense: 0, monthExpense: 0, monthIncome: 0 });
+
+  const todayStr = now.toISOString().slice(0, 10);
+  const todaySpend = transactions.filter((t) => t.date.startsWith(todayStr) && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+
   const topCategories = Object.entries(expCats).sort(([, a], [, b]) => b - a).slice(0, 6).map(([category, amount]) => ({ amount, category, percentage: totals.expense ? Math.max((amount / totals.expense) * 100, 4) : 0 }));
   const projectedExpense = totals.monthExpense ? (totals.monthExpense / de) * dim : 0;
   const remainingBudget = monthlyBudget - totals.monthExpense;
-  return { ...totals, balance: totals.income - totals.expense, budgetUsedPercent: Math.min((totals.monthExpense / monthlyBudget) * 100, 100), count: transactions.length, dailyAverageExpense: totals.monthExpense / Math.max(de, 1), dailyBudgetLeft: Math.max(remainingBudget, 0) / Math.max(dim - de + 1, 1), daysLeft: Math.max(dim - de + 1, 1), projectedExpense, remainingBudget, savingsRate: totals.monthIncome ? ((totals.monthIncome - totals.monthExpense) / totals.monthIncome) * 100 : 0, topCategories, topCategory: topCategories[0], weekDays, weekMaxSpend: Math.max(...weekDays.map((d) => d.total), 1), weekSpend: weekDays.reduce((s, d) => s + d.total, 0) };
+  const dailyBudgetLeft = Math.max(remainingBudget, 0) / Math.max(dim - de + 1, 1);
+
+  return {
+    ...totals,
+    balance: totals.income - totals.expense,
+    budgetUsedPercent: Math.min((totals.monthExpense / monthlyBudget) * 100, 100),
+    categorySpend,
+    count: transactions.length,
+    dailyAverageExpense: totals.monthExpense / Math.max(de, 1),
+    dailyBudgetLeft,
+    daysLeft: Math.max(dim - de + 1, 1),
+    projectedExpense,
+    remainingBudget,
+    savingsRate: totals.monthIncome ? ((totals.monthIncome - totals.monthExpense) / totals.monthIncome) * 100 : 0,
+    todaySpend,
+    topCategories,
+    topCategory: topCategories[0],
+    weekDays,
+    weekMaxSpend: Math.max(...weekDays.map((d) => d.total), 1),
+    weekSpend: weekDays.reduce((s, d) => s + d.total, 0),
+  };
 }
 
 function buildInsight(stats, monthlyBudget, count) {
@@ -931,11 +1317,22 @@ function buildInsight(stats, monthlyBudget, count) {
 }
 
 function calculateHealthScore(stats, monthlyBudget) {
-  let score = 40;
-  score += Math.min(Math.max(stats.savingsRate, 0), 30);
-  if (stats.budgetUsedPercent <= 100) score += Math.max(0, 20 - stats.budgetUsedPercent / 10);
-  if (stats.count > 0) score += 5;
-  if (stats.balance > 0) score += 5;
+  if (!stats.count) return 0;
+  let score = 0;
+
+  // Savings rate: up to 40 pts (0% saves = 0, 40%+ saves = 40)
+  score += Math.min(Math.max(stats.savingsRate, 0) * 1.0, 40);
+
+  // Budget adherence: up to 30 pts
+  if (stats.budgetUsedPercent <= 80) score += 30;
+  else if (stats.budgetUsedPercent <= 100) score += Math.max(0, 30 - (stats.budgetUsedPercent - 80) * 1.5);
+
+  // Positive balance: 20 pts
+  if (stats.balance > 0) score += 20;
+
+  // Has logged income: 10 pts
+  if (stats.monthIncome > 0) score += 10;
+
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 

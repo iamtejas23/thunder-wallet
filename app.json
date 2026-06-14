@@ -2,34 +2,55 @@
   "expo": {
     "name": "Thunder Wallet",
     "slug": "thunder-wallet",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "thunderwallet",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f8f6f1"
+      "backgroundColor": "#0A0E1A"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.tejas8787.thunderwallet"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tejas8787.thunderwallet",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to unlock Thunder Wallet",
+        "NSCameraUsageDescription": "Used for biometric authentication"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d1518"
+        "backgroundColor": "#0A0E1A"
       },
       "package": "com.tejas8787.thunderwallet",
-      "versionCode": 2
+      "versionCode": 3,
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0A0E1A",
+          "sounds": []
+        }
+      ],
+      "expo-local-authentication"
+    ],
     "extra": {
       "eas": {
         "projectId": "20973568-e0e6-48b1-a5ee-2c55cd8b6f39"

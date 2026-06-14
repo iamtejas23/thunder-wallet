@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
   Linking,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -13,11 +14,58 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
+import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
+import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
 
 const SettingsScreen = ({ resetAllData }) => {
   const { C, toggleTheme, isDark } = useTheme();
   const navigation = useNavigation();
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [notif, pin] = await Promise.all([
+        isNotificationsEnabled(),
+        AsyncStorage.getItem(PIN_ENABLED_KEY),
+      ]);
+      setNotifEnabled(notif);
+      setPinEnabled(pin === 'true');
+    })();
+  }, []);
+
+  const handleNotifToggle = async (val) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (val) {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        Alert.alert('Permission needed', 'Enable notifications in your device Settings to receive daily reminders.');
+        return;
+      }
+    }
+    await setNotificationsEnabled(val);
+    setNotifEnabled(val);
+  };
+
+  const handlePinToggle = async (val) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (val) {
+      setShowPinSetup(true);
+    } else {
+      Alert.alert('Remove PIN?', 'Your app will no longer require a PIN to open.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove PIN', style: 'destructive', onPress: async () => {
+            await AsyncStorage.multiRemove([PIN_ENABLED_KEY, PIN_KEY]);
+            setPinEnabled(false);
+          },
+        },
+      ]);
+    }
+  };
 
   const handleReset = () => {
     Alert.alert(
@@ -26,22 +74,25 @@ const SettingsScreen = ({ resetAllData }) => {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset Everything',
-          style: 'destructive',
+          text: 'Reset Everything', style: 'destructive',
           onPress: async () => {
-            if (resetAllData) {
-              await resetAllData();
-            } else {
-              try {
-                await AsyncStorage.multiRemove(['transactions', 'monthlyBudget']);
-              } catch {}
-            }
-            Alert.alert('Data reset', 'All data has been cleared. Navigate back to see the changes.');
+            if (resetAllData) await resetAllData();
+            Alert.alert('Data reset', 'All data has been cleared.');
           },
         },
       ],
     );
   };
+
+  if (showPinSetup) {
+    return (
+      <PinScreen
+        mode="setup"
+        onSuccess={() => { setPinEnabled(true); setShowPinSetup(false); }}
+        onCancel={() => setShowPinSetup(false)}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: C.bg }]}>
@@ -49,10 +100,7 @@ const SettingsScreen = ({ resetAllData }) => {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: C.card, borderColor: C.border }]}
-            onPress={() => navigation.navigate('Dashboard')}
-          >
+          <TouchableOpacity style={[styles.iconBtn, { backgroundColor: C.card, borderColor: C.border }]} onPress={() => navigation.navigate('Dashboard')}>
             <Ionicons name="home-outline" size={19} color={C.text2} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: C.text1 }]}>Settings</Text>
@@ -68,11 +116,11 @@ const SettingsScreen = ({ resetAllData }) => {
           <Text style={[styles.heroSub, { color: C.text2 }]}>Smart local expense manager</Text>
           <View style={[styles.heroBadge, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
             <Ionicons name="flash" size={12} color={C.accent} />
-            <Text style={[styles.heroBadgeText, { color: C.accent }]}>v1.0.1 · Pro</Text>
+            <Text style={[styles.heroBadgeText, { color: C.accent }]}>v1.1.0 · Free</Text>
           </View>
         </View>
 
-        {/* ── APPEARANCE ─────────────────────────────── */}
+        {/* APPEARANCE */}
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={styles.sectionHead}>
             <View style={[styles.sectionHeadIcon, { backgroundColor: C.purpleBg }]}>
@@ -80,55 +128,78 @@ const SettingsScreen = ({ resetAllData }) => {
             </View>
             <Text style={[styles.sectionTitle, { color: C.text1 }]}>Appearance</Text>
           </View>
-
           <Text style={[styles.sectionDesc, { color: C.text2 }]}>Choose how Thunder Wallet looks on your device.</Text>
-
           <View style={styles.themeRow}>
-            {/* Light Mode Button */}
-            <TouchableOpacity
-              style={[
-                styles.themeBtn,
-                { backgroundColor: C.cardInner, borderColor: C.border },
-                !isDark && { backgroundColor: 'rgba(217,119,6,0.12)', borderColor: '#D97706', borderWidth: 2 },
-              ]}
-              onPress={() => isDark && toggleTheme()}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.themeBtn, { backgroundColor: C.cardInner, borderColor: C.border }, !isDark && { backgroundColor: 'rgba(217,119,6,0.12)', borderColor: '#D97706', borderWidth: 2 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isDark) toggleTheme(); }} activeOpacity={0.8}>
               <View style={[styles.themeIconCircle, { backgroundColor: !isDark ? 'rgba(217,119,6,0.2)' : C.accentBg }]}>
                 <Ionicons name="sunny" size={22} color={!isDark ? '#D97706' : C.text3} />
               </View>
               <Text style={[styles.themeBtnLabel, { color: !isDark ? '#D97706' : C.text2 }]}>Light</Text>
-              {!isDark && (
-                <View style={[styles.themeActive, { backgroundColor: '#D97706' }]}>
-                  <Ionicons name="checkmark" size={10} color="#fff" />
-                </View>
-              )}
+              {!isDark && (<View style={[styles.themeActive, { backgroundColor: '#D97706' }]}><Ionicons name="checkmark" size={10} color="#fff" /></View>)}
             </TouchableOpacity>
-
-            {/* Dark Mode Button */}
-            <TouchableOpacity
-              style={[
-                styles.themeBtn,
-                { backgroundColor: C.cardInner, borderColor: C.border },
-                isDark && { backgroundColor: C.purpleBg, borderColor: C.purple, borderWidth: 2 },
-              ]}
-              onPress={() => !isDark && toggleTheme()}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.themeBtn, { backgroundColor: C.cardInner, borderColor: C.border }, isDark && { backgroundColor: C.purpleBg, borderColor: C.purple, borderWidth: 2 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (!isDark) toggleTheme(); }} activeOpacity={0.8}>
               <View style={[styles.themeIconCircle, { backgroundColor: isDark ? C.purpleBg : C.accentBg }]}>
                 <Ionicons name="moon" size={20} color={isDark ? C.purple : C.text3} />
               </View>
               <Text style={[styles.themeBtnLabel, { color: isDark ? C.purple : C.text2 }]}>Dark</Text>
-              {isDark && (
-                <View style={[styles.themeActive, { backgroundColor: C.purple }]}>
-                  <Ionicons name="checkmark" size={10} color="#fff" />
-                </View>
-              )}
+              {isDark && (<View style={[styles.themeActive, { backgroundColor: C.purple }]}><Ionicons name="checkmark" size={10} color="#fff" /></View>)}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── DATA & PRIVACY ────────────────────────── */}
+        {/* SECURITY */}
+        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={styles.sectionHead}>
+            <View style={[styles.sectionHeadIcon, { backgroundColor: C.purpleBg }]}>
+              <Ionicons name="lock-closed" size={16} color={C.purple} />
+            </View>
+            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Security</Text>
+          </View>
+
+          <View style={[styles.toggleRow, { borderBottomColor: C.border }]}>
+            <View style={[styles.infoIcon, { backgroundColor: C.purpleBg }]}>
+              <Ionicons name="keypad" size={17} color={C.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.infoValue, { color: C.text1 }]}>PIN / Biometric Lock</Text>
+              <Text style={[styles.infoLabel, { color: C.text2 }]}>Require authentication to open</Text>
+            </View>
+            <Switch
+              value={pinEnabled}
+              onValueChange={handlePinToggle}
+              trackColor={{ false: C.border, true: C.purple }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* NOTIFICATIONS */}
+        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={styles.sectionHead}>
+            <View style={[styles.sectionHeadIcon, { backgroundColor: C.amberBg }]}>
+              <Ionicons name="notifications" size={16} color={C.amber} />
+            </View>
+            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Notifications</Text>
+          </View>
+
+          <View style={styles.toggleRow}>
+            <View style={[styles.infoIcon, { backgroundColor: C.amberBg }]}>
+              <Ionicons name="moon" size={17} color={C.amber} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.infoValue, { color: C.text1 }]}>Day in Review (9pm)</Text>
+              <Text style={[styles.infoLabel, { color: C.text2 }]}>Daily spending summary notification</Text>
+            </View>
+            <Switch
+              value={notifEnabled}
+              onValueChange={handleNotifToggle}
+              trackColor={{ false: C.border, true: C.amber }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* DATA & PRIVACY */}
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={styles.sectionHead}>
             <View style={[styles.sectionHeadIcon, { backgroundColor: C.blueBg }]}>
@@ -136,7 +207,6 @@ const SettingsScreen = ({ resetAllData }) => {
             </View>
             <Text style={[styles.sectionTitle, { color: C.text1 }]}>Data & Privacy</Text>
           </View>
-
           {[
             { icon: 'shield-checkmark', color: C.income, iconBg: C.incomeBg, label: 'Storage', value: 'On-device only' },
             { icon: 'cloud-offline', color: C.blue, iconBg: C.blueBg, label: 'Works offline', value: 'Always' },
@@ -152,13 +222,7 @@ const SettingsScreen = ({ resetAllData }) => {
               </View>
             </View>
           ))}
-
-          {/* Reset Data */}
-          <TouchableOpacity
-            style={[styles.resetBtn, { backgroundColor: C.expenseBg, borderColor: `${C.expense}35` }]}
-            onPress={handleReset}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={[styles.resetBtn, { backgroundColor: C.expenseBg, borderColor: `${C.expense}35` }]} onPress={handleReset} activeOpacity={0.8}>
             <View style={[styles.resetIconWrap, { backgroundColor: `${C.expense}20` }]}>
               <Ionicons name="trash" size={18} color={C.expense} />
             </View>
@@ -170,24 +234,25 @@ const SettingsScreen = ({ resetAllData }) => {
           </TouchableOpacity>
         </View>
 
-        {/* ── FEATURES ──────────────────────────────── */}
+        {/* FEATURES */}
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={styles.sectionHead}>
             <View style={[styles.sectionHeadIcon, { backgroundColor: C.amberBg }]}>
               <Ionicons name="sparkles" size={16} color={C.amber} />
             </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Pro Features</Text>
+            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Features</Text>
           </View>
           {[
             { icon: 'pie-chart', color: '#F87171', label: 'Interactive spending chart' },
-            { icon: 'calendar', color: C.blue, label: 'Month-wise transaction grouping' },
-            { icon: 'download', color: C.amber, label: 'CSV export & summary sharing' },
-            { icon: 'shield-checkmark', color: C.purple, label: 'Financial health score' },
-            { icon: 'bar-chart', color: C.income, label: '7-day spending trend chart' },
-            { icon: 'color-palette', color: '#A78BFA', label: 'Dark & light mode themes' },
-            { icon: 'trophy', color: C.amber, label: 'Savings goals with progress tracking' },
-            { icon: 'flame', color: '#FB923C', label: 'Under-budget streak gamification' },
-            { icon: 'sparkles', color: C.blue, label: 'Smart spending insights' },
+            { icon: 'create', color: C.blue, label: 'Edit & back-date transactions' },
+            { icon: 'options', color: C.purple, label: 'Per-category budget limits' },
+            { icon: 'repeat', color: C.income, label: 'Recurring transaction tags' },
+            { icon: 'trophy', color: C.amber, label: 'Savings goals with confetti' },
+            { icon: 'flame', color: '#FB923C', label: 'Under-budget streak tracking' },
+            { icon: 'notifications', color: C.blue, label: '9pm Day in Review notification' },
+            { icon: 'lock-closed', color: C.purple, label: 'PIN & biometric lock' },
+            { icon: 'flask', color: '#34D399', label: 'What-If spending simulator' },
+            { icon: 'color-palette', color: '#A78BFA', label: 'Dark & light mode' },
           ].map((item, i) => (
             <View key={item.label} style={[styles.featureRow, i > 0 && { borderTopColor: C.border, borderTopWidth: 1 }]}>
               <View style={[styles.infoIcon, { backgroundColor: `${item.color}18` }]}>
@@ -199,7 +264,7 @@ const SettingsScreen = ({ resetAllData }) => {
           ))}
         </View>
 
-        {/* ── ABOUT ─────────────────────────────────── */}
+        {/* ABOUT */}
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={styles.sectionHead}>
             <View style={[styles.sectionHeadIcon, { backgroundColor: C.accentBg }]}>
@@ -208,16 +273,11 @@ const SettingsScreen = ({ resetAllData }) => {
             <Text style={[styles.sectionTitle, { color: C.text1 }]}>About</Text>
           </View>
           <Text style={[styles.aboutText, { color: C.text2 }]}>
-            Built by Tejas Mane. All data stays on your device — nothing is sent to the cloud. Your privacy is fully protected.
+            Built by Tejas Mane. All data stays on your device — nothing is ever sent to the cloud. Your finances, fully private.
           </Text>
         </View>
 
-        {/* GitHub Button */}
-        <TouchableOpacity
-          style={styles.githubBtn}
-          onPress={() => Linking.openURL('https://github.com/iamtejas23')}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={styles.githubBtn} onPress={() => Linking.openURL('https://github.com/iamtejas23')} activeOpacity={0.85}>
           <View style={styles.githubIconWrap}>
             <Ionicons name="logo-github" size={19} color="#fff" />
           </View>
@@ -254,6 +314,7 @@ const styles = StyleSheet.create({
   themeIconCircle: { alignItems: 'center', borderRadius: 20, height: 44, justifyContent: 'center', width: 44 },
   themeBtnLabel: { fontSize: 13, fontWeight: '800' },
   themeActive: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 16 },
+  toggleRow: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingTop: 12 },
   infoRow: { alignItems: 'center', flexDirection: 'row', paddingVertical: 12 },
   infoIcon: { alignItems: 'center', borderRadius: 12, height: 38, justifyContent: 'center', marginRight: 12, width: 38 },
   infoLabel: { fontSize: 12, fontWeight: '600' },
