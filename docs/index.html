@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thunder Wallet — Smart Money Tracker</title>
+  <meta name="description" content="A beautiful, private expense manager. No cloud. No account. No ads. Just your money, finally under control." />
+  <meta property="og:title" content="Thunder Wallet — Smart Money Tracker" />
+  <meta property="og:description" content="No cloud. No account. No ads. Track expenses with streaks, goals, and daily insights." />
+  <meta property="og:image" content="https://iamtejas23.github.io/thunder-wallet/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0A0E1A;
+      --card: #111827;
+      --card2: #1A2235;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.12);
+      --text1: #F9FAFB;
+      --text2: rgba(249,250,251,0.55);
+      --text3: rgba(249,250,251,0.25);
+      --accent: #FFFFFF;
+      --green: #34D399;
+      --red: #F87171;
+      --blue: #60A5FA;
+      --purple: #A78BFA;
+      --amber: #FCD34D;
+      --orange: #FB923C;
+      --teal: #4ECDC4;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text1);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px;
+      background: rgba(10,14,26,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; border-radius: 10px; }
+    .nav-logo span { font-size: 17px; font-weight: 900; color: var(--text1); }
+    nav a.cta {
+      background: var(--text1); color: #000; border-radius: 10px;
+      padding: 9px 20px; font-size: 14px; font-weight: 800;
+      text-decoration: none; transition: opacity .15s;
+    }
+    nav a.cta:hover { opacity: .85; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 120px 24px 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(96,165,250,0.14) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(167,139,250,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 10% 70%, rgba(52,211,153,0.08) 0%, transparent 60%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border2);
+      border-radius: 999px; padding: 6px 16px;
+      font-size: 12px; font-weight: 700; color: var(--text2);
+      margin-bottom: 28px; letter-spacing: .5px;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+
+    .hero h1 {
+      font-size: clamp(42px, 8vw, 80px);
+      font-weight: 900; line-height: 1.06; letter-spacing: -2px;
+      max-width: 760px; margin-bottom: 22px;
+    }
+    .hero h1 .highlight {
+      background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 50%, var(--green) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 18px; color: var(--text2); max-width: 520px;
+      margin-bottom: 40px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: var(--text1); color: #000; border-radius: 14px;
+      padding: 15px 30px; font-size: 16px; font-weight: 900;
+      text-decoration: none; transition: transform .15s, opacity .15s;
+      box-shadow: 0 8px 32px rgba(255,255,255,0.15);
+    }
+    .btn-primary:hover { transform: translateY(-2px); opacity: .9; }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: rgba(255,255,255,0.06); color: var(--text1);
+      border: 1px solid var(--border2); border-radius: 14px;
+      padding: 15px 30px; font-size: 16px; font-weight: 700;
+      text-decoration: none; transition: background .15s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    /* ── PHONE MOCKUP ── */
+    .phone-wrap {
+      margin-top: 72px; position: relative; display: inline-block;
+    }
+    .phone {
+      width: 260px; aspect-ratio: 9/19.5;
+      background: var(--card); border-radius: 40px;
+      border: 2px solid var(--border2);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04),
+        0 40px 80px rgba(0,0,0,0.6),
+        0 0 120px rgba(96,165,250,0.12);
+      overflow: hidden; position: relative;
+      display: flex; flex-direction: column;
+    }
+    .phone-notch {
+      width: 90px; height: 26px; background: var(--bg);
+      border-radius: 0 0 18px 18px; align-self: center; margin-top: -1px;
+      border: 1px solid var(--border); border-top: none;
+    }
+    .phone-screen {
+      flex: 1; padding: 12px 14px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      overflow: hidden;
+    }
+    .phone-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .phone-logo-row { display: flex; align-items: center; gap: 7px; }
+    .phone-logo { width: 26px; height: 26px; border-radius: 8px; background: var(--card2); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .phone-title { font-size: 12px; font-weight: 900; color: var(--text1); }
+    .streak-badge { background: rgba(251,146,60,0.15); border: 1px solid rgba(251,146,60,0.3); border-radius: 12px; padding: 3px 8px; font-size: 9px; font-weight: 900; color: #FB923C; }
+
+    .balance-card {
+      background: #131D30; border-radius: 14px; border: 1px solid var(--border); padding: 14px;
+    }
+    .balance-label { font-size: 8px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .8px; }
+    .balance-amount { font-size: 24px; font-weight: 900; color: var(--text1); margin: 4px 0 10px; }
+    .balance-row { display: flex; gap: 8px; }
+    .balance-pill { flex: 1; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 6px 8px; border: 1px solid var(--border); }
+    .balance-pill-label { font-size: 7px; font-weight: 700; color: var(--text2); text-transform: uppercase; }
+    .balance-pill-val { font-size: 11px; font-weight: 800; margin-top: 2px; }
+
+    .mini-card { background: var(--card2); border-radius: 10px; border: 1px solid var(--border); padding: 10px; }
+    .mini-card-row { display: flex; align-items: center; justify-content: space-between; }
+    .mini-label { font-size: 8px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; }
+    .mini-score { font-size: 18px; font-weight: 900; color: var(--green); }
+    .score-bar-track { background: var(--card); border-radius: 4px; height: 5px; overflow: hidden; margin-top: 6px; }
+    .score-bar-fill { height: 5px; border-radius: 4px; background: var(--green); width: 82%; }
+
+    .quick-btns { display: flex; gap: 7px; }
+    .qbtn { flex: 1; border-radius: 10px; border: 1px solid; padding: 9px; text-align: center; font-size: 10px; font-weight: 900; }
+    .qbtn-income { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.3); color: var(--green); }
+    .qbtn-expense { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3); color: var(--red); }
+
+    .tx-list { display: flex; flex-direction: column; gap: 6px; }
+    .tx-row { display: flex; align-items: center; gap: 8px; }
+    .tx-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+    .tx-info { flex: 1; }
+    .tx-cat { font-size: 10px; font-weight: 800; color: var(--text1); }
+    .tx-date { font-size: 7px; color: var(--text3); margin-top: 1px; }
+    .tx-amount { font-size: 11px; font-weight: 900; }
+
+    .glow-ring {
+      position: absolute; width: 340px; height: 340px;
+      border-radius: 50%; border: 1px solid rgba(96,165,250,0.12);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      pointer-events: none;
+      animation: spin 20s linear infinite;
+    }
+    .glow-ring:nth-child(2) { width: 480px; height: 480px; border-color: rgba(167,139,250,0.07); animation-direction: reverse; animation-duration: 30s; }
+    @keyframes spin { from{transform:translate(-50%,-50%) rotate(0)} to{transform:translate(-50%,-50%) rotate(360deg)} }
+
+    /* ── TRUST BAR ── */
+    .trust-bar {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 32px; padding: 28px 24px;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .trust-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text2); }
+    .trust-icon { font-size: 16px; }
+
+    /* ── FEATURES GRID ── */
+    section { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--blue); margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 5vw, 48px); font-weight: 900; letter-spacing: -1px; margin-bottom: 16px; }
+    .section-sub { font-size: 17px; color: var(--text2); max-width: 540px; line-height: 1.7; margin-bottom: 52px; }
+
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .feature-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 28px; transition: border-color .2s, transform .2s;
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--fc, var(--blue)), transparent);
+      opacity: 0; transition: opacity .2s;
+    }
+    .feature-card:hover { transform: translateY(-4px); border-color: var(--border2); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 18px;
+    }
+    .feature-title { font-size: 17px; font-weight: 900; margin-bottom: 8px; }
+    .feature-desc { font-size: 14px; color: var(--text2); line-height: 1.65; }
+
+    /* ── STATS STRIP ── */
+    .stats-strip {
+      background: var(--card); border-radius: 24px; border: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; overflow: hidden; margin: 0 24px;
+    }
+    .stat-item {
+      flex: 1; min-width: 180px; padding: 36px 32px;
+      border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-val { font-size: 44px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+    .stat-label { font-size: 14px; color: var(--text2); margin-top: 8px; font-weight: 600; }
+
+    /* ── SCREENSHOT SECTION ── */
+    .screenshots-section { padding: 80px 24px; text-align: center; }
+    .screens-row {
+      display: flex; gap: 20px; justify-content: center;
+      overflow-x: auto; padding: 20px 0 10px;
+      scroll-snap-type: x mandatory;
+    }
+    .screen-card {
+      flex-shrink: 0; width: 200px; aspect-ratio: 9/19;
+      background: var(--card); border-radius: 28px;
+      border: 1px solid var(--border2); overflow: hidden;
+      scroll-snap-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .screen-label { font-size: 11px; font-weight: 700; color: var(--text3); margin-top: 10px; letter-spacing: .5px; text-transform: uppercase; }
+
+    /* ── HOW IT WORKS ── */
+    .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+    .step { padding: 28px; background: var(--card); border-radius: 20px; border: 1px solid var(--border); }
+    .step-num { font-size: 11px; font-weight: 800; color: var(--text3); letter-spacing: 1px; margin-bottom: 16px; }
+    .step-title { font-size: 18px; font-weight: 900; margin-bottom: 8px; }
+    .step-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+    /* ── COFFEE SECTION ── */
+    .coffee-section {
+      padding: 80px 24px; text-align: center;
+    }
+    .coffee-card {
+      max-width: 600px; margin: 0 auto;
+      background: linear-gradient(135deg, rgba(252,211,77,0.08) 0%, rgba(251,146,60,0.06) 100%);
+      border: 1px solid rgba(252,211,77,0.2); border-radius: 28px;
+      padding: 52px 40px;
+    }
+    .coffee-emoji { font-size: 64px; display: block; margin-bottom: 20px; animation: bob 3s ease-in-out infinite; }
+    @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .coffee-title { font-size: 32px; font-weight: 900; letter-spacing: -1px; margin-bottom: 12px; }
+    .coffee-desc { font-size: 16px; color: var(--text2); line-height: 1.7; margin-bottom: 32px; max-width: 420px; margin-left: auto; margin-right: auto; }
+    .coffee-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, #FCD34D 0%, #FB923C 100%);
+      color: #000; border-radius: 14px; padding: 16px 32px;
+      font-size: 17px; font-weight: 900; text-decoration: none;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 8px 30px rgba(252,211,77,0.3);
+    }
+    .coffee-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(252,211,77,0.4); }
+    .coffee-note { margin-top: 20px; font-size: 13px; color: var(--text3); }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      padding: 80px 24px; text-align: center; position: relative;
+    }
+    .cta-section::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(96,165,250,0.08) 0%, transparent 70%);
+    }
+    .cta-card {
+      max-width: 640px; margin: 0 auto; position: relative;
+    }
+    .cta-title { font-size: clamp(30px, 6vw, 52px); font-weight: 900; letter-spacing: -1.5px; margin-bottom: 16px; }
+    .cta-sub { font-size: 17px; color: var(--text2); margin-bottom: 40px; }
+    .privacy-chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+    .privacy-chip { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 12px; color: var(--text2); font-weight: 600; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 32px 24px;
+      text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .footer-logo { display: flex; align-items: center; gap: 8px; }
+    .footer-logo img { width: 28px; height: 28px; border-radius: 8px; }
+    .footer-logo span { font-size: 15px; font-weight: 900; }
+    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+    .footer-links a { color: var(--text2); text-decoration: none; font-size: 13px; font-weight: 600; transition: color .15s; }
+    .footer-links a:hover { color: var(--text1); }
+    .footer-copy { font-size: 12px; color: var(--text3); }
+
+    @media (max-width: 640px) {
+      nav { padding: 14px 18px; }
+      .hero { padding: 100px 18px 60px; }
+      .trust-bar { gap: 20px; }
+      .stat-item { border-right: none; }
+      .coffee-card { padding: 36px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <img src="icon.png" alt="Thunder Wallet" />
+    <span>Thunder Wallet</span>
+  </a>
+  <a class="cta" href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank">Download APK ↓</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="glow-ring"></div>
+  <div class="glow-ring"></div>
+
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Free · Open Source · No Cloud · No Ads
+  </div>
+
+  <h1>Your money,<br /><span class="highlight">finally under control.</span></h1>
+
+  <p>Thunder Wallet is a premium expense tracker that lives entirely on your phone. No account. No subscription. No one watching your money but you.</p>
+
+  <div class="hero-actions">
+    <a class="btn-primary" href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      Download APK
+    </a>
+    <a class="btn-secondary" href="https://github.com/iamtejas23/thunder-wallet" target="_blank">
+      View Source →
+    </a>
+  </div>
+
+  <!-- PHONE MOCKUP -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="phone-header">
+          <div class="phone-logo-row">
+            <div class="phone-logo">⚡</div>
+            <div>
+              <div class="phone-title">Thunder Wallet</div>
+              <div style="font-size:8px;color:var(--text3);margin-top:1px;">Your money, under control</div>
+            </div>
+          </div>
+          <div class="streak-badge">🔥 8d</div>
+        </div>
+
+        <div class="balance-card">
+          <div class="balance-label">Current Balance</div>
+          <div class="balance-amount">₹42,580</div>
+          <div class="balance-row">
+            <div class="balance-pill">
+              <div class="balance-pill-label">Income</div>
+              <div class="balance-pill-val" style="color:var(--green)">₹75,000</div>
+            </div>
+            <div class="balance-pill">
+              <div class="balance-pill-label">Expenses</div>
+              <div class="balance-pill-val" style="color:var(--red)">₹32,420</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-row">
+            <div style="font-size:9px;font-weight:700;color:var(--text2)">Financial Health</div>
+            <div style="font-size:9px;font-weight:800;color:var(--green)">Excellent</div>
+          </div>
+          <div class="mini-card-row" style="margin-top:4px">
+            <div class="score-bar-track" style="flex:1;margin-right:10px"><div class="score-bar-fill"></div></div>
+            <div class="mini-score">82</div>
+          </div>
+        </div>
+
+        <div class="quick-btns">
+          <div class="qbtn qbtn-income">＋ Income</div>
+          <div class="qbtn qbtn-expense">－ Expense</div>
+        </div>
+
+        <div class="tx-list">
+          <div class="tx-row">
+            <div class="tx-icon" style="background:rgba(248,113,113,0.15)">🍔</div>
+            <div class="tx-info">
+              <div class="tx-cat">Food</div>
+              <div class="tx-date">Today, 1:30 PM</div>
+            </div>
+            <div class="tx-amount" style="color:var(--red)">-₹340</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-icon" style="background:rgba(52,211,153,0.15)">💼</div>
+            <div class="tx-info">
+              <div class="tx-cat">Salary</div>
+              <div class="tx-date">Jun 1</div>
+            </div>
+            <div class="tx-amount" style="color:var(--green)">+₹75k</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-icon" style="background:rgba(167,139,250,0.15)">🛍</div>
+            <div class="tx-info">
+              <div class="tx-cat">Shopping</div>
+              <div class="tx-date">Yesterday</div>
+            </div>
+            <div class="tx-amount" style="color:var(--red)">-₹1,200</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <div class="trust-item"><span class="trust-icon">🔒</span> 100% On-Device Storage</div>
+  <div class="trust-item"><span class="trust-icon">📵</span> Zero Cloud Dependency</div>
+  <div class="trust-item"><span class="trust-icon">🚫</span> No Ads, Ever</div>
+  <div class="trust-item"><span class="trust-icon">📖</span> Open Source</div>
+  <div class="trust-item"><span class="trust-icon">⚡</span> Works Offline Always</div>
+</div>
+
+<!-- FEATURES SECTION -->
+<section>
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything you need.<br />Nothing you don't.</h2>
+  <p class="section-sub">Built around the features that actually change how you think about money — not just track it.</p>
+
+  <div class="features-grid">
+    <div class="feature-card" style="--fc: var(--green)">
+      <div class="feature-icon" style="background:rgba(52,211,153,0.12)">📊</div>
+      <div class="feature-title">Animated Balance Counter</div>
+      <div class="feature-desc">Your balance counts up and down every time a transaction is added. You feel the money move. That's the whole point.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--orange)">
+      <div class="feature-icon" style="background:rgba(251,146,60,0.12)">🔥</div>
+      <div class="feature-title">Under-Budget Streak</div>
+      <div class="feature-desc">Stay under your daily budget and build a streak. 7 days gets you a ⚡, 14 days gets you 🔥. It's oddly addictive.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--amber)">
+      <div class="feature-icon" style="background:rgba(252,211,77,0.12)">🏆</div>
+      <div class="feature-title">Goal Confetti</div>
+      <div class="feature-desc">Hit a savings goal and get a full-screen confetti celebration. The most emotional moment in any finance app — and we nailed it.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--purple)">
+      <div class="feature-icon" style="background:rgba(167,139,250,0.12)">🧪</div>
+      <div class="feature-title">What-If Simulator</div>
+      <div class="feature-desc">Drag a slider to cut your Food budget by ₹1,000 and instantly see how much you'd save per year. No other free app does this.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--blue)">
+      <div class="feature-icon" style="background:rgba(96,165,250,0.12)">🔔</div>
+      <div class="feature-title">9pm Day in Review</div>
+      <div class="feature-desc">"Today: ₹840 spent. You're ₹160 under budget 🔥" — a nightly local notification that builds the daily habit. No server needed.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--red)">
+      <div class="feature-icon" style="background:rgba(248,113,113,0.12)">🗂</div>
+      <div class="feature-title">Category Budgets</div>
+      <div class="feature-desc">Set monthly limits per category — ₹3k for Food, ₹2k for Entertainment. Color-coded progress bars warn you before you overspend.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: #34D399">
+      <div class="feature-icon" style="background:rgba(52,211,153,0.12)">✏️</div>
+      <div class="feature-title">Edit & Back-Date</div>
+      <div class="feature-desc">Entered the wrong amount? Long-press to edit. Forgot to log rent on the 1st? Back-date it. Finally, a finance app that trusts you.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--purple)">
+      <div class="feature-icon" style="background:rgba(167,139,250,0.12)">🔐</div>
+      <div class="feature-title">PIN & Biometric Lock</div>
+      <div class="feature-desc">Protect your finances with a 4-digit PIN or fingerprint/face unlock. Because your money data deserves real security.</div>
+    </div>
+
+    <div class="feature-card" style="--fc: var(--teal)">
+      <div class="feature-icon" style="background:rgba(78,205,196,0.12)">🔁</div>
+      <div class="feature-title">Recurring Transactions</div>
+      <div class="feature-desc">Tag transactions as daily, weekly, or monthly. EMI, Netflix, rent — marked clearly so you never lose track of fixed costs.</div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS STRIP -->
+<div class="stats-strip">
+  <div class="stat-item">
+    <div class="stat-val" style="color:var(--green)">0</div>
+    <div class="stat-label">Data sent to any server. Ever.</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" style="color:var(--blue)">10+</div>
+    <div class="stat-label">Features that make users emotional</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" style="color:var(--amber)">100%</div>
+    <div class="stat-label">Free. Open source. Always.</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" style="color:var(--purple)">∞</div>
+    <div class="stat-label">Transactions, offline, forever</div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="section-label">Getting Started</div>
+  <h2 class="section-title">Up and running<br />in 60 seconds.</h2>
+  <p class="section-sub">No signup. No form filling. Just install and start.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">STEP 01</div>
+      <div class="step-title">Download the APK</div>
+      <div class="step-desc">Grab the latest release from GitHub. No Play Store account needed — sideload directly on any Android phone.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">STEP 02</div>
+      <div class="step-title">Set your budget</div>
+      <div class="step-desc">The onboarding flow asks for one thing: your monthly budget. That's it. Pick from presets or type your own number.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">STEP 03</div>
+      <div class="step-title">Log your income</div>
+      <div class="step-desc">Add your salary or any income source. Your balance comes alive. The app is now personally yours.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">STEP 04</div>
+      <div class="step-title">Build the streak</div>
+      <div class="step-desc">Log expenses daily. Stay under budget. Watch your streak grow. Let the 9pm notification become your money ritual.</div>
+    </div>
+  </div>
+</section>
+
+<!-- BUY ME A COFFEE -->
+<section class="coffee-section">
+  <div class="coffee-card">
+    <span class="coffee-emoji">☕</span>
+    <h2 class="coffee-title">Buy Me a Coffee</h2>
+    <p class="coffee-desc">Thunder Wallet is free and will always be free. If it's saved you money, helped you build a habit, or just made you feel in control — consider buying me a coffee. It directly funds new features like widgets, charts, and more.</p>
+    <a class="coffee-btn" href="https://www.buymeacoffee.com/iamtejas23" target="_blank" rel="noopener noreferrer">
+      ☕ Buy Me a Coffee
+    </a>
+    <p class="coffee-note">No pressure. Even sharing the app with a friend helps more than you know. 🙏</p>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="cta-section">
+  <div class="cta-card">
+    <div class="section-label" style="justify-content:center;display:flex">Download</div>
+    <h2 class="cta-title">Start tracking today.<br />It's free.</h2>
+    <p class="cta-sub">Your finances deserve an app that respects your privacy as much as your money.</p>
+    <a class="btn-primary" href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank" style="margin: 0 auto; display: inline-flex;">
+      ⬇ Get the APK
+    </a>
+    <div class="privacy-chips">
+      <span class="privacy-chip">🔒 No account</span>
+      <span class="privacy-chip">📵 No cloud</span>
+      <span class="privacy-chip">🚫 No ads</span>
+      <span class="privacy-chip">📖 Open source</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <img src="icon.png" alt="Thunder Wallet" />
+    <span>Thunder Wallet</span>
+  </div>
+  <div class="footer-links">
+    <a href="https://github.com/iamtejas23/thunder-wallet" target="_blank">GitHub</a>
+    <a href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank">Releases</a>
+    <a href="https://github.com/iamtejas23/thunder-wallet/issues" target="_blank">Report a Bug</a>
+    <a href="https://www.buymeacoffee.com/iamtejas23" target="_blank">☕ Support</a>
+  </div>
+  <p class="footer-copy">Built with ❤️ by <a href="https://github.com/iamtejas23" style="color:var(--text2);text-decoration:none;">Tejas Mane</a> · All data stays on your device.</p>
+</footer>
+
+</body>
+</html>
