@@ -61,10 +61,10 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease \
-            -Pexpo.useLegacyPackaging=true \
-            -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
-            --build-cache \
-            --parallel
+            -PreactNativeArchitectures=arm64-v8a \
+            -Pandroid.enableProguardInReleaseBuilds=false \
+            -Pandroid.enableShrinkResourcesInReleaseBuilds=false \
+            -Pexpo.useLegacyPackaging=true
 
       - name: Resolve release name
         id: release
