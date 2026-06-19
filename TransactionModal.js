@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import {
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from './ThemeContext';
 
 const expenseCategories = [
@@ -121,6 +124,8 @@ const TransactionModal = ({
   setTransactionDate,
   transactionRecurring,
   setTransactionRecurring,
+  transactionImage,
+  setTransactionImage,
   addTransaction,
   editingTransaction,
 }) => {
@@ -134,6 +139,33 @@ const TransactionModal = ({
   const handleSave = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addTransaction();
+  };
+
+  const pickImage = async (fromCamera) => {
+    try {
+      let result;
+      if (fromCamera) {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access is required to take a photo.'); return; }
+        result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.75 });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permission needed', 'Gallery access is required to pick an image.'); return; }
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.75 });
+      }
+      if (!result.canceled && result.assets?.length) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setTransactionImage(result.assets[0].uri);
+      }
+    } catch { Alert.alert('Error', 'Could not open image picker.'); }
+  };
+
+  const showImageOptions = () => {
+    Alert.alert('Attach Receipt', 'Choose a source', [
+      { text: 'Camera',  onPress: () => pickImage(true)  },
+      { text: 'Gallery', onPress: () => pickImage(false) },
+      { text: 'Cancel',  style: 'cancel'                 },
+    ]);
   };
 
   return (
@@ -273,6 +305,31 @@ const TransactionModal = ({
                 );
               })}
             </View>
+
+            {/* Receipt Image */}
+            <Text style={[styles.label, { color: C.text1 }]}>
+              Receipt <Text style={{ color: C.text3, fontSize: 11, fontWeight: '500', textTransform: 'none' }}>(optional)</Text>
+            </Text>
+            {transactionImage ? (
+              <View style={{ marginBottom: 16 }}>
+                <Image source={{ uri: transactionImage }} style={styles.receiptPreview} resizeMode="cover" />
+                <TouchableOpacity
+                  style={[styles.removeImgBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTransactionImage(null); }}
+                >
+                  <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.attachBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}
+                onPress={showImageOptions}
+              >
+                <Ionicons name="camera-outline" size={20} color={C.text2} />
+                <Text style={[styles.attachText, { color: C.text2 }]}>Attach Receipt Photo</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
 
           <TouchableOpacity
@@ -316,6 +373,10 @@ const styles = StyleSheet.create({
   noteInput: { minHeight: 72, paddingTop: 12, textAlignVertical: 'top' },
   saveBtn: { alignItems: 'center', borderRadius: 14, elevation: 6, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 8, minHeight: 56, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.35, shadowRadius: 16 },
   saveBtnText: { fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  attachBtn: { alignItems: 'center', borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 16, minHeight: 52 },
+  attachText: { fontSize: 14, fontWeight: '700' },
+  receiptPreview: { borderRadius: 12, height: 160, width: '100%', marginBottom: 8 },
+  removeImgBtn: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', paddingVertical: 8 },
 });
 
 export default TransactionModal;

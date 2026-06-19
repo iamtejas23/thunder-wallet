@@ -34,7 +34,12 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "READ_SMS",
+        "RECEIVE_SMS",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -49,19 +54,19 @@
           "sounds": []
         }
       ],
-      "expo-local-authentication"
+      "expo-local-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Thunder Wallet accesses your photos to attach receipts to transactions.",
+          "cameraPermission": "Thunder Wallet uses the camera to photograph receipts."
+        }
+      ]
     ],
     "extra": {
       "eas": {
         "projectId": "20973568-e0e6-48b1-a5ee-2c55cd8b6f39"
       }
-    },
-    "updates": {
-      "enabled": false,
-      "url": "https://u.expo.dev/20973568-e0e6-48b1-a5ee-2c55cd8b6f39"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
     }
   }
 }
