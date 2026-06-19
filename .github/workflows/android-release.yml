@@ -52,7 +52,6 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew clean assembleRelease \
-            -PreactNativeArchitectures=arm64-v8a \
             -Pexpo.useLegacyPackaging=true
 
       - name: Resolve release name
