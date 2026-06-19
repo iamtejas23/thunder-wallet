@@ -16,30 +16,39 @@ permissions:
 
 jobs:
   build-release-apk:
-    name: Build lightweight release APK
+    name: Build release APK
     runs-on: ubuntu-latest
     env:
       NODE_ENV: production
       EXPO_UNSTABLE_CORE_AUTOLINKING: '1'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
+
+      # Cache Gradle wrapper binary
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper
+          key: gradle-wrapper-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+
+      # Cache all downloaded Gradle/Maven dependencies — this is the big one
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-caches-${{ hashFiles('android/build.gradle', 'android/app/build.gradle', 'package-lock.json') }}
+          restore-keys: gradle-caches-
 
       - name: Install dependencies
         run: npm ci
@@ -47,12 +56,15 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
-      - name: Build lightweight APK
+      - name: Build release APK
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew clean assembleRelease \
-            -Pexpo.useLegacyPackaging=true
+          ./gradlew assembleRelease \
+            -Pexpo.useLegacyPackaging=true \
+            -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
+            --build-cache \
+            --parallel
 
       - name: Resolve release name
         id: release
@@ -65,7 +77,6 @@ jobs:
           else
             RELEASE_TAG="manual-${GITHUB_RUN_NUMBER}"
           fi
-
           echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "apk_name=thunder-wallet-${RELEASE_TAG}.apk" >> "$GITHUB_OUTPUT"
 
@@ -75,8 +86,7 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "release/${{ steps.release.outputs.apk_name }}"
           ls -lh release
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: thunder-wallet-release-apk
           path: release/*.apk
@@ -103,5 +113,5 @@ jobs:
             gh release create "$TAG_NAME" "$APK_PATH" \
               --target "$GITHUB_SHA" \
               --title "Thunder Wallet ${TAG_NAME}" \
-              --notes "Lightweight Android release APK built automatically from ${GITHUB_SHA}."
+              --notes "Android release APK built from ${GITHUB_SHA}."
           fi
