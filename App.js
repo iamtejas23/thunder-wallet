@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Animated, Easing, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,10 +68,11 @@ export default function App() {
     })();
   }, []);
 
-  if (!ready) return <SplashScreen />;
-
-  if (showOnboarding) {
-    return (
+  let inner;
+  if (!ready) {
+    inner = <SplashScreen />;
+  } else if (showOnboarding) {
+    inner = (
       <SafeAreaProvider>
         <OnboardingScreen
           onDone={async () => {
@@ -81,24 +83,28 @@ export default function App() {
         />
       </SafeAreaProvider>
     );
-  }
-
-  if (showPin && !pinUnlocked) {
-    return (
+  } else if (showPin && !pinUnlocked) {
+    inner = (
       <SafeAreaProvider>
         <PinScreen mode="check" onSuccess={() => setPinUnlocked(true)} />
+      </SafeAreaProvider>
+    );
+  } else {
+    inner = (
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <NavigationContainer>
+            <MainApp />
+          </NavigationContainer>
+        </ThemeProvider>
       </SafeAreaProvider>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <NavigationContainer>
-          <MainApp />
-        </NavigationContainer>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {inner}
+    </GestureHandlerRootView>
   );
 }
 
