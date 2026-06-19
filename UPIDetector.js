@@ -1,11 +1,10 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Graceful imports — work in production APK, silently absent in Expo Go
-let SmsAndroid = null;
-let SmsListener = null;
-try { SmsAndroid = require('react-native-get-sms-android'); } catch {}
-try { SmsListener = require('react-native-android-sms-listener'); } catch {}
+// SMS native modules removed — they crash with New Architecture (RN 0.81).
+// UPI detection is disabled; all functions degrade gracefully to empty results.
+const SmsAndroid = null;
+const SmsListener = null;
 
 const SEEN_KEY = 'upi_seen_sms_ids';
 
