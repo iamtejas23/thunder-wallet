@@ -21,15 +21,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Svg, { Circle, G, Path } from 'react-native-svg';
-import { useTheme } from './ThemeContext';
-import * as FileSystem from 'expo-file-system';
-import SettingsScreen from './SettingsScreen';
 import BillsScreen, { BILLS_STORAGE_KEY } from './BillsScreen';
+import { useTheme } from './ThemeContext';
+import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
 import { scheduleDailyReview } from './NotificationService';
-import { fetchNewUPITransactions, markSMSSeen, requestSMSPermission, isSMSAvailable, startUPIListener } from './UPIDetector';
-import UPIPrompt from './UPIPrompt';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
@@ -53,7 +50,6 @@ const GOAL_PRESETS = [
 ];
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-// compactCurrency — notation:'compact' + style:'currency' throws RangeError on some Hermes builds
 const compactCurrency = {
   format: (n) => {
     const abs = Math.abs(n);
@@ -491,205 +487,15 @@ function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, 
   );
 }
 
-// ─── Credit Card Balance ──────────────────────────────────────────────────────
-function CreditCard({ stats }) {
-  return (
-    <View style={ccStyles.card}>
-      <View style={ccStyles.glow1} />
-      <View style={ccStyles.glow2} />
-      <View style={ccStyles.glow3} />
-      <View style={ccStyles.topShimmer} />
-
-      {/* Top row: brand + NFC */}
-      <View style={ccStyles.topRow}>
-        <View style={ccStyles.brandRow}>
-          <View style={ccStyles.brandIcon}><Text style={{ fontSize: 13 }}>⚡</Text></View>
-          <Text style={ccStyles.brandText}>Thunder Wallet</Text>
-        </View>
-        <View style={{ transform: [{ rotate: '90deg' }] }}>
-          <Ionicons name="wifi-outline" size={22} color="rgba(255,255,255,0.4)" />
-        </View>
-      </View>
-
-      {/* EMV Chip */}
-      <View style={ccStyles.chip}>
-        <View style={ccStyles.chipLine} />
-        <View style={ccStyles.chipCol} />
-        <View style={ccStyles.chipTL} />
-        <View style={ccStyles.chipTR} />
-        <View style={ccStyles.chipBL} />
-        <View style={ccStyles.chipBR} />
-      </View>
-
-      {/* Balance */}
-      <Text style={ccStyles.balLabel}>CURRENT BALANCE</Text>
-      <AnimatedBalance value={stats.balance} color="#FFFFFF" fontSize={36} />
-
-      {/* Status */}
-      <View style={ccStyles.statusRow}>
-        <View style={[ccStyles.statusDot, { backgroundColor: stats.balance >= 0 ? '#34D399' : '#F87171' }]} />
-        <Text style={[ccStyles.statusText, { color: stats.balance >= 0 ? '#34D399' : '#F87171' }]}>
-          {stats.balance >= 0 ? 'Healthy' : 'Overspent'}
-        </Text>
-      </View>
-
-      <View style={ccStyles.divider} />
-
-      {/* Bottom stats */}
-      <View style={ccStyles.bottomRow}>
-        <View>
-          <Text style={ccStyles.bottomLabel}>INCOME</Text>
-          <Text style={[ccStyles.bottomVal, { color: '#34D399' }]}>+{compactCurrency.format(stats.income)}</Text>
-        </View>
-        <View style={ccStyles.sep} />
-        <View>
-          <Text style={ccStyles.bottomLabel}>SPENT</Text>
-          <Text style={[ccStyles.bottomVal, { color: '#F87171' }]}>-{compactCurrency.format(stats.expense)}</Text>
-        </View>
-        <View style={ccStyles.sep} />
-        <View>
-          <Text style={ccStyles.bottomLabel}>SAVED</Text>
-          <Text style={[ccStyles.bottomVal, { color: '#FCD34D' }]}>{Math.round(Math.max(stats.savingsRate, 0))}%</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const ccStyles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    backgroundColor: '#0B1628',
-    padding: 22,
-    overflow: 'hidden',
-    elevation: 20,
-    shadowColor: '#3B5BDB',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    minHeight: 210,
-  },
-  glow1: {
-    position: 'absolute', width: 280, height: 280, borderRadius: 140,
-    backgroundColor: 'rgba(96,165,250,0.10)', top: -110, right: -80,
-  },
-  glow2: {
-    position: 'absolute', width: 220, height: 220, borderRadius: 110,
-    backgroundColor: 'rgba(167,139,250,0.09)', bottom: -100, left: -60,
-  },
-  glow3: {
-    position: 'absolute', width: 160, height: 160, borderRadius: 80,
-    backgroundColor: 'rgba(52,211,153,0.05)', top: 40, left: '40%',
-  },
-  topShimmer: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  brandIcon: {
-    width: 30, height: 30, borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  brandText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 0.2 },
-  chip: {
-    width: 44, height: 34, borderRadius: 7,
-    backgroundColor: '#C9A96E',
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  chipLine: { position: 'absolute', top: '50%', left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.2)' },
-  chipCol: { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.2)' },
-  chipTL: { position: 'absolute', top: 0, left: 0, width: '50%', height: '50%', borderBottomRightRadius: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.18)' },
-  chipTR: { position: 'absolute', top: 0, right: 0, width: '50%', height: '50%', borderBottomLeftRadius: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.18)' },
-  chipBL: { position: 'absolute', bottom: 0, left: 0, width: '50%', height: '50%', borderTopRightRadius: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.18)' },
-  chipBR: { position: 'absolute', bottom: 0, right: 0, width: '50%', height: '50%', borderTopLeftRadius: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.18)' },
-  balLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', letterSpacing: 1.8, marginBottom: 2 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)', marginVertical: 14 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center' },
-  bottomLabel: { color: 'rgba(255,255,255,0.38)', fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginBottom: 5 },
-  bottomVal: { fontSize: 15, fontWeight: '900' },
-  sep: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.09)', marginHorizontal: 18 },
-});
-
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 function DashboardScreen({ wallet }) {
   const { C } = useTheme();
-  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, addTransaction, goals, deleteGoal, openGoalModal, streak, categoryBudgets, openCategoryBudgetModal } = wallet;
+  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, streak, categoryBudgets, openCategoryBudgetModal } = wallet;
   const healthScore = calculateHealthScore(stats, monthlyBudget);
   const scoreColor = healthScore >= 70 ? C.income : healthScore >= 40 ? C.amber : C.expense;
   const scoreLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Work';
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState(String(monthlyBudget));
-
-  // ── UPI detection state ──
-  const [upiQueue, setUpiQueue] = useState([]);
-  const [showUPIPrompt, setShowUPIPrompt] = useState(false);
-
-  useEffect(() => {
-    if (!isSMSAvailable()) return;
-
-    let stopListener = () => {};
-
-    const init = async () => {
-      // Ask permission once
-      const granted = await requestSMSPermission();
-      if (!granted) return;
-
-      // 1. On-open scan — catch any UPI payments from the last 48h
-      const { transactions } = await fetchNewUPITransactions();
-      if (transactions.length > 0) {
-        setUpiQueue(transactions);
-        setShowUPIPrompt(true);
-      }
-
-      // 2. Real-time listener — fires instantly when a new bank SMS arrives
-      stopListener = startUPIListener((detected) => {
-        // Queue it even if another prompt is already open
-        setUpiQueue((q) => {
-          const already = q.some((t) => t.smsId === detected.smsId);
-          return already ? q : [...q, detected];
-        });
-        setShowUPIPrompt(true);
-      });
-    };
-
-    const t = setTimeout(init, 800);
-    return () => {
-      clearTimeout(t);
-      stopListener();
-    };
-  }, []);
-
-  const handleUPISave = async (data) => {
-    addTransaction({
-      id: String(Date.now()),
-      type: 'expense',
-      amount: -Math.abs(data.amount),
-      category: data.category,
-      note: data.note,
-      date: data.date,
-      recurring: null,
-      fromUPI: true,
-    });
-    await markSMSSeen([data.smsId]);
-  };
-
-  const handleUPISkip = async (smsId) => {
-    await markSMSSeen([smsId]);
-  };
-
-  const handleUPIDismissAll = () => {
-    setShowUPIPrompt(false);
-    setUpiQueue([]);
-  };
 
   const commitBudget = async () => {
     const val = Number.parseFloat(budgetInput);
@@ -699,19 +505,38 @@ function DashboardScreen({ wallet }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      {showUPIPrompt && upiQueue.length > 0 && (
-        <UPIPrompt
-          transactions={upiQueue}
-          onSave={handleUPISave}
-          onDismiss={handleUPISkip}
-          onDismissAll={handleUPIDismissAll}
-        />
-      )}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
         <AppHeader streak={streak} />
 
-        {/* Credit Card Balance */}
-        <CreditCard stats={stats} />
+        {/* Balance Card */}
+        <View style={{ backgroundColor: C.balanceCard, borderColor: C.border, borderRadius: 22, borderWidth: 1, overflow: 'hidden', padding: 22, elevation: 10, shadowColor: '#000', shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.4, shadowRadius: 20 }}>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent, opacity: 0.2 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+            <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Current Balance</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: stats.balance >= 0 ? C.incomeBg : C.expenseBg, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 5 }}>
+              <Ionicons name={stats.balance >= 0 ? 'trending-up' : 'warning'} size={12} color={stats.balance >= 0 ? C.income : C.expense} />
+              <Text style={{ color: stats.balance >= 0 ? C.income : C.expense, fontSize: 11, fontWeight: '800' }}>{stats.balance >= 0 ? 'Healthy' : 'Overspent'}</Text>
+            </View>
+          </View>
+          <AnimatedBalance value={stats.balance} color={C.text1} fontSize={38} />
+          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 18, padding: 14 }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.income }} />
+                <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Income</Text>
+              </View>
+              <Text style={{ color: C.income, fontSize: 16, fontWeight: '800' }}>{currency.format(stats.income)}</Text>
+            </View>
+            <View style={{ backgroundColor: C.border, marginHorizontal: 14, width: 1 }} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.expense }} />
+                <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Expenses</Text>
+              </View>
+              <Text style={{ color: C.expense, fontSize: 16, fontWeight: '800' }}>{currency.format(stats.expense)}</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Health Score */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14 }}>
@@ -1214,7 +1039,6 @@ function MainApp() {
   const [transactionNote, setTransactionNote] = useState('');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString());
   const [transactionRecurring, setTransactionRecurring] = useState(null);
-  const [transactionImage, setTransactionImage] = useState(null);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1247,12 +1071,9 @@ function MainApp() {
   const insight = useMemo(() => buildInsight(stats, monthlyBudget, transactions.length), [monthlyBudget, stats, transactions.length]);
   const streak = useMemo(() => calculateStreak(transactions, monthlyBudget), [transactions, monthlyBudget]);
 
-  // Only reschedule notification once per day, not on every stat change
   useEffect(() => {
-    const today = new Date().toDateString();
     scheduleDailyReview(stats).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [new Date().toDateString()]);
+  }, [stats]);
 
   const resetForm = () => {
     setTransactionType('expense');
@@ -1261,7 +1082,6 @@ function MainApp() {
     setTransactionNote('');
     setTransactionDate(new Date().toISOString());
     setTransactionRecurring(null);
-    setTransactionImage(null);
     setEditingTransaction(null);
   };
 
@@ -1275,7 +1095,6 @@ function MainApp() {
     setTransactionNote(tx.note || '');
     setTransactionDate(tx.date);
     setTransactionRecurring(tx.recurring || null);
-    setTransactionImage(tx.imageUri || null);
     setModalVisible(true);
   };
 
@@ -1302,82 +1121,37 @@ function MainApp() {
     await AsyncStorage.setItem(CAT_BUDGETS_KEY, JSON.stringify(budgets));
   };
 
-  const copyReceiptImage = async (tempUri, txId) => {
-    if (!tempUri) return null;
-    try {
-      const dir = `${FileSystem.documentDirectory}receipts/`;
-      const dirInfo = await FileSystem.getInfoAsync(dir);
-      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      const ext = (tempUri.split('.').pop()?.split('?')[0] || 'jpg').replace(/[^a-zA-Z0-9]/g, '').slice(0, 5) || 'jpg';
-      const dest = `${dir}${txId}.${ext}`;
-      await FileSystem.copyAsync({ from: tempUri, to: dest });
-      return dest;
-    } catch { return null; }
-  };
-
   const addTransaction = async () => {
     const amount = Number.parseFloat(transactionAmount);
     if (!transactionCategory.trim()) { Alert.alert('Missing category', 'Choose or type a category.'); return; }
     if (!Number.isFinite(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Amount must be greater than zero.'); return; }
 
-    const txId = editingTransaction ? editingTransaction.id : `${Date.now()}`;
-    // Copy image to permanent storage if it's a new/changed temp file
-    let imageUri = null;
-    if (transactionImage) {
-      const isAlreadyPermanent = transactionImage.includes(FileSystem.documentDirectory);
-      imageUri = isAlreadyPermanent ? transactionImage : await copyReceiptImage(transactionImage, txId);
-    }
-
     const txData = {
-      id: txId,
+      id: editingTransaction ? editingTransaction.id : `${Date.now()}`,
       category: transactionCategory.trim(),
       amount: transactionType === 'expense' ? -Math.abs(amount) : Math.abs(amount),
       note: transactionNote.trim(),
       type: transactionType,
       date: transactionDate,
       recurring: transactionRecurring,
-      imageUri: imageUri || undefined,
     };
 
     try {
-      await new Promise((resolve, reject) => {
-        setTransactions((prev) => {
-          const next = editingTransaction
-            ? prev.map((t) => t.id === editingTransaction.id ? txData : t)
-            : [txData, ...prev];
-          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).then(resolve).catch(reject);
-          return next;
-        });
-      });
+      let next;
+      if (editingTransaction) {
+        next = transactions.map((t) => t.id === editingTransaction.id ? txData : t);
+      } else {
+        next = [txData, ...transactions];
+      }
+      await persistTransactions(next);
       resetForm();
       setModalVisible(false);
     } catch { Alert.alert('Save error', 'Could not save transaction.'); }
   };
 
-  const addTransactionDirect = async (txData) => {
-    try {
-      const normalized = normalizeTransaction(txData);
-      // Functional updater avoids stale-closure on `transactions` when called from a tab component
-      await new Promise((resolve, reject) => {
-        setTransactions((prev) => {
-          const next = [normalized, ...prev];
-          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).then(resolve).catch(reject);
-          return next;
-        });
-      });
-    } catch { Alert.alert('Save error', 'Could not save transaction.'); }
-  };
-
   const deleteTransaction = async (id) => {
-    try {
-      await new Promise((resolve, reject) => {
-        setTransactions((prev) => {
-          const next = prev.filter((t) => t.id !== id);
-          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).then(resolve).catch(reject);
-          return next;
-        });
-      });
-    } catch { Alert.alert('Delete error', 'Could not delete transaction.'); }
+    try { await persistTransactions(transactions.filter((t) => t.id !== id)); }
+    catch { Alert.alert('Delete error', 'Could not delete transaction.'); }
   };
 
   const clearTransactions = () => {
@@ -1389,51 +1163,31 @@ function MainApp() {
   };
 
   const addGoal = async (goal) => {
-    await new Promise((resolve, reject) => {
-      setGoals((prev) => {
-        const next = [goal, ...prev];
-        AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next)).then(resolve).catch(reject);
-        return next;
-      });
-    });
+    const next = [goal, ...goals];
+    await persistGoals(next);
   };
 
   const deleteGoal = (id) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Remove goal?', 'This goal will be deleted.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        await new Promise((resolve, reject) => {
-          setGoals((prev) => {
-            const next = prev.filter((g) => g.id !== id);
-            AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next)).then(resolve).catch(reject);
-            return next;
-          });
-        });
-      }},
+      { text: 'Remove', style: 'destructive', onPress: async () => { await persistGoals(goals.filter((g) => g.id !== id)); } },
     ]);
   };
 
-  // Check if any goal just hit completion — batch all new completions in one write
+  // Check if any goal just hit completion
   useEffect(() => {
-    const newlyDone = goals.filter((g) => g.savedAmount >= g.target && !g.celebratedAt);
-    if (!newlyDone.length) return;
-    const doneIds = new Set(newlyDone.map((g) => g.id));
-    setConfettiGoal(newlyDone[0]);
-    const updated = goals.map((g) => doneIds.has(g.id) ? { ...g, celebratedAt: new Date().toISOString() } : g);
-    setGoals(updated);
-    AsyncStorage.setItem(GOALS_KEY, JSON.stringify(updated)).catch(() => {});
+    goals.forEach((g) => {
+      if (g.savedAmount >= g.target && !g.celebratedAt) {
+        setConfettiGoal(g);
+        persistGoals(goals.map((goal) => goal.id === g.id ? { ...goal, celebratedAt: new Date().toISOString() } : goal));
+      }
+    });
   }, [goals]);
 
   const resetAllData = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.removeItem(STORAGE_KEY),
-        AsyncStorage.removeItem(BUDGET_KEY),
-        AsyncStorage.removeItem(GOALS_KEY),
-        AsyncStorage.removeItem(CAT_BUDGETS_KEY),
-        AsyncStorage.removeItem(BILLS_STORAGE_KEY),
-      ]);
+      await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(BUDGET_KEY), AsyncStorage.removeItem(GOALS_KEY), AsyncStorage.removeItem(CAT_BUDGETS_KEY), AsyncStorage.removeItem(BILLS_STORAGE_KEY)]);
       setTransactions([]);
       setMonthlyBudget(DEFAULT_MONTHLY_BUDGET);
       setGoals([]);
@@ -1445,7 +1199,7 @@ function MainApp() {
     activeFilter, adjustMonthlyBudget, clearTransactions, deleteTransaction, editTransaction,
     deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal,
     openCategoryBudgetModal, categoryBudgets, searchQuery, setActiveFilter, setSearchQuery,
-    stats, streak, transactions, addTransaction: addTransactionDirect,
+    stats, streak, transactions,
   };
 
   return (
@@ -1470,7 +1224,7 @@ function MainApp() {
         <Tab.Screen name="Dashboard">{() => <DashboardScreen wallet={wallet} />}</Tab.Screen>
         <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
         <Tab.Screen name="Activity">{() => <ActivityScreen wallet={wallet} />}</Tab.Screen>
-        <Tab.Screen name="Bills">{() => <BillsScreen addTransaction={addTransactionDirect} />}</Tab.Screen>
+        <Tab.Screen name="Bills">{() => <BillsScreen />}</Tab.Screen>
         <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} />}</Tab.Screen>
       </Tab.Navigator>
 
@@ -1491,8 +1245,6 @@ function MainApp() {
         setTransactionRecurring={setTransactionRecurring}
         addTransaction={addTransaction}
         editingTransaction={editingTransaction}
-        transactionImage={transactionImage}
-        setTransactionImage={setTransactionImage}
       />
 
       <AddGoalModal visible={isGoalModalVisible} onClose={() => setGoalModalVisible(false)} onAdd={addGoal} />
