@@ -53,7 +53,17 @@ const GOAL_PRESETS = [
 ];
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-const compactCurrency = new Intl.NumberFormat('en-IN', { currency: 'INR', maximumFractionDigits: 0, notation: 'compact', style: 'currency' });
+// compactCurrency — notation:'compact' + style:'currency' throws RangeError on some Hermes builds
+const compactCurrency = {
+  format: (n) => {
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(1)}Cr`;
+    if (abs >= 100000)   return `${sign}₹${(abs / 100000).toFixed(1)}L`;
+    if (abs >= 1000)     return `${sign}₹${(abs / 1000).toFixed(1)}K`;
+    return `${sign}₹${Math.round(abs)}`;
+  },
+};
 
 const normalizeTransaction = (t) => {
   const hasType = t.type === 'income' || t.type === 'expense';
@@ -1237,9 +1247,12 @@ function MainApp() {
   const insight = useMemo(() => buildInsight(stats, monthlyBudget, transactions.length), [monthlyBudget, stats, transactions.length]);
   const streak = useMemo(() => calculateStreak(transactions, monthlyBudget), [transactions, monthlyBudget]);
 
+  // Only reschedule notification once per day, not on every stat change
   useEffect(() => {
+    const today = new Date().toDateString();
     scheduleDailyReview(stats).catch(() => {});
-  }, [stats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [new Date().toDateString()]);
 
   const resetForm = () => {
     setTransactionType('expense');
@@ -1295,7 +1308,7 @@ function MainApp() {
       const dir = `${FileSystem.documentDirectory}receipts/`;
       const dirInfo = await FileSystem.getInfoAsync(dir);
       if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      const ext = tempUri.split('.').pop().split('?')[0] || 'jpg';
+      const ext = (tempUri.split('.').pop()?.split('?')[0] || 'jpg').replace(/[^a-zA-Z0-9]/g, '').slice(0, 5) || 'jpg';
       const dest = `${dir}${txId}.${ext}`;
       await FileSystem.copyAsync({ from: tempUri, to: dest });
       return dest;
@@ -1327,13 +1340,15 @@ function MainApp() {
     };
 
     try {
-      let next;
-      if (editingTransaction) {
-        next = transactions.map((t) => t.id === editingTransaction.id ? txData : t);
-      } else {
-        next = [txData, ...transactions];
-      }
-      await persistTransactions(next);
+      await new Promise((resolve, reject) => {
+        setTransactions((prev) => {
+          const next = editingTransaction
+            ? prev.map((t) => t.id === editingTransaction.id ? txData : t)
+            : [txData, ...prev];
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).then(resolve).catch(reject);
+          return next;
+        });
+      });
       resetForm();
       setModalVisible(false);
     } catch { Alert.alert('Save error', 'Could not save transaction.'); }
@@ -1405,7 +1420,9 @@ function MainApp() {
     if (!newlyDone.length) return;
     const doneIds = new Set(newlyDone.map((g) => g.id));
     setConfettiGoal(newlyDone[0]);
-    persistGoals(goals.map((g) => doneIds.has(g.id) ? { ...g, celebratedAt: new Date().toISOString() } : g));
+    const updated = goals.map((g) => doneIds.has(g.id) ? { ...g, celebratedAt: new Date().toISOString() } : g);
+    setGoals(updated);
+    AsyncStorage.setItem(GOALS_KEY, JSON.stringify(updated)).catch(() => {});
   }, [goals]);
 
   const resetAllData = async () => {
