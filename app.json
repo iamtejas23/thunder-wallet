@@ -44,14 +44,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#0A0E1A",
-          "sounds": []
-        }
-      ],
       "expo-local-authentication",
       [
         "expo-image-picker",
