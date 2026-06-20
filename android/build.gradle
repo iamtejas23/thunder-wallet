@@ -7,12 +7,12 @@ buildscript {
         compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '35')
         targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '35')
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.23'
-        ndkVersion = "26.1.10909125"
+        ndkVersion = "27.1.12297006"
         // KSP version compatible with Kotlin 2.1.20 (resolved by RN 0.81 gradle plugin).
         // expo-updates defaults to ksp-1.9.24-1.0.20 which breaks; setting this here
         // overrides it for all Expo modules (expo-updates/android/build.gradle checks
         // rootProject.hasProperty("kspVersion")).
-        kspVersion = "2.0.21-1.0.28"
+        kspVersion = "2.1.20-1.0.32"
     }
     repositories {
         google()
