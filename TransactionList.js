@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -144,21 +145,258 @@ const TransactionList = ({
     });
   };
 
-  const escapeCSV = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-
-  const generateCSV = async () => {
+  const generatePDF = async () => {
     if (!transactions.length) { Alert.alert('Nothing to export', 'Add a transaction first.'); return; }
     try {
-      const rows = [
-        ['ID', 'Type', 'Category', 'Amount', 'Note', 'Date'].map(escapeCSV).join(','),
-        ...transactions.map((t) => [t.id, t.amount >= 0 ? 'Income' : 'Expense', t.category, t.amount, t.note, formatTs(t.date)].map(escapeCSV).join(',')),
-      ];
-      const uri = `${FileSystem.documentDirectory}thunder-wallet-transactions.csv`;
-      await FileSystem.writeAsStringAsync(uri, rows.join('\n'));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
-      else Alert.alert('Exported', 'CSV saved to app documents.');
-    } catch {
-      Alert.alert('Export failed', 'Could not export transactions.');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const now = new Date();
+      const reportDate = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      const curM = now.getMonth(), curY = now.getFullYear();
+
+      // ── Compute summary ─────────────────────────────────────────────────────
+      const allIncome  = transactions.filter((t) => t.amount >= 0).reduce((s, t) => s + t.amount, 0);
+      const allExpense = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+      const mTx        = transactions.filter((t) => { const d = new Date(t.date); return d.getMonth() === curM && d.getFullYear() === curY; });
+      const mIncome    = mTx.filter((t) => t.amount >= 0).reduce((s, t) => s + t.amount, 0);
+      const mExpense   = mTx.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+      const savingsRate = mIncome > 0 ? Math.round(((mIncome - mExpense) / mIncome) * 100) : 0;
+
+      // ── Category breakdown ──────────────────────────────────────────────────
+      const catMap = {};
+      transactions.filter((t) => t.amount < 0).forEach((t) => { catMap[t.category] = (catMap[t.category] || 0) + Math.abs(t.amount); });
+      const catRows = Object.entries(catMap).sort(([, a], [, b]) => b - a).slice(0, 8);
+
+      // ── Format helpers ──────────────────────────────────────────────────────
+      const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+      const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      // ── Category bar rows ───────────────────────────────────────────────────
+      const maxCat = catRows[0]?.[1] || 1;
+      const catHTML = catRows.map(([cat, amt]) => {
+        const pct = Math.round((amt / allExpense) * 100);
+        const barW = Math.round((amt / maxCat) * 100);
+        return `
+          <div class="cat-row">
+            <div class="cat-meta">
+              <span class="cat-name">${cat}</span>
+              <span class="cat-amt">${fmt(amt)} <span class="cat-pct">${pct}%</span></span>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
+          </div>`;
+      }).join('');
+
+      // ── Transaction table rows ──────────────────────────────────────────────
+      const txHTML = [...transactions]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((t, i) => {
+          const isIncome = t.amount >= 0;
+          const rowBg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+          return `
+            <tr style="background:${rowBg}">
+              <td>${fmtDate(t.date)}</td>
+              <td><span class="badge ${isIncome ? 'badge-in' : 'badge-ex'}">${isIncome ? 'Income' : 'Expense'}</span></td>
+              <td>${t.category}</td>
+              <td>${t.note || '—'}</td>
+              <td class="${isIncome ? 'amt-in' : 'amt-ex'}">${isIncome ? '+' : '-'}${fmt(Math.abs(t.amount))}</td>
+            </tr>`;
+        }).join('');
+
+      // ── HTML template ───────────────────────────────────────────────────────
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; background: #fff; color: #0F172A; font-size: 13px; }
+
+  /* ── Page header ── */
+  .page-header {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #1a1040 100%);
+    padding: 36px 40px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon {
+    width: 48px; height: 48px; background: rgba(167,139,250,0.2);
+    border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+  .brand-name { color: #fff; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+  .brand-sub  { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+  .report-meta { text-align: right; }
+  .report-title { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .report-date  { color: rgba(255,255,255,0.5); font-size: 11px; margin-top: 4px; }
+
+  /* ── Body ── */
+  .body { padding: 32px 40px; }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
+    text-transform: uppercase; color: #94A3B8; margin-bottom: 14px; margin-top: 28px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* ── Summary grid ── */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat-card {
+    border-radius: 14px; padding: 16px; border: 1px solid #E2E8F0;
+  }
+  .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8; }
+  .stat-value { font-size: 18px; font-weight: 900; margin-top: 5px; }
+  .stat-sub   { font-size: 10px; color: #94A3B8; margin-top: 3px; }
+  .card-income  { background: #F0FDF4; border-color: #BBF7D0; }
+  .card-expense { background: #FFF1F2; border-color: #FECDD3; }
+  .card-balance { background: #EFF6FF; border-color: #BFDBFE; }
+  .card-savings { background: #FAF5FF; border-color: #E9D5FF; }
+  .col-income  { color: #059669; }
+  .col-expense { color: #DC2626; }
+  .col-balance { color: #2563EB; }
+  .col-savings { color: #7C3AED; }
+
+  /* ── This month highlight strip ── */
+  .month-strip {
+    background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px;
+    padding: 16px 20px; display: flex; gap: 0; margin-bottom: 4px;
+  }
+  .month-stat { flex: 1; text-align: center; }
+  .month-stat + .month-stat { border-left: 1px solid #E2E8F0; }
+  .month-stat-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.6px; }
+  .month-stat-val   { font-size: 17px; font-weight: 900; margin-top: 4px; }
+
+  /* ── Category bars ── */
+  .cat-row { margin-bottom: 12px; }
+  .cat-meta { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .cat-name { font-size: 12px; font-weight: 700; color: #1E293B; }
+  .cat-amt  { font-size: 12px; font-weight: 800; color: #1E293B; }
+  .cat-pct  { font-size: 10px; font-weight: 600; color: #94A3B8; }
+  .bar-bg   { background: #F1F5F9; border-radius: 6px; height: 8px; overflow: hidden; }
+  .bar-fill { background: linear-gradient(90deg, #7C3AED, #A78BFA); border-radius: 6px; height: 8px; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #0F172A; }
+  thead th { color: rgba(255,255,255,0.85); font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 11px 12px; text-align: left; }
+  tbody td { padding: 10px 12px; font-size: 12px; color: #334155; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
+  .badge { border-radius: 6px; font-size: 10px; font-weight: 800; padding: 3px 7px; }
+  .badge-in  { background: #D1FAE5; color: #059669; }
+  .badge-ex  { background: #FFE4E6; color: #DC2626; }
+  .amt-in  { color: #059669; font-weight: 800; }
+  .amt-ex  { color: #DC2626; font-weight: 800; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 36px; padding-top: 20px; border-top: 1px solid #E2E8F0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-left  { font-size: 11px; color: #94A3B8; }
+  .footer-right { font-size: 10px; color: #CBD5E1; }
+</style>
+</head>
+<body>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-name">Thunder Wallet</div>
+        <div class="brand-sub">Smart Expense Manager</div>
+      </div>
+    </div>
+    <div class="report-meta">
+      <div class="report-title">Financial Report</div>
+      <div class="report-date">Generated ${reportDate}</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- All-time summary -->
+    <div class="section-title">All-Time Overview</div>
+    <div class="summary-grid">
+      <div class="stat-card card-income">
+        <div class="stat-label">Total Income</div>
+        <div class="stat-value col-income">${fmt(allIncome)}</div>
+        <div class="stat-sub">${transactions.filter((t) => t.amount >= 0).length} entries</div>
+      </div>
+      <div class="stat-card card-expense">
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-value col-expense">${fmt(allExpense)}</div>
+        <div class="stat-sub">${transactions.filter((t) => t.amount < 0).length} entries</div>
+      </div>
+      <div class="stat-card card-balance">
+        <div class="stat-label">Net Balance</div>
+        <div class="stat-value col-balance">${fmt(allIncome - allExpense)}</div>
+        <div class="stat-sub">${transactions.length} total entries</div>
+      </div>
+      <div class="stat-card card-savings">
+        <div class="stat-label">This Month Savings</div>
+        <div class="stat-value col-savings">${savingsRate}%</div>
+        <div class="stat-sub">of monthly income</div>
+      </div>
+    </div>
+
+    <!-- This month -->
+    <div class="section-title">This Month — ${now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
+    <div class="month-strip">
+      <div class="month-stat">
+        <div class="month-stat-label">Income</div>
+        <div class="month-stat-val col-income">${fmt(mIncome)}</div>
+      </div>
+      <div class="month-stat">
+        <div class="month-stat-label">Spent</div>
+        <div class="month-stat-val col-expense">${fmt(mExpense)}</div>
+      </div>
+      <div class="month-stat">
+        <div class="month-stat-label">Saved</div>
+        <div class="month-stat-val col-savings">${fmt(mIncome - mExpense)}</div>
+      </div>
+      <div class="month-stat">
+        <div class="month-stat-label">Transactions</div>
+        <div class="month-stat-val col-balance">${mTx.length}</div>
+      </div>
+    </div>
+
+    ${catRows.length ? `
+    <!-- Category breakdown -->
+    <div class="section-title">Spending by Category</div>
+    ${catHTML}
+    ` : ''}
+
+    <!-- Transaction history -->
+    <div class="section-title">All Transactions</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Type</th><th>Category</th><th>Note</th><th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>${txHTML}</tbody>
+    </table>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-left">Thunder Wallet · All data stored locally on your device · No cloud sync</div>
+      <div class="footer-right">thunder-wallet-report-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.pdf</div>
+    </div>
+
+  </div>
+</body>
+</html>`;
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const dest = `${FileSystem.documentDirectory}thunder-wallet-${curY}${String(curM + 1).padStart(2, '0')}.pdf`;
+      await FileSystem.moveAsync({ from: uri, to: dest });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(dest, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('PDF saved', 'Report saved to app documents.');
+      }
+    } catch (err) {
+      Alert.alert('Export failed', err.message || 'Could not generate PDF.');
     }
   };
 
@@ -303,8 +541,8 @@ const TransactionList = ({
           <Text style={[styles.title, { color: C.text1 }]}>Transactions</Text>
         </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={generateCSV} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
-            <Ionicons name="download-outline" size={18} color={C.income} />
+          <TouchableOpacity onPress={generatePDF} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
+            <Ionicons name="document-text-outline" size={18} color={C.income} />
           </TouchableOpacity>
           <TouchableOpacity onPress={shareSummary} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
             <Ionicons name="share-social-outline" size={18} color={C.blue} />

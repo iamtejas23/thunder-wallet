@@ -25,13 +25,15 @@ import { useTheme } from './ThemeContext';
 import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
-import { scheduleDailyReview } from './NotificationService';
+import BillsScreen, { BILLS_KEY } from './BillsScreen';
+import { scheduleDailyReview, scheduleBillReminders } from './NotificationService';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
 const BUDGET_KEY = 'monthlyBudget';
 const GOALS_KEY = 'savingsGoals';
 const CAT_BUDGETS_KEY = 'categoryBudgets';
+const SAVINGS_KEY = 'savings_v1';
 const DEFAULT_MONTHLY_BUDGET = 30000;
 const CHART_COLORS = ['#F87171', '#60A5FA', '#FCD34D', '#34D399', '#A78BFA', '#FB923C'];
 
@@ -67,6 +69,10 @@ const normalizeTransaction = (t) => {
   };
 };
 
+// Returns "YYYY-MM-DD" in LOCAL timezone — avoids UTC-offset date-shift bugs
+const localDateStr = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 const polarToCartesian = (c, r, deg) => {
   const rad = ((deg - 90) * Math.PI) / 180;
   return { x: c + r * Math.cos(rad), y: c + r * Math.sin(rad) };
@@ -82,15 +88,14 @@ const describeArc = (c, r, s, e) => {
 // ─── Streak ───────────────────────────────────────────────────────────────────
 function calculateStreak(transactions, monthlyBudget) {
   const now = new Date();
-  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const dailyBudget = monthlyBudget / dim;
   let streak = 0;
   for (let i = 0; i < 60; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const dailyBudget = monthlyBudget / dim;
+    const dateStr = localDateStr(d);
     const daySpend = transactions
-      .filter((t) => t.date.startsWith(dateStr) && t.amount < 0)
+      .filter((t) => localDateStr(new Date(t.date)) === dateStr && t.amount < 0)
       .reduce((s, t) => s + Math.abs(t.amount), 0);
     if (daySpend <= dailyBudget) streak++;
     else break;
@@ -398,6 +403,77 @@ function AddGoalModal({ visible, onClose, onAdd }) {
   );
 }
 
+// ─── Add Savings Modal ────────────────────────────────────────────────────────
+function AddSavingsModal({ visible, type, onClose, onSave }) {
+  const { C } = useTheme();
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  const isDeposit = type === 'deposit';
+  const accentColor = isDeposit ? '#34D399' : '#F87171';
+
+  const reset = () => { setAmount(''); setNote(''); };
+
+  const handleSave = () => {
+    const amt = Number.parseFloat(amount);
+    if (!Number.isFinite(amt) || amt <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount greater than zero.'); return; }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onSave({ id: `${Date.now()}`, type, amount: amt, note: note.trim(), date: new Date().toISOString() });
+    reset();
+    onClose();
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={() => { reset(); onClose(); }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' }} onPress={() => { reset(); onClose(); }} />
+        <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20, paddingBottom: 36 }}>
+          <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginBottom: 16, width: 40 }} />
+          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            {isDeposit ? 'Add Savings' : 'Withdraw Savings'}
+          </Text>
+          <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 20, marginTop: 2 }}>
+            {isDeposit ? 'Deposit to Savings' : 'Withdraw from Savings'}
+          </Text>
+
+          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Amount</Text>
+          <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: `${accentColor}50`, borderRadius: 14, borderWidth: 2, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14, marginBottom: 14 }}>
+            <Text style={{ color: accentColor, fontSize: 22, fontWeight: '900', marginRight: 8 }}>₹</Text>
+            <TextInput
+              style={{ color: C.text1, flex: 1, fontSize: 22, fontWeight: '800' }}
+              placeholder="0"
+              placeholderTextColor={C.text3}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+              autoFocus
+            />
+          </View>
+
+          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Note (optional)</Text>
+          <TextInput
+            style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 15, minHeight: 48, paddingHorizontal: 14, marginBottom: 20 }}
+            placeholder={isDeposit ? 'e.g. Monthly savings, bonus…' : 'e.g. Emergency, purchase…'}
+            placeholderTextColor={C.text3}
+            value={note}
+            onChangeText={setNote}
+          />
+
+          <TouchableOpacity
+            style={{ alignItems: 'center', backgroundColor: accentColor, borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 54, elevation: 6, shadowColor: accentColor, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.35, shadowRadius: 14 }}
+            onPress={handleSave}
+          >
+            <Ionicons name={isDeposit ? 'arrow-down-circle' : 'arrow-up-circle'} size={20} color="#000" />
+            <Text style={{ color: '#000', fontSize: 16, fontWeight: '900' }}>
+              {isDeposit ? 'Add to Savings' : 'Withdraw'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ─── Category Budget Modal ────────────────────────────────────────────────────
 const BUDGET_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Rent', 'Health', 'Entertainment', 'Groceries', 'Education', 'Other'];
 
@@ -477,6 +553,109 @@ function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, 
   );
 }
 
+// ─── Credit Balance Card ──────────────────────────────────────────────────────
+function CreditBalanceCard({ stats }) {
+  const { isDark } = useTheme();
+  const isHealthy = stats.balance >= 0;
+  const statusColor = isHealthy ? '#34D399' : '#F87171';
+
+  // Card stays dark in both themes — real credit cards are always dark
+  const card = {
+    bg:           isDark ? '#0F172A' : '#1E293B',
+    border:       isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.12)',
+    brandText:    'rgba(255,255,255,0.9)',
+    labelText:    'rgba(255,255,255,0.38)',
+    subText:      'rgba(255,255,255,0.32)',
+    sep:          'rgba(255,255,255,0.1)',
+    chipBg:       '#C9A535',
+    chipLine:     'rgba(100,70,0,0.4)',
+    nfcColor:     'rgba(255,255,255,0.28)',
+    shadow:       isDark ? '#000' : '#1E293B',
+  };
+
+  return (
+    <View style={{
+      backgroundColor: card.bg,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: card.border,
+      paddingHorizontal: 22,
+      paddingVertical: 20,
+      height: 196,
+      justifyContent: 'space-between',
+      elevation: 10,
+      shadowColor: card.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.28,
+      shadowRadius: 16,
+    }}>
+
+      {/* ── Row 1: brand + status ── */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Ionicons name="flash" size={14} color="#A78BFA" />
+          <Text style={{ color: card.brandText, fontSize: 14, fontWeight: '800', letterSpacing: 0.2 }}>
+            Thunder Wallet
+          </Text>
+        </View>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 5,
+          backgroundColor: `${statusColor}18`, borderColor: `${statusColor}40`,
+          borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4,
+        }}>
+          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: statusColor }} />
+          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '800' }}>
+            {isHealthy ? 'Healthy' : 'Overspent'}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Row 2: balance (hero) ── */}
+      <View>
+        <Text style={{ color: card.labelText, fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 3 }}>
+          Current Balance
+        </Text>
+        <AnimatedBalance value={stats.balance} color="#FFFFFF" fontSize={36} />
+      </View>
+
+      {/* ── Row 3: chip + nfc + income / expenses ── */}
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* EMV chip */}
+        <View style={{
+          width: 30, height: 22, borderRadius: 5,
+          backgroundColor: card.chipBg, borderWidth: 0.5, borderColor: '#8B6914',
+        }}>
+          <View style={{ position: 'absolute', top: 9, left: 0, right: 0, height: 1, backgroundColor: card.chipLine }} />
+          <View style={{ position: 'absolute', top: 0, bottom: 0, left: 8, width: 1, backgroundColor: card.chipLine }} />
+          <View style={{ position: 'absolute', top: 0, bottom: 0, right: 8, width: 1, backgroundColor: card.chipLine }} />
+        </View>
+        {/* NFC / contactless */}
+        <Ionicons name="wifi" size={15} color={card.nfcColor} style={{ marginLeft: 8, transform: [{ rotate: '90deg' }] }} />
+
+        {/* separator */}
+        <View style={{ width: 1, height: 28, backgroundColor: card.sep, marginHorizontal: 16 }} />
+
+        {/* income */}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Income</Text>
+          <Text style={{ color: '#34D399', fontSize: 13, fontWeight: '900' }}>{compactCurrency.format(stats.income)}</Text>
+        </View>
+
+        {/* separator */}
+        <View style={{ width: 1, height: 28, backgroundColor: card.sep, marginHorizontal: 16 }} />
+
+        {/* expenses */}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Expenses</Text>
+          <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '900' }}>{compactCurrency.format(stats.expense)}</Text>
+        </View>
+      </View>
+
+    </View>
+  );
+}
+
+
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 function DashboardScreen({ wallet }) {
   const { C } = useTheme();
@@ -498,51 +677,28 @@ function DashboardScreen({ wallet }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
         <AppHeader streak={streak} />
 
-        {/* Balance Card */}
-        <View style={{ backgroundColor: C.balanceCard, borderColor: C.border, borderRadius: 22, borderWidth: 1, overflow: 'hidden', padding: 22, elevation: 10, shadowColor: '#000', shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.4, shadowRadius: 20 }}>
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent, opacity: 0.2 }} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Current Balance</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: stats.balance >= 0 ? C.incomeBg : C.expenseBg, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 5 }}>
-              <Ionicons name={stats.balance >= 0 ? 'trending-up' : 'warning'} size={12} color={stats.balance >= 0 ? C.income : C.expense} />
-              <Text style={{ color: stats.balance >= 0 ? C.income : C.expense, fontSize: 11, fontWeight: '800' }}>{stats.balance >= 0 ? 'Healthy' : 'Overspent'}</Text>
-            </View>
-          </View>
-          <AnimatedBalance value={stats.balance} color={C.text1} fontSize={38} />
-          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 18, padding: 14 }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.income }} />
-                <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Income</Text>
-              </View>
-              <Text style={{ color: C.income, fontSize: 16, fontWeight: '800' }}>{currency.format(stats.income)}</Text>
-            </View>
-            <View style={{ backgroundColor: C.border, marginHorizontal: 14, width: 1 }} />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.expense }} />
-                <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Expenses</Text>
-              </View>
-              <Text style={{ color: C.expense, fontSize: 16, fontWeight: '800' }}>{currency.format(stats.expense)}</Text>
-            </View>
-          </View>
-        </View>
+        {/* Credit Balance Card */}
+        <CreditBalanceCard stats={stats} />
 
         {/* Health Score */}
-        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14 }}>
-          <View style={{ alignItems: 'center', backgroundColor: `${scoreColor}18`, borderRadius: 12, height: 38, justifyContent: 'center', width: 38 }}>
-            <Ionicons name="shield-checkmark" size={18} color={scoreColor} />
+        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 16, borderWidth: 1, marginTop: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center', width: 46, height: 46 }}>
+            <Svg width={46} height={46}>
+              <Circle cx={23} cy={23} r={19} stroke={C.cardInner} strokeWidth={5} fill="none" />
+              <Circle cx={23} cy={23} r={19} stroke={scoreColor} strokeWidth={5} fill="none"
+                strokeDasharray={`${(healthScore / 100) * 119.4} 119.4`}
+                strokeLinecap="round" rotation="-90" origin="23,23" />
+            </Svg>
+            <Text style={{ position: 'absolute', color: scoreColor, fontSize: 11, fontWeight: '900' }}>{healthScore}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700' }}>Financial Health</Text>
-              <Text style={{ color: scoreColor, fontSize: 11, fontWeight: '800' }}>{scoreLabel}</Text>
-            </View>
-            <View style={{ backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
-              <View style={{ borderRadius: 4, height: 6, width: `${healthScore}%`, backgroundColor: scoreColor }} />
+            <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Financial Health</Text>
+            <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginBottom: 5 }}>{scoreLabel}</Text>
+            <View style={{ backgroundColor: C.cardInner, borderRadius: 3, height: 4, overflow: 'hidden' }}>
+              <View style={{ borderRadius: 3, height: 4, width: `${healthScore}%`, backgroundColor: scoreColor }} />
             </View>
           </View>
-          <Text style={{ color: scoreColor, fontSize: 22, fontWeight: '900', minWidth: 36, textAlign: 'right' }}>{healthScore}</Text>
+          <Ionicons name="shield-checkmark" size={18} color={scoreColor} style={{ opacity: 0.8 }} />
         </View>
 
         {/* Streak Banner */}
@@ -561,14 +717,20 @@ function DashboardScreen({ wallet }) {
         )}
 
         {/* Quick Actions */}
-        <View style={{ flexDirection: 'row', gap: 10, marginVertical: 14 }}>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}>
-            <Ionicons name="add-circle" size={20} color={C.income} />
-            <Text style={{ color: C.income, fontSize: 14, fontWeight: '900' }}>Income</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginVertical: 12 }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.incomeBg, borderColor: `${C.income}30`, borderRadius: 14, borderWidth: 1, paddingVertical: 14 }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}
+          >
+            <Ionicons name="add-circle" size={18} color={C.income} />
+            <Text style={{ color: C.income, fontSize: 13, fontWeight: '900' }}>Income</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.expenseBg, borderColor: `${C.expense}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}>
-            <Ionicons name="remove-circle" size={20} color={C.expense} />
-            <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>Expense</Text>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.expenseBg, borderColor: `${C.expense}30`, borderRadius: 14, borderWidth: 1, paddingVertical: 14 }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}
+          >
+            <Ionicons name="remove-circle" size={18} color={C.expense} />
+            <Text style={{ color: C.expense, fontSize: 13, fontWeight: '900' }}>Expense</Text>
           </TouchableOpacity>
         </View>
 
@@ -708,6 +870,105 @@ function DashboardScreen({ wallet }) {
           )}
         </View>
 
+        {/* ── Savings ── */}
+        {(() => {
+          const { savings, openSavingsModal } = wallet;
+          const total = savings.reduce((s, e) => e.type === 'deposit' ? s + e.amount : s - e.amount, 0);
+          const recent = savings.slice(0, 4);
+          return (
+            <View style={{ marginTop: 14 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <View>
+                  <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Piggy Bank</Text>
+                  <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>Savings</Text>
+                </View>
+                {/* action buttons */}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{ alignItems: 'center', backgroundColor: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.3)', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 12, paddingVertical: 8 }}
+                    onPress={() => openSavingsModal('withdrawal')}
+                  >
+                    <Ionicons name="arrow-up" size={13} color="#F87171" />
+                    <Text style={{ color: '#F87171', fontSize: 12, fontWeight: '800' }}>Withdraw</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ alignItems: 'center', backgroundColor: 'rgba(52,211,153,0.12)', borderColor: 'rgba(52,211,153,0.3)', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 12, paddingVertical: 8 }}
+                    onPress={() => openSavingsModal('deposit')}
+                  >
+                    <Ionicons name="arrow-down" size={13} color="#34D399" />
+                    <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '800' }}>Deposit</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Balance card */}
+              <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Total Saved</Text>
+                    <Text style={{ color: total >= 0 ? '#34D399' : '#F87171', fontSize: 30, fontWeight: '900' }}>
+                      {currency.format(Math.abs(total))}
+                    </Text>
+                    {total < 0 && <Text style={{ color: '#F87171', fontSize: 11, marginTop: 2 }}>Withdrawals exceed deposits</Text>}
+                  </View>
+                  <View style={{ alignItems: 'center', backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 18, height: 52, justifyContent: 'center', width: 52 }}>
+                    <Ionicons name="wallet" size={24} color="#34D399" />
+                  </View>
+                </View>
+
+                {/* deposit / withdrawal totals */}
+                {savings.length > 0 && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 14, paddingTop: 14, borderTopColor: C.border, borderTopWidth: 1 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Deposited</Text>
+                      <Text style={{ color: '#34D399', fontSize: 15, fontWeight: '900', marginTop: 2 }}>
+                        {compactCurrency.format(savings.filter((e) => e.type === 'deposit').reduce((s, e) => s + e.amount, 0))}
+                      </Text>
+                    </View>
+                    <View style={{ width: 1, backgroundColor: C.border }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Withdrawn</Text>
+                      <Text style={{ color: '#F87171', fontSize: 15, fontWeight: '900', marginTop: 2 }}>
+                        {compactCurrency.format(savings.filter((e) => e.type === 'withdrawal').reduce((s, e) => s + e.amount, 0))}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Recent entries */}
+              {recent.length > 0 ? (
+                recent.map((entry) => (
+                  <View key={entry.id} style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, marginBottom: 8 }}>
+                    <View style={{ alignItems: 'center', backgroundColor: entry.type === 'deposit' ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)', borderRadius: 12, height: 38, justifyContent: 'center', width: 38 }}>
+                      <Ionicons name={entry.type === 'deposit' ? 'arrow-down-circle' : 'arrow-up-circle'} size={20} color={entry.type === 'deposit' ? '#34D399' : '#F87171'} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{entry.note || (entry.type === 'deposit' ? 'Deposit' : 'Withdrawal')}</Text>
+                      <Text style={{ color: C.text3, fontSize: 11, marginTop: 2 }}>{new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                    </View>
+                    <Text style={{ color: entry.type === 'deposit' ? '#34D399' : '#F87171', fontSize: 14, fontWeight: '900' }}>
+                      {entry.type === 'deposit' ? '+' : '-'}{compactCurrency.format(entry.amount)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <TouchableOpacity
+                  style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderStyle: 'dashed', borderWidth: 1.5, padding: 24 }}
+                  onPress={() => openSavingsModal('deposit')}
+                >
+                  <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 20, height: 48, justifyContent: 'center', marginBottom: 10, width: 48 }}>
+                    <Ionicons name="wallet-outline" size={22} color={C.text3} />
+                  </View>
+                  <Text style={{ color: C.text1, fontSize: 15, fontWeight: '800' }}>Start saving today</Text>
+                  <Text style={{ color: C.text2, fontSize: 13, marginTop: 4 }}>Tap to make your first deposit.</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })()}
+
         {/* Forecast row */}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
           {[
@@ -724,27 +985,6 @@ function DashboardScreen({ wallet }) {
             </View>
           ))}
         </View>
-
-        {/* 7-day Trend */}
-        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="bar-chart" size={15} color={C.blue} />
-              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '900' }}>7-day Spending</Text>
-            </View>
-            <Text style={{ color: C.blue, fontSize: 14, fontWeight: '900' }}>{compactCurrency.format(stats.weekSpend)}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 8, height: 100 }}>
-            {stats.weekDays.map((day) => (
-              <View key={day.key} style={{ alignItems: 'center', flex: 1, gap: 6 }}>
-                <View style={{ backgroundColor: C.cardInner, borderRadius: 6, flex: 1, justifyContent: 'flex-end', overflow: 'hidden', width: '100%' }}>
-                  <View style={{ backgroundColor: C.accent, borderRadius: 6, height: `${Math.max((day.total / stats.weekMaxSpend) * 100, day.total ? 10 : 2)}%`, opacity: 0.55, width: '100%' }} />
-                </View>
-                <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700' }}>{day.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -753,7 +993,7 @@ function DashboardScreen({ wallet }) {
 // ─── Analytics Screen ─────────────────────────────────────────────────────────
 function AnalyticsScreen({ wallet }) {
   const { C } = useTheme();
-  const { monthlyBudget, stats, transactions } = wallet;
+  const { monthlyBudget, stats, transactions, categoryBudgets } = wallet;
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [simulateMode, setSimulateMode] = useState(false);
   const [simOverrides, setSimOverrides] = useState({});
@@ -788,6 +1028,64 @@ function AnalyticsScreen({ wallet }) {
     return saved;
   }, [simulateMode, simOverrides, pieData]);
 
+  // ── Month vs Last Month ─────────────────────────────────────────────────────
+  const monthComparison = useMemo(() => {
+    const now = new Date();
+    const curM = now.getMonth(), curY = now.getFullYear();
+    const prevM = curM === 0 ? 11 : curM - 1;
+    const prevY = curM === 0 ? curY - 1 : curY;
+    let curIncome = 0, curExpense = 0, prevIncome = 0, prevExpense = 0;
+    transactions.forEach((t) => {
+      const d = new Date(t.date);
+      const m = d.getMonth(), y = d.getFullYear();
+      if (m === curM && y === curY) { if (t.amount >= 0) curIncome += t.amount; else curExpense += Math.abs(t.amount); }
+      if (m === prevM && y === prevY) { if (t.amount >= 0) prevIncome += t.amount; else prevExpense += Math.abs(t.amount); }
+    });
+    const pctChange = (cur, prev) => prev === 0 ? null : Math.round(((cur - prev) / prev) * 100);
+    return {
+      curIncome, curExpense, prevIncome, prevExpense,
+      curSavings: curIncome - curExpense,
+      prevSavings: prevIncome - prevExpense,
+      incomeChange: pctChange(curIncome, prevIncome),
+      expenseChange: pctChange(curExpense, prevExpense),
+      savingsChange: pctChange(curIncome - curExpense, prevIncome - prevExpense),
+      hasPrevData: prevIncome > 0 || prevExpense > 0,
+      prevMonthLabel: new Date(prevY, prevM, 1).toLocaleDateString('en-IN', { month: 'short' }),
+      curMonthLabel: new Date(curY, curM, 1).toLocaleDateString('en-IN', { month: 'short' }),
+    };
+  }, [transactions]);
+
+  // ── Spending by Day of Week ─────────────────────────────────────────────────
+  const dowData = useMemo(() => {
+    const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const totals = Array(7).fill(0);
+    transactions.forEach((t) => {
+      if (t.amount < 0) totals[new Date(t.date).getDay()] += Math.abs(t.amount);
+    });
+    const maxVal = Math.max(...totals, 1);
+    const peakIdx = totals.indexOf(Math.max(...totals));
+    return DAY_SHORT.map((label, i) => ({ label, total: totals[i], pct: totals[i] / maxVal, isPeak: i === peakIdx }));
+  }, [transactions]);
+
+  // ── Top 5 largest expenses this month ──────────────────────────────────────
+  const topExpenses = useMemo(() => {
+    const now = new Date();
+    const curM = now.getMonth(), curY = now.getFullYear();
+    return transactions
+      .filter((t) => { const d = new Date(t.date); return t.amount < 0 && d.getMonth() === curM && d.getFullYear() === curY; })
+      .sort((a, b) => a.amount - b.amount)
+      .slice(0, 5);
+  }, [transactions]);
+
+  // ── Category budget adherence ───────────────────────────────────────────────
+  const catBudgetRows = useMemo(() => {
+    if (!categoryBudgets || !Object.keys(categoryBudgets).length) return [];
+    return Object.entries(categoryBudgets)
+      .map(([cat, budget]) => ({ cat, budget, spent: stats.categorySpend[cat] || 0 }))
+      .filter((r) => r.budget > 0)
+      .sort((a, b) => b.spent / b.budget - a.spent / a.budget);
+  }, [categoryBudgets, stats.categorySpend]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
@@ -799,6 +1097,23 @@ function AnalyticsScreen({ wallet }) {
           <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 20, height: 42, justifyContent: 'center', width: 42 }}>
             <Ionicons name="pie-chart" size={20} color={C.purple} />
           </View>
+        </View>
+
+        {/* ── Quick Stats Row ── */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          {[
+            { icon: 'receipt', color: C.blue, bg: C.blueBg, label: 'Transactions', value: stats.count },
+            { icon: 'trending-down', color: C.expense, bg: C.expenseBg, label: 'Avg / Day', value: compactCurrency.format(stats.dailyAverageExpense) },
+            { icon: 'flame', color: C.amber, bg: C.amberBg, label: 'Top Category', value: stats.topCategory?.category || '—' },
+          ].map((s) => (
+            <View key={s.label} style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flex: 1, padding: 12 }}>
+              <View style={{ alignItems: 'center', backgroundColor: s.bg, borderRadius: 9, height: 28, justifyContent: 'center', marginBottom: 8, width: 28 }}>
+                <Ionicons name={s.icon} size={14} color={s.color} />
+              </View>
+              <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</Text>
+              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '900', marginTop: 3 }} numberOfLines={1}>{s.value}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Donut */}
@@ -948,6 +1263,153 @@ function AnalyticsScreen({ wallet }) {
           })}
         </View>
 
+        {/* ── Month vs Last Month ── */}
+        {monthComparison.hasPrevData && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <View style={{ alignItems: 'center', backgroundColor: C.blueBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+                <Ionicons name="swap-horizontal" size={16} color={C.blue} />
+              </View>
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Comparison</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>{monthComparison.curMonthLabel} vs {monthComparison.prevMonthLabel}</Text>
+              </View>
+            </View>
+            {/* Column headers */}
+            <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+              <View style={{ flex: 1 }} />
+              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 74, textAlign: 'right' }}>{monthComparison.prevMonthLabel}</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 74, textAlign: 'right' }}>{monthComparison.curMonthLabel}</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 48, textAlign: 'right' }}>Δ</Text>
+            </View>
+            {[
+              { label: 'Income', cur: monthComparison.curIncome, prev: monthComparison.prevIncome, change: monthComparison.incomeChange, positiveIsGood: true, color: C.income },
+              { label: 'Expenses', cur: monthComparison.curExpense, prev: monthComparison.prevExpense, change: monthComparison.expenseChange, positiveIsGood: false, color: C.expense },
+              { label: 'Net', cur: monthComparison.curSavings, prev: monthComparison.prevSavings, change: monthComparison.savingsChange, positiveIsGood: true, color: monthComparison.curSavings >= 0 ? C.income : C.expense },
+            ].map((row, i) => {
+              const isGood = row.change === null ? null : row.positiveIsGood ? row.change > 0 : row.change < 0;
+              const changeColor = isGood === null ? C.text3 : isGood ? C.income : C.expense;
+              const changePrefix = row.change > 0 ? '+' : '';
+              return (
+                <View key={row.label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ backgroundColor: `${row.color}18`, borderRadius: 6, height: 8, width: 8 }} />
+                    <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>{row.label}</Text>
+                  </View>
+                  <Text style={{ color: C.text3, fontSize: 13, fontWeight: '600', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.prev))}</Text>
+                  <Text style={{ color: row.color, fontSize: 13, fontWeight: '800', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.cur))}</Text>
+                  <Text style={{ color: changeColor, fontSize: 12, fontWeight: '800', width: 48, textAlign: 'right' }}>
+                    {row.change === null ? '—' : `${changePrefix}${row.change}%`}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ── Spending by Day of Week ── */}
+        {transactions.some((t) => t.amount < 0) && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+              <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+                <Ionicons name="calendar" size={15} color={C.purple} />
+              </View>
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Spending by Weekday</Text>
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 6, height: 90 }}>
+              {dowData.map((day) => (
+                <View key={day.label} style={{ alignItems: 'center', flex: 1 }}>
+                  <View style={{ backgroundColor: C.cardInner, borderRadius: 6, flex: 1, justifyContent: 'flex-end', overflow: 'hidden', width: '100%' }}>
+                    <View style={{
+                      backgroundColor: day.isPeak ? C.purple : C.accent,
+                      borderRadius: 6,
+                      height: `${Math.max(day.pct * 100, day.total ? 8 : 2)}%`,
+                      opacity: day.total ? (day.isPeak ? 1 : 0.5) : 0.15,
+                      width: '100%',
+                    }} />
+                  </View>
+                  <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 10, fontWeight: day.isPeak ? '900' : '600', marginTop: 6 }}>{day.label}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderColor: `${C.purple}30`, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 14, padding: 10 }}>
+              <Ionicons name="alert-circle" size={14} color={C.purple} />
+              <Text style={{ color: C.purple, fontSize: 12, fontWeight: '700', flex: 1 }}>
+                {dowData.find((d) => d.isPeak)?.label}s are your highest-spend day
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* ── Top 5 Largest Expenses This Month ── */}
+        {topExpenses.length > 0 && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <View style={{ alignItems: 'center', backgroundColor: C.expenseBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+                <Ionicons name="arrow-up-circle" size={16} color={C.expense} />
+              </View>
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Biggest Expenses</Text>
+              </View>
+            </View>
+            {topExpenses.map((t, i) => (
+              <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
+                <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 10, height: 34, justifyContent: 'center', width: 34 }}>
+                  <Text style={{ color: C.text3, fontSize: 13, fontWeight: '800' }}>#{i + 1}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }} numberOfLines={1}>{t.note || t.category}</Text>
+                  <Text style={{ color: C.text3, fontSize: 11, marginTop: 1 }}>{t.category} · {new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+                </View>
+                <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>{currency.format(Math.abs(t.amount))}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Category Budget Adherence ── */}
+        {catBudgetRows.length > 0 && (
+          <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <View style={{ alignItems: 'center', backgroundColor: C.amberBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+                <Ionicons name="options" size={15} color={C.amber} />
+              </View>
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Budget vs Actual</Text>
+              </View>
+            </View>
+            {catBudgetRows.map((row, i) => {
+              const pct = Math.min((row.spent / row.budget) * 100, 100);
+              const over = row.spent > row.budget;
+              const barColor = over ? C.expense : pct > 80 ? C.amber : C.income;
+              return (
+                <View key={row.cat} style={{ paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{row.cat}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {over && (
+                        <View style={{ backgroundColor: C.expenseBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: C.expense, fontSize: 10, fontWeight: '800' }}>OVER</Text>
+                        </View>
+                      )}
+                      <Text style={{ color: barColor, fontSize: 13, fontWeight: '800' }}>{compactCurrency.format(row.spent)}</Text>
+                      <Text style={{ color: C.text3, fontSize: 12 }}>/ {compactCurrency.format(row.budget)}</Text>
+                    </View>
+                  </View>
+                  <View style={{ backgroundColor: C.cardInner, borderRadius: 6, height: 8, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: barColor, borderRadius: 6, height: 8, width: `${pct}%` }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Monthly History */}
         {monthlyBreakdown.length > 1 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
@@ -1019,6 +1481,10 @@ function MainApp() {
   const { C } = useTheme();
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [savings, setSavings] = useState([]);
+  const [isSavingsModalVisible, setSavingsModalVisible] = useState(false);
+  const [savingsModalType, setSavingsModalType] = useState('deposit');
+  const [bills, setBills] = useState([]);
   const [categoryBudgets, setCategoryBudgets] = useState({});
   const [isModalVisible, setModalVisible] = useState(false);
   const [isGoalModalVisible, setGoalModalVisible] = useState(false);
@@ -1038,11 +1504,13 @@ function MainApp() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [savedTx, savedBudget, savedGoals, savedCatBudgets] = await Promise.all([
+        const [savedTx, savedBudget, savedGoals, savedCatBudgets, savedBills, savedSavings] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(BUDGET_KEY),
           AsyncStorage.getItem(GOALS_KEY),
           AsyncStorage.getItem(CAT_BUDGETS_KEY),
+          AsyncStorage.getItem(BILLS_KEY),
+          AsyncStorage.getItem(SAVINGS_KEY),
         ]);
         if (savedTx) {
           const parsed = JSON.parse(savedTx).map(normalizeTransaction);
@@ -1052,6 +1520,8 @@ function MainApp() {
         if (Number.isFinite(b) && b > 0) setMonthlyBudget(b);
         if (savedGoals) setGoals(JSON.parse(savedGoals));
         if (savedCatBudgets) setCategoryBudgets(JSON.parse(savedCatBudgets));
+        if (savedBills) setBills(JSON.parse(savedBills));
+        if (savedSavings) setSavings(JSON.parse(savedSavings));
       } catch { Alert.alert('Load error', 'Could not load wallet data. Please restart the app.'); }
     };
     load();
@@ -1064,6 +1534,10 @@ function MainApp() {
   useEffect(() => {
     scheduleDailyReview(stats).catch(() => {});
   }, [stats]);
+
+  useEffect(() => {
+    scheduleBillReminders(bills).catch(() => {});
+  }, [bills]);
 
   const resetForm = () => {
     setTransactionType('expense');
@@ -1100,6 +1574,17 @@ function MainApp() {
     await AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next));
   };
 
+  const persistSavings = async (next) => {
+    setSavings(next);
+    await AsyncStorage.setItem(SAVINGS_KEY, JSON.stringify(next));
+  };
+
+  const addSavingsEntry = async (entry) => {
+    await persistSavings([entry, ...savings]);
+  };
+
+  const openSavingsModal = (type) => { setSavingsModalType(type); setSavingsModalVisible(true); };
+
   const adjustMonthlyBudget = async (val) => {
     const next = Math.max(500, val);
     setMonthlyBudget(next);
@@ -1109,6 +1594,65 @@ function MainApp() {
   const saveCategoryBudgets = async (budgets) => {
     setCategoryBudgets(budgets);
     await AsyncStorage.setItem(CAT_BUDGETS_KEY, JSON.stringify(budgets));
+  };
+
+  const persistBills = async (next) => {
+    setBills(next);
+    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(next));
+  };
+
+  const addBill = async (bill) => {
+    await persistBills([bill, ...bills]);
+  };
+
+  const deleteBill = async (id) => {
+    await persistBills(bills.filter((b) => b.id !== id));
+  };
+
+  const markBillPaid = async (bill) => {
+    const now = new Date();
+    const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const txId = `bill_${bill.id}_${mk}`;
+
+    // Create expense transaction
+    const tx = normalizeTransaction({
+      id: txId,
+      type: 'expense',
+      category: bill.category || 'Bills',
+      amount: bill.amount,
+      note: bill.name,
+      date: now.toISOString(),
+      recurring: null,
+    });
+    const nextTx = [tx, ...transactions.filter((t) => t.id !== txId)];
+    await persistTransactions(nextTx);
+
+    // Mark bill as paid this month
+    const nextBills = bills.map((b) =>
+      b.id === bill.id
+        ? { ...b, paidMonths: { ...b.paidMonths, [mk]: { paidAt: now.toISOString(), txId } } }
+        : b
+    );
+    await persistBills(nextBills);
+  };
+
+  const markBillUnpaid = async (bill) => {
+    const now = new Date();
+    const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const txId = bill.paidMonths?.[mk]?.txId;
+
+    // Remove the auto-created transaction if it exists
+    if (txId) {
+      await persistTransactions(transactions.filter((t) => t.id !== txId));
+    }
+
+    // Remove this month from paidMonths
+    const nextBills = bills.map((b) => {
+      if (b.id !== bill.id) return b;
+      const { [mk]: _removed, ...rest } = b.paidMonths || {};
+      return { ...b, paidMonths: rest };
+    });
+    await persistBills(nextBills);
   };
 
   const addTransaction = async () => {
@@ -1177,11 +1721,20 @@ function MainApp() {
 
   const resetAllData = async () => {
     try {
-      await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(BUDGET_KEY), AsyncStorage.removeItem(GOALS_KEY), AsyncStorage.removeItem(CAT_BUDGETS_KEY)]);
+      await Promise.all([
+        AsyncStorage.removeItem(STORAGE_KEY),
+        AsyncStorage.removeItem(BUDGET_KEY),
+        AsyncStorage.removeItem(GOALS_KEY),
+        AsyncStorage.removeItem(CAT_BUDGETS_KEY),
+        AsyncStorage.removeItem(BILLS_KEY),
+        AsyncStorage.removeItem(SAVINGS_KEY),
+      ]);
       setTransactions([]);
       setMonthlyBudget(DEFAULT_MONTHLY_BUDGET);
       setGoals([]);
       setCategoryBudgets({});
+      setBills([]);
+      setSavings([]);
     } catch { Alert.alert('Reset error', 'Could not reset data.'); }
   };
 
@@ -1190,6 +1743,8 @@ function MainApp() {
     deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal,
     openCategoryBudgetModal, categoryBudgets, searchQuery, setActiveFilter, setSearchQuery,
     stats, streak, transactions,
+    bills, addBill, deleteBill, markBillPaid, markBillUnpaid,
+    savings, openSavingsModal,
   };
 
   return (
@@ -1202,7 +1757,7 @@ function MainApp() {
           tabBarLabelStyle: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
           tabBarStyle: { backgroundColor: C.tab, borderTopColor: C.tabBorder, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, elevation: 14, height: 76, paddingBottom: 12, paddingTop: 8, shadowColor: '#000', shadowOffset: { height: -6, width: 0 }, shadowOpacity: 0.25, shadowRadius: 18 },
           tabBarIcon: ({ color, focused }) => {
-            const icons = { Dashboard: focused ? 'home' : 'home-outline', Analytics: focused ? 'pie-chart' : 'pie-chart-outline', Activity: focused ? 'receipt' : 'receipt-outline', Settings: focused ? 'settings' : 'settings-outline' };
+            const icons = { Dashboard: focused ? 'home' : 'home-outline', Analytics: focused ? 'pie-chart' : 'pie-chart-outline', Activity: focused ? 'receipt' : 'receipt-outline', Bills: focused ? 'card' : 'card-outline', Settings: focused ? 'settings' : 'settings-outline' };
             return (
               <View style={{ alignItems: 'center', backgroundColor: focused ? C.accentBg : 'transparent', borderRadius: 18, height: 34, justifyContent: 'center', width: 44 }}>
                 <Ionicons name={icons[route.name]} size={21} color={color} />
@@ -1214,6 +1769,15 @@ function MainApp() {
         <Tab.Screen name="Dashboard">{() => <DashboardScreen wallet={wallet} />}</Tab.Screen>
         <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
         <Tab.Screen name="Activity">{() => <ActivityScreen wallet={wallet} />}</Tab.Screen>
+        <Tab.Screen name="Bills">{() => (
+          <BillsScreen
+            bills={wallet.bills}
+            onAddBill={wallet.addBill}
+            onDeleteBill={wallet.deleteBill}
+            onMarkPaid={wallet.markBillPaid}
+            onMarkUnpaid={wallet.markBillUnpaid}
+          />
+        )}</Tab.Screen>
         <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} />}</Tab.Screen>
       </Tab.Navigator>
 
@@ -1237,6 +1801,7 @@ function MainApp() {
       />
 
       <AddGoalModal visible={isGoalModalVisible} onClose={() => setGoalModalVisible(false)} onAdd={addGoal} />
+      <AddSavingsModal visible={isSavingsModalVisible} type={savingsModalType} onClose={() => setSavingsModalVisible(false)} onSave={addSavingsEntry} />
 
       <CategoryBudgetModal
         visible={isCategoryBudgetModalVisible}
@@ -1264,11 +1829,11 @@ function buildStats(transactions, monthlyBudget) {
   const categorySpend = {};
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(cy, cm, de - (6 - i));
-    return { key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('en-IN', { weekday: 'short' }), total: 0 };
+    return { key: localDateStr(d), label: d.toLocaleDateString('en-IN', { weekday: 'short' }), total: 0 };
   });
   const weekMap = weekDays.reduce((m, d) => { m[d.key] = d; return m; }, {});
   const totals = transactions.reduce((s, t) => {
-    const d = new Date(t.date), itm = d.getMonth() === cm && d.getFullYear() === cy, dk = d.toISOString().slice(0, 10);
+    const d = new Date(t.date), itm = d.getMonth() === cm && d.getFullYear() === cy, dk = localDateStr(d);
     if (t.amount >= 0) { s.income += t.amount; if (itm) s.monthIncome += t.amount; }
     else {
       const abs = Math.abs(t.amount);
@@ -1280,10 +1845,10 @@ function buildStats(transactions, monthlyBudget) {
     return s;
   }, { income: 0, expense: 0, monthExpense: 0, monthIncome: 0 });
 
-  const todayStr = now.toISOString().slice(0, 10);
-  const todaySpend = transactions.filter((t) => t.date.startsWith(todayStr) && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const todayStr = localDateStr(now);
+  const todaySpend = transactions.filter((t) => localDateStr(new Date(t.date)) === todayStr && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  const topCategories = Object.entries(expCats).sort(([, a], [, b]) => b - a).slice(0, 6).map(([category, amount]) => ({ amount, category, percentage: totals.expense ? Math.max((amount / totals.expense) * 100, 4) : 0 }));
+  const topCategories = Object.entries(expCats).sort(([, a], [, b]) => b - a).slice(0, 6).map(([category, amount]) => ({ amount, category, percentage: totals.expense ? (amount / totals.expense) * 100 : 0 }));
   const projectedExpense = totals.monthExpense ? (totals.monthExpense / de) * dim : 0;
   const remainingBudget = monthlyBudget - totals.monthExpense;
   const dailyBudgetLeft = Math.max(remainingBudget, 0) / Math.max(dim - de + 1, 1);

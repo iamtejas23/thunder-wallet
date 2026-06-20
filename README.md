@@ -30,6 +30,22 @@ Run the App:
 npm start
 ```
 
+## Running on Android Emulator (Local Dev) 🤖
+
+Open **two terminals** and run one command in each:
+
+**Terminal 1 — Start the emulator:**
+```bash
+emulator -avd FreshPixel5 -gpu swiftshader_indirect -no-snapshot-load
+```
+> Wait until the emulator fully boots and the home screen is visible before moving to Terminal 2.
+
+**Terminal 2 — Start the app:**
+```bash
+cd ~/family/thunder-wallet && npx expo start --clear
+```
+> Once Metro is running, press **`a`** to open the app on the emulator. No QR code needed.
+
 ## Build Lightweight Release APK
 
 Use this magic command from the project root to build a small Android release APK:

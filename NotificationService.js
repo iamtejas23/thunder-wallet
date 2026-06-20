@@ -1,17 +1,33 @@
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NOTIF_ENABLED_KEY = 'notificationsEnabled';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+// Detect Expo Go reliably via expo-constants (always safe to import)
+let IS_EXPO_GO = false;
+try {
+  const Constants = require('expo-constants').default;
+  IS_EXPO_GO = Constants.appOwnership === 'expo';
+} catch (_) {}
+
+// Never import expo-notifications in Expo Go — the package itself emits
+// errors and warnings at import time when it detects it's running in Expo Go,
+// and those cannot be suppressed from outside the package.
+let Notifications = null;
+if (!IS_EXPO_GO) {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (_) {}
+}
 
 export async function requestNotificationPermission() {
+  if (!Notifications) return false;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
 }
@@ -31,11 +47,10 @@ export async function setNotificationsEnabled(enabled) {
 }
 
 export async function scheduleDailyReview(stats) {
+  if (!Notifications) return;
   await cancelDailyReview();
   const enabled = await isNotificationsEnabled();
   if (!enabled) return;
-
-  const trigger = { hour: 21, minute: 0, repeats: true };
 
   let body = 'Open Thunder Wallet to review your day.';
   if (stats) {
@@ -50,19 +65,18 @@ export async function scheduleDailyReview(stats) {
   }
 
   await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Day in Review ⚡',
-      body,
-    },
-    trigger,
+    content: { title: 'Day in Review ⚡', body },
+    trigger: { hour: 21, minute: 0, repeats: true },
   });
 }
 
 export async function cancelDailyReview() {
+  if (!Notifications) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
 export async function sendGoalReachedNotification(goalName) {
+  if (!Notifications) return;
   await Notifications.scheduleNotificationAsync({
     content: {
       title: `Goal Reached! 🎉`,
@@ -70,4 +84,49 @@ export async function sendGoalReachedNotification(goalName) {
     },
     trigger: null,
   });
+}
+
+export async function scheduleBillReminders(bills) {
+  if (!Notifications || !bills?.length) return;
+  try {
+    // Cancel all existing bill reminders before rescheduling
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+      if (n.content?.data?.type === 'bill_reminder') {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    }
+
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    for (const bill of bills) {
+      if (!bill.isActive) continue;
+      const isPaidThisMonth = !!bill.paidMonths?.[currentMonth];
+      if (isPaidThisMonth) continue;
+
+      // Schedule reminder 1 day before due date at 9 AM
+      const reminderDay = bill.dueDay - 1 < 1 ? 28 : bill.dueDay - 1;
+      const trigger = { day: reminderDay, hour: 9, minute: 0, repeats: true };
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Bill Due Tomorrow: ${bill.name} 📋`,
+          body: `₹${bill.amount.toLocaleString('en-IN')} due on the ${bill.dueDay}th. Tap to mark as paid.`,
+          data: { type: 'bill_reminder', billId: bill.id },
+        },
+        trigger,
+      });
+
+      // Also schedule on the due day itself at 9 AM
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Bill Due Today: ${bill.name} ⚡`,
+          body: `₹${bill.amount.toLocaleString('en-IN')} is due today. Don't forget to pay!`,
+          data: { type: 'bill_reminder', billId: bill.id },
+        },
+        trigger: { day: bill.dueDay, hour: 9, minute: 0, repeats: true },
+      });
+    }
+  } catch (_) {}
 }
