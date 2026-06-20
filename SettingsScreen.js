@@ -4,7 +4,6 @@ import {
   Image,
   Linking,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TouchableOpacity,
@@ -13,15 +12,64 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
 import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
 
+// ── Primitives ─────────────────────────────────────────────────────────────────
+
+function SectionLabel({ text, C }) {
+  return (
+    <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 }}>
+      {text}
+    </Text>
+  );
+}
+
+function SettingsCard({ children, C }) {
+  return (
+    <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginBottom: 24, overflow: 'hidden' }}>
+      {children}
+    </View>
+  );
+}
+
+function Row({ icon, iconColor, iconBg, label, sublabel, right, onPress, showSep = true, C, destructive = false }) {
+  const labelColor = destructive ? '#F87171' : C.text1;
+  const content = (
+    <View style={{ alignItems: 'center', flexDirection: 'row', minHeight: 58, paddingHorizontal: 16 }}>
+      {icon && (
+        <View style={{ alignItems: 'center', backgroundColor: iconBg || `${iconColor}18`, borderRadius: 11, height: 36, justifyContent: 'center', marginRight: 14, width: 36 }}>
+          <Ionicons name={icon} size={17} color={iconColor} />
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: labelColor, fontSize: 15, fontWeight: '600' }}>{label}</Text>
+        {sublabel ? <Text style={{ color: C.text3, fontSize: 12, marginTop: 1 }}>{sublabel}</Text> : null}
+      </View>
+      {right}
+    </View>
+  );
+
+  return (
+    <View>
+      {onPress ? (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.65}>
+          {content}
+        </TouchableOpacity>
+      ) : content}
+      {showSep && (
+        <View style={{ backgroundColor: C.border, height: 1, marginLeft: icon ? 66 : 16 }} />
+      )}
+    </View>
+  );
+}
+
+// ── Main Screen ────────────────────────────────────────────────────────────────
+
 const SettingsScreen = ({ resetAllData }) => {
   const { C, toggleTheme, isDark } = useTheme();
-  const navigation = useNavigation();
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [pinEnabled, setPinEnabled] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -68,16 +116,17 @@ const SettingsScreen = ({ resetAllData }) => {
   };
 
   const handleReset = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
       'Reset all data?',
-      'This will permanently delete all your transactions and reset the monthly budget. This cannot be undone.',
+      'This will permanently delete all transactions, goals, bills, and savings. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reset Everything', style: 'destructive',
           onPress: async () => {
             if (resetAllData) await resetAllData();
-            Alert.alert('Data reset', 'All data has been cleared.');
+            Alert.alert('Done', 'All data has been cleared.');
           },
         },
       ],
@@ -94,241 +143,225 @@ const SettingsScreen = ({ resetAllData }) => {
     );
   }
 
+  const FEATURES = [
+    { icon: 'pie-chart',      color: '#F87171', label: 'Spending chart'    },
+    { icon: 'trophy',         color: '#FCD34D', label: 'Savings goals'     },
+    { icon: 'card',           color: '#60A5FA', label: 'Bills tracker'     },
+    { icon: 'wallet',         color: '#34D399', label: 'Piggy bank'        },
+    { icon: 'flame',          color: '#FB923C', label: 'Budget streak'     },
+    { icon: 'flask',          color: '#A78BFA', label: 'What-If simulator' },
+    { icon: 'repeat',         color: '#4ECDC4', label: 'Recurring tags'    },
+    { icon: 'options',        color: '#60A5FA', label: 'Category budgets'  },
+    { icon: 'notifications',  color: '#FCD34D', label: 'Daily review'      },
+    { icon: 'lock-closed',    color: '#A78BFA', label: 'PIN & biometrics'  },
+    { icon: 'color-palette',  color: '#F87171', label: 'Dark / light'      },
+    { icon: 'shield-checkmark', color: '#34D399', label: 'Fully offline'   },
+  ];
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: C.bg }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 110 }}
+      >
 
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={[styles.iconBtn, { backgroundColor: C.card, borderColor: C.border }]} onPress={() => navigation.navigate('Dashboard')}>
-            <Ionicons name="home-outline" size={19} color={C.text2} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: C.text1 }]}>Settings</Text>
-          <View style={styles.iconBtnPlaceholder} />
+        {/* ── Page title ── */}
+        <Text style={{ color: C.text1, fontSize: 32, fontWeight: '900', marginBottom: 24, letterSpacing: -0.5 }}>
+          Settings
+        </Text>
+
+        {/* ── Profile card ── */}
+        <View style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 22, borderWidth: 1, marginBottom: 28, paddingVertical: 28 }}>
+          <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 36, borderWidth: 1, height: 72, justifyContent: 'center', width: 72, marginBottom: 14 }}>
+            <Image source={require('./assets/logo.png')} style={{ borderRadius: 16, height: 54, width: 54 }} resizeMode="cover" />
+          </View>
+          <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>Thunder Wallet</Text>
+          <Text style={{ color: C.text3, fontSize: 13, marginTop: 3 }}>Smart local expense manager</Text>
+          <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 5, marginTop: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
+            <Ionicons name="flash" size={11} color={C.accent} />
+            <Text style={{ color: C.accent, fontSize: 12, fontWeight: '800' }}>v1.0.54 · Free</Text>
+          </View>
         </View>
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={[styles.logoRing, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-            <Image source={require('./assets/logo.png')} style={styles.logoImg} />
-          </View>
-          <Text style={[styles.heroTitle, { color: C.text1 }]}>Thunder Wallet</Text>
-          <Text style={[styles.heroSub, { color: C.text2 }]}>Smart local expense manager</Text>
-          <View style={[styles.heroBadge, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-            <Ionicons name="flash" size={12} color={C.accent} />
-            <Text style={[styles.heroBadgeText, { color: C.accent }]}>v1.1.0 · Free</Text>
-          </View>
-        </View>
-
-        {/* APPEARANCE */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.purpleBg }]}>
-              <Ionicons name="color-palette" size={16} color={C.purple} />
+        {/* ── Appearance ── */}
+        <SectionLabel text="Appearance" C={C} />
+        <SettingsCard C={C}>
+          {/* Theme toggle — inline visual picker */}
+          <View style={{ padding: 14 }}>
+            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600', marginBottom: 10, marginLeft: 2 }}>Theme</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {/* Light */}
+              <TouchableOpacity
+                style={{ alignItems: 'center', backgroundColor: !isDark ? 'rgba(217,119,6,0.1)' : C.cardInner, borderColor: !isDark ? '#D97706' : C.border, borderRadius: 14, borderWidth: !isDark ? 2 : 1, flex: 1, gap: 8, paddingVertical: 14, position: 'relative' }}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isDark) toggleTheme(); }}
+                activeOpacity={0.75}
+              >
+                <View style={{ alignItems: 'center', backgroundColor: !isDark ? 'rgba(217,119,6,0.18)' : C.accentBg, borderRadius: 18, height: 40, justifyContent: 'center', width: 40 }}>
+                  <Ionicons name="sunny" size={20} color={!isDark ? '#D97706' : C.text3} />
+                </View>
+                <Text style={{ color: !isDark ? '#D97706' : C.text2, fontSize: 13, fontWeight: '700' }}>Light</Text>
+                {!isDark && (
+                  <View style={{ alignItems: 'center', backgroundColor: '#D97706', borderRadius: 7, height: 14, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 14 }}>
+                    <Ionicons name="checkmark" size={9} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              {/* Dark */}
+              <TouchableOpacity
+                style={{ alignItems: 'center', backgroundColor: isDark ? C.purpleBg : C.cardInner, borderColor: isDark ? C.purple : C.border, borderRadius: 14, borderWidth: isDark ? 2 : 1, flex: 1, gap: 8, paddingVertical: 14, position: 'relative' }}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (!isDark) toggleTheme(); }}
+                activeOpacity={0.75}
+              >
+                <View style={{ alignItems: 'center', backgroundColor: isDark ? C.purpleBg : C.accentBg, borderRadius: 18, height: 40, justifyContent: 'center', width: 40 }}>
+                  <Ionicons name="moon" size={18} color={isDark ? C.purple : C.text3} />
+                </View>
+                <Text style={{ color: isDark ? C.purple : C.text2, fontSize: 13, fontWeight: '700' }}>Dark</Text>
+                {isDark && (
+                  <View style={{ alignItems: 'center', backgroundColor: C.purple, borderRadius: 7, height: 14, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 14 }}>
+                    <Ionicons name="checkmark" size={9} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Appearance</Text>
           </View>
-          <Text style={[styles.sectionDesc, { color: C.text2 }]}>Choose how Thunder Wallet looks on your device.</Text>
-          <View style={styles.themeRow}>
-            <TouchableOpacity style={[styles.themeBtn, { backgroundColor: C.cardInner, borderColor: C.border }, !isDark && { backgroundColor: 'rgba(217,119,6,0.12)', borderColor: '#D97706', borderWidth: 2 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isDark) toggleTheme(); }} activeOpacity={0.8}>
-              <View style={[styles.themeIconCircle, { backgroundColor: !isDark ? 'rgba(217,119,6,0.2)' : C.accentBg }]}>
-                <Ionicons name="sunny" size={22} color={!isDark ? '#D97706' : C.text3} />
+        </SettingsCard>
+
+        {/* ── Preferences ── */}
+        <SectionLabel text="Preferences" C={C} />
+        <SettingsCard C={C}>
+          <Row
+            C={C}
+            icon="notifications"
+            iconColor={C.amber}
+            iconBg={C.amberBg}
+            label="Day in Review"
+            sublabel="Daily 9 PM spending summary"
+            right={
+              <Switch
+                value={notifEnabled}
+                onValueChange={handleNotifToggle}
+                trackColor={{ false: C.border, true: C.amber }}
+                thumbColor="#fff"
+              />
+            }
+          />
+          <Row
+            C={C}
+            icon="lock-closed"
+            iconColor={C.purple}
+            iconBg={C.purpleBg}
+            label="PIN & Biometric Lock"
+            sublabel="Require auth to open app"
+            showSep={false}
+            right={
+              <Switch
+                value={pinEnabled}
+                onValueChange={handlePinToggle}
+                trackColor={{ false: C.border, true: C.purple }}
+                thumbColor="#fff"
+              />
+            }
+          />
+        </SettingsCard>
+
+        {/* ── Data & Privacy ── */}
+        <SectionLabel text="Data & Privacy" C={C} />
+        <SettingsCard C={C}>
+          <Row
+            C={C}
+            icon="phone-portrait"
+            iconColor={C.income}
+            iconBg={C.incomeBg}
+            label="Storage"
+            right={<Text style={{ color: C.text3, fontSize: 13, fontWeight: '600' }}>On-device only</Text>}
+          />
+          <Row
+            C={C}
+            icon="cloud-offline"
+            iconColor={C.blue}
+            iconBg={C.blueBg}
+            label="Works offline"
+            right={<Text style={{ color: C.text3, fontSize: 13, fontWeight: '600' }}>Always</Text>}
+          />
+          <Row
+            C={C}
+            icon="eye-off"
+            iconColor={C.purple}
+            iconBg={C.purpleBg}
+            label="Data sharing"
+            showSep={false}
+            right={<Text style={{ color: C.income, fontSize: 13, fontWeight: '700' }}>Never</Text>}
+          />
+        </SettingsCard>
+
+        {/* ── Danger zone ── */}
+        <SectionLabel text="Danger Zone" C={C} />
+        <SettingsCard C={C}>
+          <Row
+            C={C}
+            icon="trash"
+            iconColor="#F87171"
+            iconBg="rgba(248,113,113,0.12)"
+            label="Reset All Data"
+            sublabel="Permanently delete everything"
+            destructive
+            showSep={false}
+            onPress={handleReset}
+            right={<Ionicons name="chevron-forward" size={16} color="#F87171" />}
+          />
+        </SettingsCard>
+
+        {/* ── Features grid ── */}
+        <SectionLabel text="What's Inside" C={C} />
+        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginBottom: 24, padding: 14 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {FEATURES.map((f) => (
+              <View key={f.label} style={{ alignItems: 'center', backgroundColor: `${f.color}12`, borderColor: `${f.color}28`, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7 }}>
+                <Ionicons name={f.icon} size={13} color={f.color} />
+                <Text style={{ color: f.color, fontSize: 12, fontWeight: '700' }}>{f.label}</Text>
               </View>
-              <Text style={[styles.themeBtnLabel, { color: !isDark ? '#D97706' : C.text2 }]}>Light</Text>
-              {!isDark && (<View style={[styles.themeActive, { backgroundColor: '#D97706' }]}><Ionicons name="checkmark" size={10} color="#fff" /></View>)}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.themeBtn, { backgroundColor: C.cardInner, borderColor: C.border }, isDark && { backgroundColor: C.purpleBg, borderColor: C.purple, borderWidth: 2 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (!isDark) toggleTheme(); }} activeOpacity={0.8}>
-              <View style={[styles.themeIconCircle, { backgroundColor: isDark ? C.purpleBg : C.accentBg }]}>
-                <Ionicons name="moon" size={20} color={isDark ? C.purple : C.text3} />
-              </View>
-              <Text style={[styles.themeBtnLabel, { color: isDark ? C.purple : C.text2 }]}>Dark</Text>
-              {isDark && (<View style={[styles.themeActive, { backgroundColor: C.purple }]}><Ionicons name="checkmark" size={10} color="#fff" /></View>)}
-            </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* SECURITY */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.purpleBg }]}>
-              <Ionicons name="lock-closed" size={16} color={C.purple} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Security</Text>
-          </View>
+        {/* ── About ── */}
+        <SectionLabel text="About" C={C} />
+        <SettingsCard C={C}>
+          <Row
+            C={C}
+            icon="person-circle"
+            iconColor={C.blue}
+            iconBg={C.blueBg}
+            label="Built by Tejas Mane"
+            right={
+              <TouchableOpacity onPress={() => Linking.openURL('https://github.com/iamtejas23')} activeOpacity={0.7}>
+                <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 5 }}>
+                  <Ionicons name="logo-github" size={13} color={C.text2} />
+                  <Text style={{ color: C.text2, fontSize: 12, fontWeight: '700' }}>GitHub</Text>
+                </View>
+              </TouchableOpacity>
+            }
+          />
+          <Row
+            C={C}
+            icon="shield-checkmark"
+            iconColor={C.income}
+            iconBg={C.incomeBg}
+            label="Privacy first"
+            sublabel="No cloud, no tracking, no ads"
+            showSep={false}
+            right={null}
+          />
+        </SettingsCard>
 
-          <View style={[styles.toggleRow, { borderBottomColor: C.border }]}>
-            <View style={[styles.infoIcon, { backgroundColor: C.purpleBg }]}>
-              <Ionicons name="keypad" size={17} color={C.purple} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.infoValue, { color: C.text1 }]}>PIN / Biometric Lock</Text>
-              <Text style={[styles.infoLabel, { color: C.text2 }]}>Require authentication to open</Text>
-            </View>
-            <Switch
-              value={pinEnabled}
-              onValueChange={handlePinToggle}
-              trackColor={{ false: C.border, true: C.purple }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* NOTIFICATIONS */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.amberBg }]}>
-              <Ionicons name="notifications" size={16} color={C.amber} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Notifications</Text>
-          </View>
-
-          <View style={styles.toggleRow}>
-            <View style={[styles.infoIcon, { backgroundColor: C.amberBg }]}>
-              <Ionicons name="moon" size={17} color={C.amber} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.infoValue, { color: C.text1 }]}>Day in Review (9pm)</Text>
-              <Text style={[styles.infoLabel, { color: C.text2 }]}>Daily spending summary notification</Text>
-            </View>
-            <Switch
-              value={notifEnabled}
-              onValueChange={handleNotifToggle}
-              trackColor={{ false: C.border, true: C.amber }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* DATA & PRIVACY */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.blueBg }]}>
-              <Ionicons name="server" size={16} color={C.blue} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Data & Privacy</Text>
-          </View>
-          {[
-            { icon: 'shield-checkmark', color: C.income, iconBg: C.incomeBg, label: 'Storage', value: 'On-device only' },
-            { icon: 'cloud-offline', color: C.blue, iconBg: C.blueBg, label: 'Works offline', value: 'Always' },
-            { icon: 'lock-closed', color: C.purple, iconBg: C.purpleBg, label: 'Privacy', value: 'No data shared' },
-          ].map((item, i) => (
-            <View key={item.label} style={[styles.infoRow, i > 0 && { borderTopColor: C.border, borderTopWidth: 1 }]}>
-              <View style={[styles.infoIcon, { backgroundColor: item.iconBg }]}>
-                <Ionicons name={item.icon} size={17} color={item.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.infoLabel, { color: C.text2 }]}>{item.label}</Text>
-                <Text style={[styles.infoValue, { color: C.text1 }]}>{item.value}</Text>
-              </View>
-            </View>
-          ))}
-          <TouchableOpacity style={[styles.resetBtn, { backgroundColor: C.expenseBg, borderColor: `${C.expense}35` }]} onPress={handleReset} activeOpacity={0.8}>
-            <View style={[styles.resetIconWrap, { backgroundColor: `${C.expense}20` }]}>
-              <Ionicons name="trash" size={18} color={C.expense} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[styles.resetLabel, { color: C.expense }]}>Reset All Data</Text>
-              <Text style={[styles.resetSub, { color: C.text2 }]}>Permanently delete all transactions & budget</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={C.expense} />
-          </TouchableOpacity>
-        </View>
-
-        {/* FEATURES */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.amberBg }]}>
-              <Ionicons name="sparkles" size={16} color={C.amber} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>Features</Text>
-          </View>
-          {[
-            { icon: 'pie-chart', color: '#F87171', label: 'Interactive spending chart' },
-            { icon: 'create', color: C.blue, label: 'Edit & back-date transactions' },
-            { icon: 'options', color: C.purple, label: 'Per-category budget limits' },
-            { icon: 'repeat', color: C.income, label: 'Recurring transaction tags' },
-            { icon: 'trophy', color: C.amber, label: 'Savings goals with confetti' },
-            { icon: 'flame', color: '#FB923C', label: 'Under-budget streak tracking' },
-            { icon: 'notifications', color: C.blue, label: '9pm Day in Review notification' },
-            { icon: 'lock-closed', color: C.purple, label: 'PIN & biometric lock' },
-            { icon: 'flask', color: '#34D399', label: 'What-If spending simulator' },
-            { icon: 'color-palette', color: '#A78BFA', label: 'Dark & light mode' },
-          ].map((item, i) => (
-            <View key={item.label} style={[styles.featureRow, i > 0 && { borderTopColor: C.border, borderTopWidth: 1 }]}>
-              <View style={[styles.infoIcon, { backgroundColor: `${item.color}18` }]}>
-                <Ionicons name={item.icon} size={16} color={item.color} />
-              </View>
-              <Text style={[styles.featureLabel, { color: C.text2 }]}>{item.label}</Text>
-              <Ionicons name="checkmark-circle" size={16} color={C.income} />
-            </View>
-          ))}
-        </View>
-
-        {/* ABOUT */}
-        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={styles.sectionHead}>
-            <View style={[styles.sectionHeadIcon, { backgroundColor: C.accentBg }]}>
-              <Ionicons name="person-circle" size={16} color={C.accent} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: C.text1 }]}>About</Text>
-          </View>
-          <Text style={[styles.aboutText, { color: C.text2 }]}>
-            Built by Tejas Mane. All data stays on your device — nothing is ever sent to the cloud. Your finances, fully private.
-          </Text>
-        </View>
-
-        <TouchableOpacity style={styles.githubBtn} onPress={() => Linking.openURL('https://github.com/iamtejas23')} activeOpacity={0.85}>
-          <View style={styles.githubIconWrap}>
-            <Ionicons name="logo-github" size={19} color="#fff" />
-          </View>
-          <Text style={styles.githubBtnText}>View on GitHub</Text>
-          <Ionicons name="arrow-forward" size={17} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
+        {/* ── Footer ── */}
+        <Text style={{ color: C.text3, fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+          Thunder Wallet v1.0.54{'\n'}Your finances. Your device. Always private.
+        </Text>
 
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 110 },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 18, fontWeight: '900' },
-  iconBtn: { alignItems: 'center', borderRadius: 20, borderWidth: 1, elevation: 2, height: 40, justifyContent: 'center', width: 40 },
-  iconBtnPlaceholder: { height: 40, width: 40 },
-  hero: { alignItems: 'center', marginBottom: 22 },
-  logoRing: { alignItems: 'center', borderRadius: 52, borderWidth: 1, height: 104, justifyContent: 'center', width: 104 },
-  logoImg: { borderRadius: 22, height: 78, width: 78 },
-  heroTitle: { fontSize: 26, fontWeight: '900', marginTop: 16 },
-  heroSub: { fontSize: 14, lineHeight: 20, marginTop: 5 },
-  heroBadge: { alignItems: 'center', borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 5, marginTop: 12, paddingHorizontal: 12, paddingVertical: 5 },
-  heroBadgeText: { fontSize: 12, fontWeight: '800' },
-  section: { borderRadius: 18, borderWidth: 1, marginBottom: 14, overflow: 'hidden', padding: 16 },
-  sectionHead: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 4 },
-  sectionHeadIcon: { alignItems: 'center', borderRadius: 10, height: 32, justifyContent: 'center', width: 32 },
-  sectionTitle: { fontSize: 16, fontWeight: '900' },
-  sectionDesc: { fontSize: 13, lineHeight: 19, marginBottom: 14, marginTop: 4 },
-  themeRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  themeBtn: { alignItems: 'center', borderRadius: 14, borderWidth: 1, flex: 1, gap: 8, paddingVertical: 16, position: 'relative' },
-  themeIconCircle: { alignItems: 'center', borderRadius: 20, height: 44, justifyContent: 'center', width: 44 },
-  themeBtnLabel: { fontSize: 13, fontWeight: '800' },
-  themeActive: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 16 },
-  toggleRow: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingTop: 12 },
-  infoRow: { alignItems: 'center', flexDirection: 'row', paddingVertical: 12 },
-  infoIcon: { alignItems: 'center', borderRadius: 12, height: 38, justifyContent: 'center', marginRight: 12, width: 38 },
-  infoLabel: { fontSize: 12, fontWeight: '600' },
-  infoValue: { fontSize: 14, fontWeight: '800', marginTop: 2 },
-  resetBtn: { alignItems: 'center', borderRadius: 14, borderWidth: 1, flexDirection: 'row', marginTop: 14, padding: 14 },
-  resetIconWrap: { alignItems: 'center', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
-  resetLabel: { fontSize: 15, fontWeight: '900' },
-  resetSub: { fontSize: 12, marginTop: 2 },
-  featureRow: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingVertical: 10 },
-  featureLabel: { flex: 1, fontSize: 14, fontWeight: '600' },
-  aboutText: { fontSize: 14, lineHeight: 22, marginTop: 8 },
-  githubBtn: { alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 14, elevation: 4, flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 54, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { height: 6, width: 0 }, shadowOpacity: 0.3, shadowRadius: 14 },
-  githubIconWrap: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 10, height: 30, justifyContent: 'center', width: 30 },
-  githubBtnText: { color: '#FFFFFF', flex: 1, fontSize: 15, fontWeight: '900' },
-});
 
 export default SettingsScreen;

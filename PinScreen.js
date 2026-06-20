@@ -9,7 +9,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
+let LocalAuthentication;
+try {
+  LocalAuthentication = require('expo-local-authentication');
+} catch {
+  LocalAuthentication = {
+    hasHardwareAsync: async () => false,
+    isEnrolledAsync: async () => false,
+    authenticateAsync: async () => ({ success: false }),
+  };
+}
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
