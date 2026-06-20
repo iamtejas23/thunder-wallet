@@ -124,6 +124,11 @@ android {
         ndk {
             abiFilters(*reactNativeArchitectures())
         }
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++20"
+            }
+        }
     }
     signingConfigs {
         debug {
