@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
 
@@ -27,20 +27,29 @@ const currency = new Intl.NumberFormat('en-IN', {
 export const BILLS_KEY = 'bills_v2';
 
 const BILL_PRESETS = [
-  { name: 'Electricity', icon: 'flash', color: '#FCD34D', category: 'Bills' },
-  { name: 'Water', icon: 'water', color: '#60A5FA', category: 'Bills' },
-  { name: 'Internet', icon: 'wifi', color: '#A78BFA', category: 'Bills' },
-  { name: 'Netflix', icon: 'tv', color: '#EF4444', category: 'Entertainment' },
-  { name: 'Spotify', icon: 'musical-notes', color: '#22C55E', category: 'Entertainment' },
-  { name: 'Amazon', icon: 'cart', color: '#FB923C', category: 'Entertainment' },
-  { name: 'Phone', icon: 'phone-portrait', color: '#94A3B8', category: 'Bills' },
-  { name: 'Gas', icon: 'flame', color: '#F97316', category: 'Bills' },
-  { name: 'Insurance', icon: 'shield-checkmark', color: '#14B8A6', category: 'Health' },
-  { name: 'Credit Card', icon: 'card', color: '#F87171', category: 'Bills' },
-  { name: 'Gym', icon: 'barbell', color: '#C084FC', category: 'Health' },
-  { name: 'Rent', icon: 'home', color: '#38BDF8', category: 'Rent' },
-  { name: 'EMI', icon: 'cash', color: '#34D399', category: 'Bills' },
-  { name: 'Custom', icon: 'receipt', color: '#94A3B8', category: 'Bills' },
+  // ── Streaming / Entertainment ─────────────────────────────────────────
+  { name: 'Netflix',      icon: 'tv',               color: '#E50914', category: 'Entertainment', brandLetter: 'N',   letterColor: '#fff', letterBg: '#E50914' },
+  { name: 'Spotify',      icon: 'musical-notes',    color: '#1DB954', category: 'Entertainment', fa5Brand: 'spotify' },
+  { name: 'Amazon Prime', icon: 'cart',             color: '#00A8E1', category: 'Entertainment', fa5Brand: 'amazon' },
+  { name: 'Hotstar',      icon: 'play-circle',      color: '#1F80E0', category: 'Entertainment', brandLetter: 'HS',  letterColor: '#fff', letterBg: '#1F3781' },
+  { name: 'Jio',          icon: 'phone-portrait',   color: '#00549A', category: 'Bills',         brandLetter: 'Jio', letterColor: '#fff', letterBg: '#00549A' },
+  { name: 'YouTube',      icon: 'logo-youtube',     color: '#FF0000', category: 'Entertainment', fa5Brand: 'youtube' },
+  { name: 'Apple TV+',    icon: 'logo-apple',       color: '#1c1c1e', category: 'Entertainment', fa5Brand: 'apple' },
+  { name: 'SonyLIV',      icon: 'tv',               color: '#FF5500', category: 'Entertainment', brandLetter: 'SL',  letterColor: '#fff', letterBg: '#FF5500' },
+  { name: 'ZEE5',         icon: 'play',             color: '#6734D1', category: 'Entertainment', brandLetter: 'Z5',  letterColor: '#fff', letterBg: '#6734D1' },
+  { name: 'ChatGPT',      icon: 'chatbubbles',      color: '#10A37F', category: 'Entertainment', brandLetter: 'AI',  letterColor: '#fff', letterBg: '#10A37F' },
+  // ── Utilities & Bills ────────────────────────────────────────────────
+  { name: 'Electricity',  icon: 'flash',            color: '#FCD34D', category: 'Bills' },
+  { name: 'Water',        icon: 'water',            color: '#60A5FA', category: 'Bills' },
+  { name: 'Internet',     icon: 'wifi',             color: '#A78BFA', category: 'Bills' },
+  { name: 'Phone',        icon: 'phone-portrait',   color: '#94A3B8', category: 'Bills' },
+  { name: 'Gas',          icon: 'flame',            color: '#F97316', category: 'Bills' },
+  { name: 'Insurance',    icon: 'shield-checkmark', color: '#14B8A6', category: 'Health' },
+  { name: 'Credit Card',  icon: 'card',             color: '#F87171', category: 'Bills' },
+  { name: 'Gym',          icon: 'barbell',          color: '#C084FC', category: 'Health' },
+  { name: 'Rent',         icon: 'home',             color: '#38BDF8', category: 'Rent' },
+  { name: 'EMI',          icon: 'cash',             color: '#34D399', category: 'Bills' },
+  { name: 'Custom',       icon: 'receipt',          color: '#94A3B8', category: 'Bills' },
 ];
 
 function currentMonthKey() {
@@ -48,25 +57,98 @@ function currentMonthKey() {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getDaysUntilDue(dueDay) {
+function BrandLogo({ fa5Brand, brandLetter, letterColor, letterBg, logo, icon, color, size = 22, bgSize }) {
+  const wrap = bgSize ?? size + 18;
+  const radius = wrap / 2;
+
+  if (fa5Brand) {
+    return (
+      <View style={{ alignItems: 'center', backgroundColor: `${color}18`, borderRadius: radius, height: wrap, justifyContent: 'center', width: wrap }}>
+        <FontAwesome5 name={fa5Brand} size={size} color={color} brand />
+      </View>
+    );
+  }
+
+  if (brandLetter) {
+    const fontSize = wrap <= 40 ? 11 : 13;
+    return (
+      <View style={{ alignItems: 'center', backgroundColor: letterBg || color, borderRadius: radius, height: wrap, justifyContent: 'center', width: wrap }}>
+        <Text style={{ color: letterColor || '#fff', fontSize, fontWeight: '900', letterSpacing: 0.5 }}>{brandLetter}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ alignItems: 'center', backgroundColor: `${color}20`, borderRadius: radius, height: wrap, justifyContent: 'center', width: wrap }}>
+      <Ionicons name={icon} size={size} color={color} />
+    </View>
+  );
+}
+
+const CYCLES = [
+  { label: 'Monthly', value: 1 },
+  { label: '2 Months', value: 2 },
+  { label: 'Quarterly', value: 3 },
+  { label: '6 Months', value: 6 },
+  { label: 'Yearly', value: 12 },
+];
+
+const CYCLE_LABELS = { 1: 'Monthly', 2: 'Every 2M', 3: 'Quarterly', 6: 'Every 6M', 12: 'Yearly' };
+
+// Core billing period calculator. Walks from createdAt by `cycle` months to
+// find the current active period. Returns { status, dueDate, periodKey, daysUntil }.
+export function getBillingPeriod(bill) {
+  const cycle = bill.cycle || 1;
+  const dueDay = bill.dueDay || 1;
   const now = new Date();
-  const today = now.getDate();
-  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  if (dueDay >= today) return dueDay - today;
-  // already passed this month — count to next month's due
-  return (dim - today) + dueDay;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const created = new Date(bill.createdAt || now);
+  let y = created.getFullYear();
+  let m = created.getMonth();
+  if (!isFinite(y) || !isFinite(m)) {
+    y = now.getFullYear();
+    m = now.getMonth();
+  }
+  let lastUnpaidDue = null;
+  let lastUnpaidKey = null;
+
+  for (let i = 0; i < 500; i++) {
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const clampedDay = Math.min(dueDay, daysInMonth);
+    const due = new Date(y, m, clampedDay);
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+    if (due >= today) {
+      // Overdue unpaid period takes priority
+      if (lastUnpaidDue) {
+        return { status: 'overdue', dueDate: lastUnpaidDue, periodKey: lastUnpaidKey, daysUntil: 0 };
+      }
+      if (bill.paidMonths?.[key]) {
+        return { status: 'paid', dueDate: due, periodKey: key, daysUntil: Math.round((due - today) / 86400000) };
+      }
+      const daysUntil = Math.round((due - today) / 86400000);
+      return { status: daysUntil <= 3 ? 'due-soon' : 'upcoming', dueDate: due, periodKey: key, daysUntil };
+    }
+
+    // Past period — track if unpaid (paid periods reset the chain)
+    if (!bill.paidMonths?.[key]) {
+      lastUnpaidDue = due;
+      lastUnpaidKey = key;
+    } else {
+      lastUnpaidDue = null;
+      lastUnpaidKey = null;
+    }
+
+    m += cycle;
+    if (m >= 12) { y += Math.floor(m / 12); m = m % 12; }
+  }
+
+  const fallbackKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return { status: 'upcoming', dueDate: today, periodKey: fallbackKey, daysUntil: 0 };
 }
 
 function getBillStatus(bill) {
-  const mk = currentMonthKey();
-  const isPaid = !!bill.paidMonths?.[mk];
-  if (isPaid) return 'paid';
-  const daysUntil = getDaysUntilDue(bill.dueDay);
-  const today = new Date().getDate();
-  const overdue = bill.dueDay < today;
-  if (overdue) return 'overdue';
-  if (daysUntil <= 3) return 'due-soon';
-  return 'upcoming';
+  return getBillingPeriod(bill).status;
 }
 
 // ─── Add Bill Modal ────────────────────────────────────────────────────────────
@@ -78,6 +160,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDay, setDueDay] = useState('1');
+  const [cycle, setCycle] = useState(1);
   const [notes, setNotes] = useState('');
 
   const reset = () => {
@@ -86,6 +169,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
     setName('');
     setAmount('');
     setDueDay('1');
+    setCycle(1);
     setNotes('');
   };
 
@@ -104,7 +188,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
     const amt = parseFloat(amount);
     if (!isFinite(amt) || amt <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount.'); return; }
     const day = parseInt(dueDay, 10);
-    if (!isFinite(day) || day < 1 || day > 28) { Alert.alert('Invalid due day', 'Enter a day between 1 and 28.'); return; }
+    if (!isFinite(day) || day < 1 || day > 31) { Alert.alert('Invalid due day', 'Enter a day between 1 and 31.'); return; }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onAdd({
@@ -112,8 +196,13 @@ function AddBillModal({ visible, onClose, onAdd }) {
       name: trimmedName,
       amount: amt,
       dueDay: day,
+      cycle,
       icon: selectedPreset?.icon || 'receipt',
       color: selectedPreset?.color || '#94A3B8',
+      fa5Brand: selectedPreset?.fa5Brand || null,
+      brandLetter: selectedPreset?.brandLetter || null,
+      letterColor: selectedPreset?.letterColor || null,
+      letterBg: selectedPreset?.letterBg || null,
       category: selectedPreset?.category || 'Bills',
       notes: notes.trim(),
       isActive: true,
@@ -128,7 +217,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
 
         <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, maxHeight: '90%' }}>
@@ -136,7 +225,11 @@ function AddBillModal({ visible, onClose, onAdd }) {
           <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginTop: 10, width: 40 }} />
 
           {step === 'preset' ? (
-            <View style={{ padding: 20, paddingBottom: 36 }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: 20, paddingBottom: 36 }}
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Add Bill</Text>
               <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 20, marginTop: 2 }}>Choose Bill Type</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -146,14 +239,12 @@ function AddBillModal({ visible, onClose, onAdd }) {
                     onPress={() => selectPreset(p)}
                     style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 14, borderWidth: 1, gap: 6, paddingHorizontal: 14, paddingVertical: 12, minWidth: '28%', flex: 1 }}
                   >
-                    <View style={{ alignItems: 'center', backgroundColor: `${p.color}20`, borderRadius: 12, height: 40, justifyContent: 'center', width: 40 }}>
-                      <Ionicons name={p.icon} size={20} color={p.color} />
-                    </View>
+                    <BrandLogo fa5Brand={p.fa5Brand} brandLetter={p.brandLetter} letterColor={p.letterColor} letterBg={p.letterBg} icon={p.icon} color={p.color} size={20} bgSize={40} />
                     <Text style={{ color: C.text1, fontSize: 11, fontWeight: '800', textAlign: 'center' }}>{p.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </ScrollView>
           ) : (
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 36 }}>
               {/* Back + title */}
@@ -163,9 +254,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
               </TouchableOpacity>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <View style={{ alignItems: 'center', backgroundColor: `${preset.color}20`, borderRadius: 14, height: 52, justifyContent: 'center', width: 52 }}>
-                  <Ionicons name={preset.icon} size={26} color={preset.color} />
-                </View>
+                <BrandLogo fa5Brand={preset.fa5Brand} brandLetter={preset.brandLetter} letterColor={preset.letterColor} letterBg={preset.letterBg} icon={preset.icon} color={preset.color} size={26} bgSize={52} />
                 <View>
                   <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Bill</Text>
                   <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900' }}>Bill Details</Text>
@@ -196,7 +285,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
 
               <Text style={[s.fieldLabel, { color: C.text2 }]}>Due on Day of Month</Text>
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                {['1', '5', '7', '10', '15', '20', '25', '28'].map((d) => (
+                {['1', '5', '10', '15', '20', '25', '28', '31'].map((d) => (
                   <TouchableOpacity
                     key={d}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDueDay(d); }}
@@ -214,6 +303,19 @@ function AddBillModal({ visible, onClose, onAdd }) {
                   onChangeText={setDueDay}
                   maxLength={2}
                 />
+              </View>
+
+              <Text style={[s.fieldLabel, { color: C.text2 }]}>Billing Cycle</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                {CYCLES.map(({ label, value }) => (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCycle(value); }}
+                    style={{ alignItems: 'center', backgroundColor: cycle === value ? `${preset.color}25` : C.cardInner, borderColor: cycle === value ? preset.color : C.border, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: cycle === value ? preset.color : C.text2, fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
               <Text style={[s.fieldLabel, { color: C.text2 }]}>Notes (optional)</Text>
@@ -243,46 +345,52 @@ function AddBillModal({ visible, onClose, onAdd }) {
 // ─── Bill Card ─────────────────────────────────────────────────────────────────
 
 function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
-  const status = getBillStatus(bill);
-  const mk = currentMonthKey();
+  const { status, daysUntil, dueDate, periodKey } = getBillingPeriod(bill);
   const isPaid = status === 'paid';
-  const daysUntil = getDaysUntilDue(bill.dueDay);
+  const cycle = bill.cycle || 1;
 
   const statusConfig = {
-    paid:     { label: 'Paid',      color: '#22C55E', bg: 'rgba(34,197,94,0.12)',    icon: 'checkmark-circle' },
-    overdue:  { label: 'Overdue',   color: '#EF4444', bg: 'rgba(239,68,68,0.12)',    icon: 'alert-circle' },
-    'due-soon':{ label: 'Due Soon', color: '#F97316', bg: 'rgba(249,115,22,0.12)',   icon: 'time' },
-    upcoming: { label: 'Upcoming',  color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',   icon: 'calendar-outline' },
+    paid:      { label: 'Paid',      color: '#22C55E', bg: 'rgba(34,197,94,0.12)',  icon: 'checkmark-circle' },
+    overdue:   { label: 'Overdue',   color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  icon: 'alert-circle' },
+    'due-soon':{ label: 'Due Soon',  color: '#F97316', bg: 'rgba(249,115,22,0.12)', icon: 'time' },
+    upcoming:  { label: 'Upcoming',  color: '#60A5FA', bg: 'rgba(96,165,250,0.12)', icon: 'calendar-outline' },
   };
-  const sc = statusConfig[status];
+  const sc = statusConfig[status] || statusConfig['upcoming'];
+
+  const dueDateStr = dueDate.toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short',
+    ...(dueDate.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+  });
+
+  const dateText = isPaid
+    ? `Paid ${new Date(bill.paidMonths[periodKey]?.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+    : status === 'overdue'
+      ? `Overdue since ${dueDateStr}`
+      : daysUntil === 0
+        ? 'Due today'
+        : `Next: ${dueDateStr} · ${daysUntil}d`;
 
   return (
     <View style={[bStyles.card, { backgroundColor: C.card, borderColor: status === 'overdue' ? 'rgba(239,68,68,0.35)' : C.border }]}>
       {/* Left: icon */}
-      <View style={[bStyles.iconWrap, { backgroundColor: `${bill.color}18` }]}>
-        <Ionicons name={bill.icon} size={22} color={bill.color} />
-      </View>
+      <BrandLogo fa5Brand={bill.fa5Brand} brandLetter={bill.brandLetter} letterColor={bill.letterColor} letterBg={bill.letterBg} icon={bill.icon} color={bill.color} size={22} bgSize={44} />
 
       {/* Center: info */}
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
           <Text style={{ color: C.text1, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{bill.name}</Text>
           <View style={{ backgroundColor: sc.bg, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
             <Text style={{ color: sc.color, fontSize: 10, fontWeight: '800' }}>{sc.label}</Text>
           </View>
+          {cycle > 1 && (
+            <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 8, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Text style={{ color: C.text3, fontSize: 9, fontWeight: '800' }}>{CYCLE_LABELS[cycle] || `Every ${cycle}M`}</Text>
+            </View>
+          )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Text style={{ color: bill.color, fontSize: 17, fontWeight: '900' }}>{currency.format(bill.amount)}</Text>
-          <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600' }}>
-            {isPaid
-              ? `Paid ${new Date(bill.paidMonths[mk].paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
-              : status === 'overdue'
-                ? `Was due ${bill.dueDay}${ordinal(bill.dueDay)}`
-                : daysUntil === 0
-                  ? 'Due today'
-                  : `Due in ${daysUntil}d (${bill.dueDay}${ordinal(bill.dueDay)})`
-            }
-          </Text>
+          <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600' }}>{dateText}</Text>
         </View>
         {!!bill.notes && (
           <Text style={{ color: C.text3, fontSize: 11, marginTop: 3 }} numberOfLines={1}>{bill.notes}</Text>
@@ -321,8 +429,6 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' | 'unpaid' | 'paid'
 
-  const mk = currentMonthKey();
-
   const enriched = useMemo(() => bills.map((b) => ({ ...b, _status: getBillStatus(b) })), [bills]);
 
   const filtered = useMemo(() => {
@@ -343,12 +449,13 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
 
   const summary = useMemo(() => {
     const total = bills.reduce((s, b) => s + b.amount, 0);
-    const paid = bills.filter((b) => !!b.paidMonths?.[mk]).reduce((s, b) => s + b.amount, 0);
-    const unpaid = bills.filter((b) => !b.paidMonths?.[mk]).reduce((s, b) => s + b.amount, 0);
-    const overdue = bills.filter((b) => getBillStatus(b) === 'overdue').length;
-    const dueSoon = bills.filter((b) => getBillStatus(b) === 'due-soon').length;
-    return { total, paid, unpaid, overdue, dueSoon, paidCount: bills.filter((b) => !!b.paidMonths?.[mk]).length };
-  }, [bills, mk]);
+    const paidBills = bills.filter((b) => getBillingPeriod(b).status === 'paid');
+    const paid = paidBills.reduce((s, b) => s + b.amount, 0);
+    const unpaid = total - paid;
+    const overdue = bills.filter((b) => getBillingPeriod(b).status === 'overdue').length;
+    const dueSoon = bills.filter((b) => getBillingPeriod(b).status === 'due-soon').length;
+    return { total, paid, unpaid, overdue, dueSoon, paidCount: paidBills.length };
+  }, [bills]);
 
   const handleDelete = useCallback((bill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
