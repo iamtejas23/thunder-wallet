@@ -25,7 +25,7 @@ import { useTheme } from './ThemeContext';
 import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
-import BillsScreen, { BILLS_KEY } from './BillsScreen';
+import BillsScreen, { BILLS_KEY, getBillingPeriod } from './BillsScreen';
 import { scheduleDailyReview, scheduleBillReminders } from './NotificationService';
 
 const Tab = createBottomTabNavigator();
@@ -1606,13 +1606,18 @@ function MainApp() {
   };
 
   const deleteBill = async (id) => {
+    // Remove every auto-created payment transaction for this bill (id: bill_<id>_YYYY-MM)
+    const nextTx = transactions.filter((t) => !t.id.startsWith(`bill_${id}_`));
+    if (nextTx.length !== transactions.length) {
+      await persistTransactions(nextTx);
+    }
     await persistBills(bills.filter((b) => b.id !== id));
   };
 
   const markBillPaid = async (bill) => {
+    const { periodKey } = getBillingPeriod(bill);
     const now = new Date();
-    const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const txId = `bill_${bill.id}_${mk}`;
+    const txId = `bill_${bill.id}_${periodKey}`;
 
     // Create expense transaction
     const tx = normalizeTransaction({
@@ -1627,29 +1632,28 @@ function MainApp() {
     const nextTx = [tx, ...transactions.filter((t) => t.id !== txId)];
     await persistTransactions(nextTx);
 
-    // Mark bill as paid this month
+    // Mark bill as paid for the current billing period
     const nextBills = bills.map((b) =>
       b.id === bill.id
-        ? { ...b, paidMonths: { ...b.paidMonths, [mk]: { paidAt: now.toISOString(), txId } } }
+        ? { ...b, paidMonths: { ...b.paidMonths, [periodKey]: { paidAt: now.toISOString(), txId } } }
         : b
     );
     await persistBills(nextBills);
   };
 
   const markBillUnpaid = async (bill) => {
-    const now = new Date();
-    const mk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const txId = bill.paidMonths?.[mk]?.txId;
+    const { periodKey } = getBillingPeriod(bill);
+    const txId = bill.paidMonths?.[periodKey]?.txId;
 
     // Remove the auto-created transaction if it exists
     if (txId) {
       await persistTransactions(transactions.filter((t) => t.id !== txId));
     }
 
-    // Remove this month from paidMonths
+    // Remove this period from paidMonths
     const nextBills = bills.map((b) => {
       if (b.id !== bill.id) return b;
-      const { [mk]: _removed, ...rest } = b.paidMonths || {};
+      const { [periodKey]: _removed, ...rest } = b.paidMonths || {};
       return { ...b, paidMonths: rest };
     });
     await persistBills(nextBills);
