@@ -100,34 +100,47 @@
     /* ── HERO ── */
     .hero {
       min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 100px 24px 60px;
-      text-align: center;
+      display: flex; align-items: center;
+      padding: 60px 0 40px;
       position: relative; overflow: hidden;
     }
-    .blob { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
-    .blob-1 { width: 700px; height: 500px; top: -160px; left: -160px; background: rgba(96,165,250,0.055); }
-    .blob-2 { width: 600px; height: 500px; top: 80px;  right: -180px; background: rgba(167,139,250,0.05); }
-    .blob-3 { width: 500px; height: 350px; bottom: 0;  left: 50%; transform: translateX(-50%); background: rgba(245,166,35,0.04); }
+    .blob { position: absolute; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0; }
+    .blob-1 { width: 600px; height: 500px; top: -100px; left: -120px; background: rgba(96,165,250,0.05); }
+    .blob-2 { width: 500px; height: 500px; top: 20%;   right: -80px;  background: rgba(167,139,250,0.045); }
+    .blob-3 { width: 400px; height: 300px; bottom: 0;  right: 10%;    background: rgba(245,166,35,0.035); }
 
     .hero-grid {
       position: absolute; inset: 0; z-index: 0;
       background-image:
-        linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 90% 90% at 50% 40%, black 0%, transparent 100%);
     }
 
-    .hero-inner { position: relative; z-index: 1; max-width: 820px; }
+    /* ── HERO SPLIT LAYOUT ── */
+    .hero-split {
+      position: relative; z-index: 1;
+      max-width: 1200px; margin: 0 auto;
+      width: 100%; padding: 0 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+    .hero-left { display: flex; flex-direction: column; align-items: flex-start; }
+    .hero-right {
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
+    }
 
     .badge {
       display: inline-flex; align-items: center; gap: 8px;
       background: rgba(245,166,35,0.08); border: 1px solid rgba(245,166,35,0.22);
       border-radius: 999px; padding: 5px 14px 5px 8px;
       font-size: 12px; font-weight: 600; color: var(--gold);
-      margin-bottom: 32px; letter-spacing: .2px;
+      margin-bottom: 28px; letter-spacing: .2px;
     }
     .badge-dot {
       width: 20px; height: 20px; border-radius: 50%;
@@ -136,9 +149,9 @@
     }
 
     h1 {
-      font-size: clamp(40px, 7.5vw, 76px);
-      font-weight: 900; line-height: 1.04; letter-spacing: -2.5px;
-      margin-bottom: 24px;
+      font-size: clamp(36px, 4.5vw, 62px);
+      font-weight: 900; line-height: 1.06; letter-spacing: -2px;
+      margin-bottom: 22px;
     }
     h1 .gr {
       background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.45) 100%);
@@ -149,12 +162,12 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
 
-    .hero-sub { font-size: 18px; color: var(--t2); max-width: 520px; margin: 0 auto 40px; line-height: 1.72; }
-    .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 56px; }
+    .hero-sub { font-size: 16px; color: var(--t2); max-width: 460px; margin: 0 0 36px; line-height: 1.75; }
+    .hero-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 32px; }
 
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
-      border-radius: 10px; padding: 12px 24px;
+      border-radius: 10px; padding: 12px 22px;
       font-size: 14px; font-weight: 700; text-decoration: none;
       transition: transform .15s, opacity .15s, box-shadow .15s;
     }
@@ -169,62 +182,87 @@
     .version-pill {
       display: inline-flex; align-items: center; gap: 10px;
       background: var(--card); border: 1px solid var(--border2);
-      border-radius: 10px; padding: 10px 18px;
+      border-radius: 10px; padding: 9px 16px;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px; color: var(--t2);
+      font-size: 12px; color: var(--t2);
     }
     .version-pill .tag { color: var(--gold); font-weight: 700; }
-    .version-pill .cursor { width: 2px; height: 14px; background: var(--gold); animation: blink 1s step-end infinite; }
+    .version-pill .cursor { width: 2px; height: 13px; background: var(--gold); animation: blink 1s step-end infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-    /* ── SCREENS SHOWCASE ── */
-    .screens-row {
-      display: flex; align-items: flex-end; justify-content: center;
-      gap: 14px; margin-top: 64px; padding: 0 12px;
+    /* Mini trust chips below version pill */
+    .hero-trust {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px;
+    }
+    .hero-trust-chip {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600; color: var(--t3);
+      background: var(--t4); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 10px;
+    }
+
+    /* ── HERO RIGHT: phone + floating cards ── */
+    /*
+     * hero-phone-wrap has generous padding on all sides.
+     * Float cards are absolutely positioned inside that padding buffer
+     * so they appear ABOVE / BESIDE the phone, never on it.
+     *
+     * Phone (260px) is centered.
+     * padding-top/bottom = 88px → float cards at top:0/bottom:0 sit ~30px clear of phone.
+     * padding-left/right = 24px → enough room for card overflow (z-index shows above siblings).
+     */
+    .hero-phone-wrap {
       position: relative;
+      display: flex; align-items: center; justify-content: center;
+      padding: 88px 24px 88px 24px;
     }
 
     /* Floating stat cards */
     .float-card {
       position: absolute;
       background: var(--card); border: 1px solid var(--border2);
-      border-radius: 14px; padding: 11px 15px;
+      border-radius: 14px; padding: 10px 14px;
       display: flex; align-items: center; gap: 10px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
       white-space: nowrap; z-index: 10;
       animation: float 6s ease-in-out infinite;
     }
-    .float-card:nth-child(2) { animation-delay: -2s; }
-    .float-card:nth-child(3) { animation-delay: -4s; }
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
-    .fc-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
-    .fc-label { font-size: 9px; font-weight: 700; color: var(--t3); }
-    .fc-value { font-size: 13px; font-weight: 900; color: var(--t1); margin-top: 1px; }
+    /* fc-tl: sits in the top-left padding buffer — left edge near phone left */
+    .float-card.fc-tl { top: 8px;    left: -30px;  animation-delay: 0s; }
+    /* fc-tr: sits in the top-right padding buffer — right edge past phone right */
+    .float-card.fc-tr { top: 34px;   right: -30px; animation-delay: -2.2s; }
+    /* fc-bl: sits in the bottom-left padding buffer */
+    .float-card.fc-bl { bottom: 8px; left: -20px;  animation-delay: -4s; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .fc-icon { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .fc-label { font-size: 9px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: .4px; }
+    .fc-value { font-size: 12.5px; font-weight: 900; color: var(--t1); margin-top: 1px; }
 
     /* Phone frame */
-    .phone {
-      border-radius: 38px;
+    .hero-phone {
+      width: 260px;
+      border-radius: 42px;
       border: 1.5px solid rgba(255,255,255,0.10);
-      box-shadow: 0 32px 80px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.035);
+      box-shadow:
+        0 40px 100px rgba(0,0,0,0.75),
+        0 0 0 1px rgba(255,255,255,0.03),
+        0 0 80px rgba(245,166,35,0.06);
       overflow: hidden;
-      flex-shrink: 0;
       background: #0D1221;
-      position: relative;
+      position: relative; z-index: 5;
+      display: flex; flex-direction: column;
     }
-    .phone-center { width: 220px; z-index: 5; }
-    .phone-side   { width: 185px; opacity: .55; filter: blur(0.5px); }
-    .phone-far    { width: 158px; opacity: .32; filter: blur(1px); display: none; }
 
     .p-notch {
       width: 72px; height: 20px; background: #07080F;
       border-radius: 0 0 12px 12px; align-self: center; margin-top: -1px;
       border: 1px solid rgba(255,255,255,0.05); border-top: none;
     }
-    .p-screen { padding: 9px 11px 14px; display: flex; flex-direction: column; gap: 7px; }
+    .p-screen { padding: 10px 13px 16px; display: flex; flex-direction: column; gap: 8px; }
     .p-header { display: flex; align-items: center; justify-content: space-between; }
     .p-logo { display: flex; align-items: center; gap: 6px; }
-    .p-logo-icon { width: 20px; height: 20px; border-radius: 5px; background: #1C2740; display:flex; align-items:center; justify-content:center; font-size:10px; }
-    .p-logo-name { font-size: 10px; font-weight: 900; color: var(--t1); }
+    .p-logo-icon { width: 22px; height: 22px; border-radius: 6px; background: #1C2740; display:flex; align-items:center; justify-content:center; font-size:11px; }
+    .p-logo-name { font-size: 11px; font-weight: 900; color: var(--t1); }
 
     /* ── TRUST STRIP ── */
     .trust {
@@ -469,7 +507,9 @@
     ::-webkit-scrollbar-thumb { background: var(--card3); border-radius: 3px; }
 
     /* ── RESPONSIVE ── */
-    @media (max-width: 1000px) {
+    @media (max-width: 1080px) {
+      .hero-split { padding: 0 32px; gap: 40px; }
+      .hero-phone { width: 230px; }
       .screens-grid { grid-template-columns: repeat(3, 1fr); }
       .screens-grid .screen-wrap:nth-child(4),
       .screens-grid .screen-wrap:nth-child(5) { display: none; }
@@ -477,6 +517,21 @@
     }
     @media (max-width: 900px) {
       .nav-links { display: none; }
+      /* Hero: stack vertically, phone below text */
+      .hero { padding: 80px 0 48px; }
+      .hero-split {
+        grid-template-columns: 1fr;
+        padding: 0 28px;
+        gap: 48px;
+        text-align: left;
+      }
+      .hero-right { padding: 0; }
+      .hero-phone { width: 240px; }
+      .hero-phone-wrap { padding: 72px 16px; }
+      .float-card.fc-tl { left: -6px; top: 6px; }
+      .float-card.fc-tr { right: -6px; top: 28px; }
+      .float-card.fc-bl { left: -4px; bottom: 6px; }
+      /* Rest */
       .b-span-4 { grid-column: span 6; }
       .b-span-6 { grid-column: span 12; }
       .b-span-8 { grid-column: span 12; }
@@ -489,7 +544,9 @@
     }
     @media (max-width: 640px) {
       nav { padding: 0 18px; }
-      .hero { padding: 90px 18px 48px; }
+      .hero-split { padding: 0 18px; gap: 36px; }
+      /* Hide phone on very small screens — text-only hero */
+      .hero-right { display: none; }
       .b-span-4 { grid-column: span 12; }
       .b-span-6 { grid-column: span 12; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -538,128 +595,146 @@
   <div class="blob blob-3"></div>
   <div class="hero-grid"></div>
 
-  <div class="hero-inner">
-    <div class="badge">
-      <div class="badge-dot">⚡</div>
-      <span id="badge-version">v1.0.60</span> · Open Source · Android · Offline-First
-    </div>
+  <div class="hero-split">
 
-    <h1>
-      <span class="gr">Your money.</span><br />
-      <span class="gr-gold">Your device. Always.</span>
-    </h1>
-
-    <p class="hero-sub">
-      Thunder Wallet is a premium Android expense manager built for people who want full control. Hardware-backed card security, bill notifications, spending analytics, PDF export — no cloud, no account, no ads.
-    </p>
-
-    <div class="hero-btns">
-      <a class="btn btn-gold" id="btn-latest" href="https://github.com/iamtejas23/thunder-wallet/releases/latest" target="_blank">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16L6 10h4V4h4v6h4l-6 6zm-6 2h12v2H6v-2z"/></svg>
-        <span id="btn-latest-label">Download Latest</span>
-      </a>
-      <a class="btn btn-ghost" id="btn-stable" href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank" style="display:none">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-        <span id="btn-stable-label">Stable</span>
-      </a>
-      <a class="btn btn-ghost" href="https://github.com/iamtejas23/thunder-wallet" target="_blank">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        View Source
-      </a>
-    </div>
-
-    <div class="version-pill">
-      <span class="tag" id="version-tag">v1.0.60</span>
-      <span style="color:var(--t3)">·</span>
-      <span>React Native 0.81 · Expo SDK 54 · New Architecture</span>
-      <span class="cursor"></span>
-    </div>
-
-    <!-- Dashboard phone mockup -->
-    <div class="screens-row" style="margin-top:64px;">
-
-      <div class="float-card" style="left:-10px; top:60px;">
-        <div class="fc-icon" style="background:rgba(245,166,35,0.12)">🔔</div>
-        <div>
-          <div class="fc-label">Bill Reminder</div>
-          <div class="fc-value" style="color:var(--gold)">Netflix due tomorrow</div>
-        </div>
+    <!-- LEFT: text content -->
+    <div class="hero-left">
+      <div class="badge">
+        <div class="badge-dot">⚡</div>
+        <span id="badge-version">v1.0.61</span> · Open Source · Android · Offline-First
       </div>
 
-      <div class="float-card" style="right:-10px; top:50px;">
-        <div class="fc-icon" style="background:rgba(167,139,250,0.12)">🔐</div>
-        <div>
-          <div class="fc-label">Card Security</div>
-          <div class="fc-value" style="color:var(--purple)">Android Keystore</div>
-        </div>
+      <h1>
+        <span class="gr">Your money.</span><br />
+        <span class="gr-gold">Your device.<br />Always.</span>
+      </h1>
+
+      <p class="hero-sub">
+        A premium Android expense manager. Hardware-backed card security, bill notifications, spending analytics, PDF export — no cloud, no account, no ads.
+      </p>
+
+      <div class="hero-btns">
+        <a class="btn btn-gold" id="btn-latest" href="https://github.com/iamtejas23/thunder-wallet/releases/latest" target="_blank">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16L6 10h4V4h4v6h4l-6 6zm-6 2h12v2H6v-2z"/></svg>
+          <span id="btn-latest-label">Download Latest</span>
+        </a>
+        <a class="btn btn-ghost" id="btn-stable" href="https://github.com/iamtejas23/thunder-wallet/releases" target="_blank" style="display:none">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <span id="btn-stable-label">Stable</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/iamtejas23/thunder-wallet" target="_blank">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          View Source
+        </a>
       </div>
 
-      <div class="float-card" style="right:10px; bottom:80px;">
-        <div class="fc-icon" style="background:rgba(52,211,153,0.12)">📊</div>
-        <div>
-          <div class="fc-label">Smart Insight</div>
-          <div class="fc-value" style="color:var(--green)">Saving 31% this month</div>
-        </div>
+      <div class="version-pill">
+        <span class="tag" id="version-tag">v1.0.61</span>
+        <span style="color:var(--t3)">·</span>
+        <span>React Native 0.81 · Expo SDK 54</span>
+        <span class="cursor"></span>
       </div>
 
-      <!-- Main phone mockup -->
-      <div class="phone phone-center" style="display:flex;flex-direction:column;">
-        <div class="p-notch" style="align-self:center"></div>
-        <div class="p-screen">
-          <!-- Header -->
-          <div class="p-header">
-            <div class="p-logo">
-              <div class="p-logo-icon">⚡</div>
-              <div>
-                <div class="p-logo-name">Thunder Wallet</div>
-                <div style="font-size:6.5px;color:var(--t3)">Your money, under control</div>
+      <div class="hero-trust">
+        <span class="hero-trust-chip">🔒 On-Device</span>
+        <span class="hero-trust-chip">📵 No Cloud</span>
+        <span class="hero-trust-chip">🚫 No Ads</span>
+        <span class="hero-trust-chip">⚡ Offline</span>
+        <span class="hero-trust-chip">🆓 Free</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: phone mockup + floating cards -->
+    <div class="hero-right">
+      <div class="hero-phone-wrap">
+
+        <!-- Float: bill reminder (top-left) -->
+        <div class="float-card fc-tl">
+          <div class="fc-icon" style="background:rgba(245,166,35,0.12)">🔔</div>
+          <div>
+            <div class="fc-label">Bill Reminder</div>
+            <div class="fc-value" style="color:var(--gold)">Netflix due tomorrow</div>
+          </div>
+        </div>
+
+        <!-- Float: card security (top-right) -->
+        <div class="float-card fc-tr">
+          <div class="fc-icon" style="background:rgba(167,139,250,0.12)">🔐</div>
+          <div>
+            <div class="fc-label">Card Security</div>
+            <div class="fc-value" style="color:var(--purple)">Android Keystore</div>
+          </div>
+        </div>
+
+        <!-- Float: savings insight (bottom-left) -->
+        <div class="float-card fc-bl">
+          <div class="fc-icon" style="background:rgba(52,211,153,0.12)">📊</div>
+          <div>
+            <div class="fc-label">Smart Insight</div>
+            <div class="fc-value" style="color:var(--green)">Saving 31% this month</div>
+          </div>
+        </div>
+
+        <!-- Phone -->
+        <div class="hero-phone">
+          <div class="p-notch"></div>
+          <div class="p-screen">
+            <div class="p-header">
+              <div class="p-logo">
+                <div class="p-logo-icon">⚡</div>
+                <div>
+                  <div class="p-logo-name">Thunder Wallet</div>
+                  <div style="font-size:7px;color:var(--t3)">Your money, under control</div>
+                </div>
+              </div>
+              <div style="width:30px;height:30px;background:#1C2740;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;">⚙️</div>
+            </div>
+
+            <!-- Balance card -->
+            <div style="background:linear-gradient(135deg,#0F1829,#131D30);border-radius:14px;border:1px solid rgba(255,255,255,0.06);padding:14px;">
+              <div style="font-size:7.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Current Balance</div>
+              <div style="font-size:28px;font-weight:900;color:#fff;margin:5px 0 12px;letter-spacing:-1px;">₹42,580</div>
+              <div style="display:flex;gap:8px;">
+                <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.06);padding:6px 8px;">
+                  <div style="font-size:6px;font-weight:700;color:var(--t3);text-transform:uppercase;">Income</div>
+                  <div style="font-size:11px;font-weight:900;color:var(--green);margin-top:2px;">₹75k</div>
+                </div>
+                <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.06);padding:6px 8px;">
+                  <div style="font-size:6px;font-weight:700;color:var(--t3);text-transform:uppercase;">Spent</div>
+                  <div style="font-size:11px;font-weight:900;color:var(--red);margin-top:2px;">₹32.4k</div>
+                </div>
               </div>
             </div>
-            <div style="width:28px;height:28px;background:#1C2740;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;">⚙️</div>
-          </div>
 
-          <!-- Balance card -->
-          <div style="background:linear-gradient(135deg,#0F1829,#131D30);border-radius:13px;border:1px solid rgba(255,255,255,0.06);padding:12px;">
-            <div style="font-size:7px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Current Balance</div>
-            <div style="font-size:24px;font-weight:900;color:#fff;margin:4px 0 10px;">₹42,580</div>
-            <div style="display:flex;gap:8px;">
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:7px;border:1px solid rgba(255,255,255,0.06);padding:5px 7px;">
-                <div style="font-size:5.5px;font-weight:700;color:var(--t3);text-transform:uppercase;">Income</div>
-                <div style="font-size:10px;font-weight:900;color:var(--green);margin-top:2px;">₹75k</div>
-              </div>
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:7px;border:1px solid rgba(255,255,255,0.06);padding:5px 7px;">
-                <div style="font-size:5.5px;font-weight:700;color:var(--t3);text-transform:uppercase;">Spent</div>
-                <div style="font-size:10px;font-weight:900;color:var(--red);margin-top:2px;">₹32.4k</div>
+            <!-- Health score bar -->
+            <div style="background:#161F30;border-radius:10px;border:1px solid rgba(255,255,255,0.06);padding:9px 10px;display:flex;align-items:center;gap:9px;">
+              <div style="font-size:14px;font-weight:900;color:var(--green);min-width:24px;">82</div>
+              <div style="flex:1;">
+                <div style="font-size:6.5px;font-weight:700;color:var(--t3);">Financial Health · Excellent</div>
+                <div style="background:#1C2740;border-radius:3px;height:5px;overflow:hidden;margin-top:5px;">
+                  <div style="width:82%;height:5px;background:linear-gradient(90deg,var(--green),#2DD4BF);border-radius:3px;"></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Health score -->
-          <div style="background:#161F30;border-radius:9px;border:1px solid rgba(255,255,255,0.06);padding:8px;display:flex;align-items:center;gap:8px;">
-            <div style="font-size:10px;font-weight:900;color:var(--green);">82</div>
-            <div style="flex:1;">
-              <div style="font-size:6px;font-weight:700;color:var(--t3);">Financial Health · Excellent</div>
-              <div style="background:#1C2740;border-radius:2px;height:4px;overflow:hidden;margin-top:4px;">
-                <div style="width:82%;height:4px;background:linear-gradient(90deg,var(--green),#2DD4BF);border-radius:2px;"></div>
-              </div>
+            <!-- Action buttons -->
+            <div style="display:flex;gap:7px;">
+              <div style="flex:1;background:var(--green2);border:1px solid rgba(52,211,153,0.25);border-radius:9px;padding:8px;text-align:center;font-size:10px;font-weight:900;color:var(--green);">＋ Income</div>
+              <div style="flex:1;background:var(--red2);border:1px solid rgba(248,113,113,0.25);border-radius:9px;padding:8px;text-align:center;font-size:10px;font-weight:900;color:var(--red);">－ Expense</div>
             </div>
-          </div>
 
-          <!-- Buttons -->
-          <div style="display:flex;gap:6px;">
-            <div style="flex:1;background:var(--green2);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:7px;text-align:center;font-size:9px;font-weight:900;color:var(--green);">＋ Income</div>
-            <div style="flex:1;background:var(--red2);border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:7px;text-align:center;font-size:9px;font-weight:900;color:var(--red);">－ Expense</div>
-          </div>
-
-          <!-- Transactions -->
-          <div style="display:flex;flex-direction:column;gap:5px;">
-            <div style="display:flex;align-items:center;gap:7px;"><div style="width:25px;height:25px;border-radius:7px;background:rgba(248,113,113,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;">🍔</div><div style="flex:1;"><div style="font-size:9px;font-weight:800;color:var(--t1);">Food</div><div style="font-size:6.5px;color:var(--t3);">Today · 1:30 PM</div></div><div style="font-size:10px;font-weight:900;color:var(--red);">-₹340</div></div>
-            <div style="display:flex;align-items:center;gap:7px;"><div style="width:25px;height:25px;border-radius:7px;background:rgba(52,211,153,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;">💼</div><div style="flex:1;"><div style="font-size:9px;font-weight:800;color:var(--t1);">Salary</div><div style="font-size:6.5px;color:var(--t3);">Jun 1</div></div><div style="font-size:10px;font-weight:900;color:var(--green);">+₹75k</div></div>
-            <div style="display:flex;align-items:center;gap:7px;"><div style="width:25px;height:25px;border-radius:7px;background:rgba(167,139,250,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;">🛍</div><div style="flex:1;"><div style="font-size:9px;font-weight:800;color:var(--t1);">Shopping</div><div style="font-size:6.5px;color:var(--t3);">Yesterday</div></div><div style="font-size:10px;font-weight:900;color:var(--red);">-₹1.2k</div></div>
+            <!-- Transactions -->
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:8px;background:rgba(248,113,113,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">🍔</div><div style="flex:1;"><div style="font-size:10px;font-weight:800;color:var(--t1);">Food</div><div style="font-size:7px;color:var(--t3);">Today · 1:30 PM</div></div><div style="font-size:11px;font-weight:900;color:var(--red);">-₹340</div></div>
+              <div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:8px;background:rgba(52,211,153,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">💼</div><div style="flex:1;"><div style="font-size:10px;font-weight:800;color:var(--t1);">Salary</div><div style="font-size:7px;color:var(--t3);">Jun 1</div></div><div style="font-size:11px;font-weight:900;color:var(--green);">+₹75k</div></div>
+              <div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:8px;background:rgba(167,139,250,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">🛍</div><div style="flex:1;"><div style="font-size:10px;font-weight:800;color:var(--t1);">Shopping</div><div style="font-size:7px;color:var(--t3);">Yesterday</div></div><div style="font-size:11px;font-weight:900;color:var(--red);">-₹1.2k</div></div>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
+
   </div>
 </section>
 
