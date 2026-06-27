@@ -29,7 +29,7 @@ import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
 import BillsScreen, { BILLS_KEY, getBillingPeriod } from './BillsScreen';
 import CardScreen from './CardScreen';
-import { scheduleDailyReview, scheduleBillReminders } from './NotificationService';
+import { scheduleDailyReview, scheduleBillReminders, requestNotificationPermission } from './NotificationService';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
@@ -1612,6 +1612,8 @@ function MainApp() {
         if (savedBills) setBills(JSON.parse(savedBills));
         if (savedSavings) setSavings(JSON.parse(savedSavings));
       } catch { Alert.alert('Load error', 'Could not load wallet data. Please restart the app.'); }
+      // Request notification permission once so bill reminders can fire
+      requestNotificationPermission().catch(() => {});
     };
     load();
   }, []);
