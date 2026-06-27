@@ -380,7 +380,7 @@ function CardForm({ initialCard, onSave, onCancel }) {
             style={[fs.input, { color: C.text1, flex: 1 }]}
             placeholder="•••• •••• •••• ••••"
             placeholderTextColor={C.text3}
-            value={showNum ? cardNumber : cardNumber.replace(/\d(?=.{5})/g, '•')}
+            value={cardNumber}
             onChangeText={v => setCardNumber(formatCardNumber(v))}
             keyboardType="number-pad"
             maxLength={19}
