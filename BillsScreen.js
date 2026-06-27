@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
+import MeshBackground from './MeshBackground';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -491,6 +492,7 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <MeshBackground blobs="bills" isDark={C.isDark} />
       <FlatList
         data={sorted}
         keyExtractor={(b) => b.id}

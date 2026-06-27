@@ -69,7 +69,7 @@ export async function scheduleDailyReview(stats) {
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_REVIEW_ID,
     content: { title: 'Day in Review ⚡', body },
-    trigger: { hour: 21, minute: 0, repeats: true },
+    trigger: { type: 'calendar', hour: 21, minute: 0, repeats: true },
   });
 }
 
