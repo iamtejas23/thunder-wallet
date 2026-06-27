@@ -13,7 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
+import MeshBackground from './MeshBackground';
 import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
 
@@ -160,6 +162,7 @@ const SettingsScreen = ({ resetAllData }) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <MeshBackground blobs="analytics" isDark={C.isDark} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 110 }}
@@ -179,7 +182,7 @@ const SettingsScreen = ({ resetAllData }) => {
           <Text style={{ color: C.text3, fontSize: 13, marginTop: 3 }}>Smart local expense manager</Text>
           <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 5, marginTop: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
             <Ionicons name="flash" size={11} color={C.accent} />
-            <Text style={{ color: C.accent, fontSize: 12, fontWeight: '800' }}>v1.0.54 · Free</Text>
+            <Text style={{ color: C.accent, fontSize: 12, fontWeight: '800' }}>v{Constants.expoConfig?.version ?? '1.0.62'} · Free</Text>
           </View>
         </View>
 
@@ -356,7 +359,7 @@ const SettingsScreen = ({ resetAllData }) => {
 
         {/* ── Footer ── */}
         <Text style={{ color: C.text3, fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-          Thunder Wallet v1.0.54{'\n'}Your finances. Your device. Always private.
+          Thunder Wallet v{Constants.expoConfig?.version ?? '1.0.62'}{'\n'}Your finances. Your device. Always private.
         </Text>
 
       </ScrollView>
