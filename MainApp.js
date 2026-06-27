@@ -472,6 +472,11 @@ const BUDGET_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Rent', 'Healt
 function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
   const [budgets, setBudgets] = useState({ ...categoryBudgets });
 
+  // Re-sync local state whenever the modal opens (useState initializer only runs once)
+  useEffect(() => {
+    if (visible) setBudgets({ ...categoryBudgets });
+  }, [visible]);
+
   const handleSave = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onSave(budgets);
