@@ -18,11 +18,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useTheme } from './ThemeContext';
 
-const CARDS_KEY = 'saved_cards_v1';
+// AsyncStorage key — stores only non-sensitive card metadata
+const CARDS_META_KEY  = 'cards_meta_v2';
+// Old XOR key — kept only for one-time migration
+const CARDS_LEGACY_KEY = 'saved_cards_v1';
+// SecureStore prefix — each card gets its own key: card_secure_<id>
+const SECURE_PREFIX   = 'card_secure_';
+
 const { width } = Dimensions.get('window');
 const CARD_W = width - 48;
 const CARD_H = CARD_W * 0.57;
@@ -37,32 +44,83 @@ function detectCardType(num) {
   return 'CARD';
 }
 
-// ── Simple XOR obfuscation (not cryptographic, keeps data out of plain text) ──
-const KEY = 'tw_card_k3y_2025';
-function obfuscate(str) {
-  return Array.from(str).map((c, i) =>
-    String.fromCharCode(c.charCodeAt(0) ^ KEY.charCodeAt(i % KEY.length))
-  ).join('');
+// ── SecureStore helpers (hardware-backed: Android Keystore / iOS Secure Enclave) ──
+async function writeSecure(id, number, cvv) {
+  await SecureStore.setItemAsync(
+    `${SECURE_PREFIX}${id}`,
+    JSON.stringify({ number, cvv })
+  );
 }
-const deobfuscate = obfuscate; // XOR is symmetric
 
-function encodeCard(card) {
-  return {
-    ...card,
-    _num: btoa(obfuscate(card.number)),
-    _cvv: btoa(obfuscate(card.cvv)),
-    number: '****',
-    cvv: '***',
-  };
-}
-function decodeCard(card) {
+async function readSecure(id) {
   try {
-    const number = card._num ? deobfuscate(atob(card._num)) : (card.number !== '****' ? card.number : '');
-    const cvv    = card._cvv ? deobfuscate(atob(card._cvv)) : (card.cvv    !== '***'  ? card.cvv    : '');
-    return { ...card, number, cvv };
-  } catch {
-    return { ...card, number: '', cvv: '' };
-  }
+    const raw = await SecureStore.getItemAsync(`${SECURE_PREFIX}${id}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { number: '', cvv: '' };
+}
+
+async function deleteSecure(id) {
+  try { await SecureStore.deleteItemAsync(`${SECURE_PREFIX}${id}`); } catch {}
+}
+
+// ── Migration: XOR decode for old cards only ──────────────────────────────────
+function xorDecode(encoded, key) {
+  try {
+    const raw = atob(encoded);
+    return Array.from(raw).map((c, i) =>
+      String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))
+    ).join('');
+  } catch { return ''; }
+}
+
+async function migrateFromLegacy() {
+  const raw = await AsyncStorage.getItem(CARDS_LEGACY_KEY);
+  if (!raw) return null;
+  const KEY = 'tw_card_k3y_2025';
+  const old = JSON.parse(raw);
+  const cards = old.map(c => ({
+    id:         c.id || String(Date.now() + Math.random()),
+    holderName: c.holderName || '',
+    expiry:     c.expiry || '',
+    type:       c.type || 'CARD',
+    number:     c._num ? xorDecode(c._num, KEY) : (c.number !== '****' ? c.number : ''),
+    cvv:        c._cvv ? xorDecode(c._cvv, KEY) : (c.cvv    !== '***'  ? c.cvv    : ''),
+  }));
+  // Write migrated data into secure storage
+  const meta = cards.map(({ number, cvv, ...rest }) => rest);
+  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
+  // Wipe the old insecure data
+  await AsyncStorage.removeItem(CARDS_LEGACY_KEY);
+  return cards;
+}
+
+// ── Load all cards: metadata from AsyncStorage + secrets from SecureStore ─────
+async function loadAllCards() {
+  const migrated = await migrateFromLegacy();
+  if (migrated) return migrated;
+
+  const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
+  if (!metaRaw) return [];
+  const meta = JSON.parse(metaRaw);
+  return Promise.all(meta.map(async m => ({ ...m, ...(await readSecure(m.id)) })));
+}
+
+// ── Save all cards: metadata to AsyncStorage, secrets to SecureStore ──────────
+async function saveAllCards(cards) {
+  const meta = cards.map(({ number, cvv, ...rest }) => rest);
+  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
+}
+
+// ── Delete one card: wipe SecureStore entry + update metadata ─────────────────
+async function deleteOneCard(cards, idx) {
+  await deleteSecure(cards[idx].id);
+  const next = cards.filter((_, i) => i !== idx);
+  const meta = next.map(({ number, cvv, ...rest }) => rest);
+  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+  return next;
 }
 
 // ── Input formatters ───────────────────────────────────────────────────────────
@@ -531,27 +589,19 @@ export default function CardScreen() {
 
   const loadCards = async () => {
     try {
-      const raw = await AsyncStorage.getItem(CARDS_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw);
-        setCards(stored.map(decodeCard));
-      }
+      const loaded = await loadAllCards();
+      setCards(loaded);
     } catch {}
     setLoaded(true);
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-  };
-
-  const saveCards = async (next) => {
-    const encoded = next.map(encodeCard);
-    await AsyncStorage.setItem(CARDS_KEY, JSON.stringify(encoded));
-    setCards(next);
   };
 
   const handleSave = async (card) => {
     const next = editing
       ? cards.map(c => c.id === card.id ? card : c)
       : [...cards, card];
-    await saveCards(next);
+    await saveAllCards(next);
+    setCards(next);
     setActiveIdx(editing ? activeIdx : next.length - 1);
     setEditing(false);
     setAdding(false);
@@ -565,8 +615,8 @@ export default function CardScreen() {
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          const next = cards.filter((_, i) => i !== activeIdx);
-          await saveCards(next);
+          const next = await deleteOneCard(cards, activeIdx);
+          setCards(next);
           setActiveIdx(Math.max(0, activeIdx - 1));
           setFlipped(false);
           setRevealed(false);
