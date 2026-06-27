@@ -39,7 +39,20 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
+
+      - name: Cache Gradle wrapper distribution
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper
+          key: gradle-wrapper-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-wrapper-
+
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-caches-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-caches-
 
       - name: Install dependencies
         run: npm ci
@@ -48,9 +61,15 @@ jobs:
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew clean assembleRelease \
-            -PreactNativeArchitectures=arm64-v8a \
-            -Pexpo.useLegacyPackaging=true
+          for attempt in 1 2 3; do
+            ./gradlew clean assembleRelease \
+              -PreactNativeArchitectures=arm64-v8a \
+              -Pexpo.useLegacyPackaging=true \
+              --no-daemon \
+              && break
+            echo "Attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
 
       - name: Resolve release name
         id: release
