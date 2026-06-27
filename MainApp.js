@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -20,12 +21,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
 import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
 import BillsScreen, { BILLS_KEY, getBillingPeriod } from './BillsScreen';
+import CardScreen from './CardScreen';
 import { scheduleDailyReview, scheduleBillReminders } from './NotificationService';
 
 const Tab = createBottomTabNavigator();
@@ -237,20 +240,8 @@ function AnimatedBalance({ value, color, fontSize = 38 }) {
 }
 
 // ─── AppHeader ────────────────────────────────────────────────────────────────
-function AppHeader({ streak }) {
+function AppHeader({ onSettingsPress }) {
   const { C } = useTheme();
-  const pulse = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (streak >= 3) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
-          Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ]),
-      ).start();
-    }
-  }, [streak]);
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -263,12 +254,13 @@ function AppHeader({ streak }) {
           <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Your money, under control</Text>
         </View>
       </View>
-      {streak > 0 && (
-        <Animated.View style={[{ alignItems: 'center', backgroundColor: streak >= 7 ? 'rgba(251,146,60,0.15)' : C.accentBg, borderColor: streak >= 7 ? '#FB923C' : C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingVertical: 6 }, streak >= 3 && { transform: [{ scale: pulse }] }]}>
-          <Text style={{ fontSize: 14 }}>{streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '✨'}</Text>
-          <Text style={{ color: streak >= 7 ? '#FB923C' : C.text1, fontSize: 12, fontWeight: '900' }}>{streak}d</Text>
-        </Animated.View>
-      )}
+      <TouchableOpacity
+        onPress={onSettingsPress}
+        style={{ backgroundColor: C.cardInner, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: C.border }}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="settings-outline" size={20} color={C.text2} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -659,7 +651,8 @@ function CreditBalanceCard({ stats }) {
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 function DashboardScreen({ wallet }) {
   const { C } = useTheme();
-  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, streak, categoryBudgets, openCategoryBudgetModal } = wallet;
+  const navigation = useNavigation();
+  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, categoryBudgets, openCategoryBudgetModal } = wallet;
   const healthScore = calculateHealthScore(stats, monthlyBudget);
   const scoreColor = healthScore >= 70 ? C.income : healthScore >= 40 ? C.amber : C.expense;
   const scoreLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Work';
@@ -675,7 +668,7 @@ function DashboardScreen({ wallet }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
-        <AppHeader streak={streak} />
+        <AppHeader onSettingsPress={() => navigation.navigate('Settings')} />
 
         {/* Credit Balance Card */}
         <CreditBalanceCard stats={stats} />
@@ -701,20 +694,6 @@ function DashboardScreen({ wallet }) {
           <Ionicons name="shield-checkmark" size={18} color={scoreColor} style={{ opacity: 0.8 }} />
         </View>
 
-        {/* Streak Banner */}
-        {streak >= 1 && (
-          <View style={{ backgroundColor: streak >= 7 ? 'rgba(251,146,60,0.1)' : C.accentBg, borderColor: streak >= 7 ? '#FB923C' : C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14 }}>
-            <Text style={{ fontSize: 28 }}>{streak >= 14 ? '🔥' : streak >= 7 ? '⚡' : '✨'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text1, fontSize: 14, fontWeight: '900' }}>
-                {streak >= 14 ? 'On fire!' : streak >= 7 ? 'Great streak!' : 'Streak going!'} {streak} day{streak > 1 ? 's' : ''} under budget
-              </Text>
-              <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>
-                {streak >= 14 ? 'Incredible discipline. Keep it up!' : streak >= 7 ? 'One week of smart spending!' : 'Each day counts — keep going!'}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Quick Actions */}
         <View style={{ flexDirection: 'row', gap: 10, marginVertical: 12 }}>
@@ -734,35 +713,8 @@ function DashboardScreen({ wallet }) {
           </TouchableOpacity>
         </View>
 
-        {/* This Month Stats */}
+        {/* Budget */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <View>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
-              <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>Money Pulse</Text>
-            </View>
-            <View style={{ alignItems: 'center', backgroundColor: C.blueBg, borderRadius: 20, height: 42, justifyContent: 'center', width: 42 }}>
-              <Ionicons name="analytics" size={20} color={C.blue} />
-            </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {[
-              { icon: 'arrow-down-circle', color: C.income, label: 'Month In', value: compactCurrency.format(stats.monthIncome) },
-              { icon: 'arrow-up-circle', color: C.expense, label: 'Month Out', value: compactCurrency.format(stats.monthExpense), dim: true },
-              { icon: 'time', color: C.blue, label: 'Daily Avg', value: compactCurrency.format(stats.dailyAverageExpense) },
-              { icon: 'trending-up', color: stats.savingsRate >= 0 ? C.income : C.expense, label: 'Savings Rate', value: `${Math.round(stats.savingsRate)}%`, dim: stats.savingsRate < 0 },
-            ].map((tile) => (
-              <View key={tile.label} style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 14, borderWidth: 1, flexBasis: '47%', flexGrow: 1, minHeight: 88, padding: 12 }}>
-                <View style={{ alignItems: 'center', backgroundColor: `${tile.color}18`, borderRadius: 10, height: 30, justifyContent: 'center', marginBottom: 8, width: 30 }}>
-                  <Ionicons name={tile.icon} size={15} color={tile.color} />
-                </View>
-                <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>{tile.label}</Text>
-                <Text style={{ color: tile.dim ? C.expense : C.text1, fontSize: 20, fontWeight: '900' }}>{tile.value}</Text>
-              </View>
-            ))}
-          </View>
-
           {/* Budget — tap to edit */}
           <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 14, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -969,22 +921,6 @@ function DashboardScreen({ wallet }) {
           );
         })()}
 
-        {/* Forecast row */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-          {[
-            { icon: 'calendar', color: C.blue, label: 'Days Left', value: stats.daysLeft },
-            { icon: 'speedometer', color: stats.projectedExpense > monthlyBudget ? C.expense : C.amber, label: 'Projected', value: compactCurrency.format(stats.projectedExpense), danger: stats.projectedExpense > monthlyBudget },
-            { icon: 'wallet', color: C.purple, label: 'This Week', value: compactCurrency.format(stats.weekSpend) },
-          ].map((t) => (
-            <View key={t.label} style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flex: 1, minHeight: 90, padding: 12 }}>
-              <View style={{ alignItems: 'center', backgroundColor: `${t.color}18`, borderRadius: 10, height: 28, justifyContent: 'center', marginBottom: 8, width: 28 }}>
-                <Ionicons name={t.icon} size={14} color={t.color} />
-              </View>
-              <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{t.label}</Text>
-              <Text style={{ color: t.danger ? C.expense : C.text1, fontSize: 17, fontWeight: '900', marginTop: 3 }}>{t.value}</Text>
-            </View>
-          ))}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1476,6 +1412,159 @@ function ActivityScreen({ wallet }) {
   );
 }
 
+// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
+const TAB_CFG = {
+  Dashboard: { on: 'home',      off: 'home-outline',      label: 'Home',      color: '#60A5FA' },
+  Activity:  { on: 'receipt',   off: 'receipt-outline',   label: 'Activity',  color: '#34D399' },
+  Bills:     { on: 'pricetag',  off: 'pricetag-outline',  label: 'Bills',     color: '#FB923C' },
+  Analytics: { on: 'analytics', off: 'analytics-outline', label: 'Analytics', color: '#A78BFA' },
+  // Settings has no entry here — it stays hidden from the tab bar but navigable
+};
+
+function CustomTabBar({ state, navigation }) {
+  const { C } = useTheme();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const cardScaleAnim = useRef(new Animated.Value(1)).current;
+  const activeRouteName = state.routes[state.index].name;
+  const isCardsActive = activeRouteName === 'Cards';
+  const BG = C.isDark ? '#0D0F1E' : '#FFFFFF';
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.22, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const handleCardPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Card swipe animation: slide left → reset right → spring to center
+    swipeAnim.setValue(0);
+    cardScaleAnim.setValue(1);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(swipeAnim, { toValue: -28, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(swipeAnim, { toValue: 22,  duration: 0,   useNativeDriver: true }),
+        Animated.spring(swipeAnim,  { toValue: 0,   friction: 5, tension: 160, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(cardScaleAnim, { toValue: 0.82, duration: 130, useNativeDriver: true }),
+        Animated.spring(cardScaleAnim, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
+      ]),
+    ]).start();
+    navigation.navigate('Cards');
+  };
+
+  const regularTabs = state.routes.filter(r => r.name !== 'Cards');
+  const leftTabs  = regularTabs.slice(0, 2);
+  const rightTabs = regularTabs.slice(2);
+
+  const renderTab = (route) => {
+    const focused = activeRouteName === route.name;
+    const cfg = TAB_CFG[route.name];
+    if (!cfg) return null;
+    return (
+      <TouchableOpacity
+        key={route.key}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate(route.name); }}
+        style={{ alignItems: 'center', flex: 1, justifyContent: 'center', paddingBottom: 10, paddingTop: 10 }}
+        activeOpacity={0.7}
+      >
+        <View style={{
+          alignItems: 'center', justifyContent: 'center',
+          width: 46, height: 30, borderRadius: 15,
+          backgroundColor: focused ? `${cfg.color}1E` : 'transparent',
+        }}>
+          <Ionicons name={focused ? cfg.on : cfg.off} size={21} color={focused ? cfg.color : C.text3} />
+        </View>
+        <Text style={{ color: focused ? cfg.color : C.text3, fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.2 }}>
+          {cfg.label}
+        </Text>
+        {focused && <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: cfg.color, marginTop: 3 }} />}
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+      {/* Tab bar body */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: BG,
+        borderTopLeftRadius: 26, borderTopRightRadius: 26,
+        height: 72,
+        paddingHorizontal: 4,
+        elevation: 20,
+        shadowColor: C.isDark ? '#7C3AED' : '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: C.isDark ? 0.22 : 0.08,
+        shadowRadius: 18,
+      }}>
+        {leftTabs.map(renderTab)}
+        {/* Space for floating button */}
+        <View style={{ width: 72 }} />
+        {rightTabs.map(renderTab)}
+      </View>
+
+      {/* Floating card button — sits above the bar */}
+      <View style={{
+        position: 'absolute',
+        alignSelf: 'center',
+        bottom: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 72,
+        height: 72,
+      }}>
+        {/* Glow ring (only when active) */}
+        <Animated.View style={{
+          position: 'absolute',
+          width: 72, height: 72, borderRadius: 36,
+          backgroundColor: isCardsActive ? 'rgba(124,58,237,0.28)' : 'rgba(124,58,237,0.14)',
+          transform: [{ scale: pulseAnim }],
+        }} />
+
+        <TouchableOpacity onPress={handleCardPress} activeOpacity={0.88} style={{ alignItems: 'center', justifyContent: 'center' }}>
+          {/* Card stack shadows */}
+          <View style={{
+            position: 'absolute',
+            width: 56, height: 56, borderRadius: 28,
+            backgroundColor: isCardsActive ? '#5B21B6' : '#6D28D9',
+            top: 4, left: 4,
+            opacity: 0.5,
+          }} />
+          {/* Main button */}
+          <View style={{
+            width: 60, height: 60, borderRadius: 30,
+            backgroundColor: '#7C3AED',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 3, borderColor: BG,
+            elevation: 14,
+            shadowColor: '#7C3AED',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.65,
+            shadowRadius: 16,
+          }}>
+            <Animated.View style={{
+              transform: [{ translateX: swipeAnim }, { scale: cardScaleAnim }],
+            }}>
+              <Ionicons name="card" size={26} color="#fff" />
+            </Animated.View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Active indicator dot */}
+        {isCardsActive && (
+          <View style={{ position: 'absolute', bottom: -6, width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#A78BFA' }} />
+        )}
+      </View>
+    </View>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 function MainApp() {
   const { C } = useTheme();
@@ -1754,25 +1843,12 @@ function MainApp() {
   return (
     <View style={{ backgroundColor: C.bg, flex: 1 }}>
       <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: C.accent,
-          tabBarInactiveTintColor: C.text3,
-          tabBarLabelStyle: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
-          tabBarStyle: { backgroundColor: C.tab, borderTopColor: C.tabBorder, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, elevation: 14, height: 76, paddingBottom: 12, paddingTop: 8, shadowColor: '#000', shadowOffset: { height: -6, width: 0 }, shadowOpacity: 0.25, shadowRadius: 18 },
-          tabBarIcon: ({ color, focused }) => {
-            const icons = { Dashboard: focused ? 'home' : 'home-outline', Analytics: focused ? 'pie-chart' : 'pie-chart-outline', Activity: focused ? 'receipt' : 'receipt-outline', Bills: focused ? 'card' : 'card-outline', Settings: focused ? 'settings' : 'settings-outline' };
-            return (
-              <View style={{ alignItems: 'center', backgroundColor: focused ? C.accentBg : 'transparent', borderRadius: 18, height: 34, justifyContent: 'center', width: 44 }}>
-                <Ionicons name={icons[route.name]} size={21} color={color} />
-              </View>
-            );
-          },
-        })}
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
       >
         <Tab.Screen name="Dashboard">{() => <DashboardScreen wallet={wallet} />}</Tab.Screen>
-        <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
         <Tab.Screen name="Activity">{() => <ActivityScreen wallet={wallet} />}</Tab.Screen>
+        <Tab.Screen name="Cards" component={CardScreen} />
         <Tab.Screen name="Bills">{() => (
           <BillsScreen
             bills={wallet.bills}
@@ -1782,6 +1858,8 @@ function MainApp() {
             onMarkUnpaid={wallet.markBillUnpaid}
           />
         )}</Tab.Screen>
+        <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
+        {/* Settings hidden from tab bar — opened via gear icon in dashboard header */}
         <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} />}</Tab.Screen>
       </Tab.Navigator>
 
