@@ -46,6 +46,8 @@ export async function setNotificationsEnabled(enabled) {
   }
 }
 
+const DAILY_REVIEW_ID = 'thunder_daily_review';
+
 export async function scheduleDailyReview(stats) {
   if (!Notifications) return;
   await cancelDailyReview();
@@ -59,12 +61,13 @@ export async function scheduleDailyReview(stats) {
     } else {
       const under = stats.dailyBudgetLeft > 0;
       body = under
-        ? `₹${Math.round(stats.todaySpend)} spent today. You're ₹${Math.round(stats.dailyBudgetLeft)} under budget 🔥`
+        ? `₹${Math.round(stats.todaySpend)} spent today. You're ₹${Math.round(stats.dailyBudgetLeft)} under budget`
         : `₹${Math.round(stats.todaySpend)} spent today. Over daily budget — plan better tomorrow.`;
     }
   }
 
   await Notifications.scheduleNotificationAsync({
+    identifier: DAILY_REVIEW_ID,
     content: { title: 'Day in Review ⚡', body },
     trigger: { hour: 21, minute: 0, repeats: true },
   });
@@ -72,7 +75,10 @@ export async function scheduleDailyReview(stats) {
 
 export async function cancelDailyReview() {
   if (!Notifications) return;
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Cancel only the daily review — not bill reminders
+  try {
+    await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_ID);
+  } catch (_) {}
 }
 
 export async function sendGoalReachedNotification(goalName) {
@@ -101,17 +107,18 @@ export async function scheduleBillReminders(bills) {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     for (const bill of bills) {
-      if (!bill.isActive) continue;
+      // Skip only if explicitly deactivated (bills don't have isActive field — treat absence as active)
+      if (bill.isActive === false) continue;
       const isPaidThisMonth = !!bill.paidMonths?.[currentMonth];
       if (isPaidThisMonth) continue;
 
-      // Schedule reminder 1 day before due date at 9 AM
+      // Schedule reminder 1 day before due date at 9 AM (monthly repeat)
       const reminderDay = bill.dueDay - 1 < 1 ? 28 : bill.dueDay - 1;
-      const trigger = { day: reminderDay, hour: 9, minute: 0, repeats: true };
+      const trigger = { type: 'calendar', day: reminderDay, hour: 9, minute: 0, repeats: true };
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `Bill Due Tomorrow: ${bill.name} 📋`,
+          title: `Bill Due Tomorrow: ${bill.name}`,
           body: `₹${bill.amount.toLocaleString('en-IN')} due on the ${bill.dueDay}th. Tap to mark as paid.`,
           data: { type: 'bill_reminder', billId: bill.id },
         },
@@ -125,7 +132,7 @@ export async function scheduleBillReminders(bills) {
           body: `₹${bill.amount.toLocaleString('en-IN')} is due today. Don't forget to pay!`,
           data: { type: 'bill_reminder', billId: bill.id },
         },
-        trigger: { day: bill.dueDay, hour: 9, minute: 0, repeats: true },
+        trigger: { type: 'calendar', day: bill.dueDay, hour: 9, minute: 0, repeats: true },
       });
     }
   } catch (_) {}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -55,6 +55,12 @@ function DatePicker({ value, onChange, C }) {
     const d = new Date(value);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   });
+
+  // Sync display text when value prop changes (e.g. when editing an existing transaction)
+  useEffect(() => {
+    const d = new Date(value);
+    setInputVal(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
+  }, [value]);
 
   const commitDate = (text) => {
     setInputVal(text);
