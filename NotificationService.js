@@ -93,7 +93,7 @@ export async function sendGoalReachedNotification(goalName) {
 }
 
 export async function scheduleBillReminders(bills) {
-  if (!Notifications || !bills?.length) return;
+  if (!Notifications) return;
   try {
     // Cancel all existing bill reminders before rescheduling
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -102,6 +102,9 @@ export async function scheduleBillReminders(bills) {
         await Notifications.cancelScheduledNotificationAsync(n.identifier);
       }
     }
+
+    // Nothing to schedule — cancellation above already cleaned up
+    if (!bills?.length) return;
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
