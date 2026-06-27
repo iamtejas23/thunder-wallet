@@ -626,7 +626,7 @@ const TransactionList = ({
       renderItem={renderItem}
       ListHeaderComponent={<ListHeader />}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 20 }}
+      contentContainerStyle={{ paddingBottom: 120 }}
     />
   );
 };
