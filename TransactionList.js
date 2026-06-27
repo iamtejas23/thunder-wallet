@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   Alert,
   Animated,
   FlatList,
+  PanResponder,
   Share,
   StyleSheet,
   Text,
@@ -46,41 +47,72 @@ const categoryConfig = {
 
 const getCfg = (cat) => categoryConfig[cat] || categoryConfig.Other;
 
-function SwipeableRow({ children, onEdit, onDelete, C }) {
+const OPEN_X = -128;
+const SNAP_THRESHOLD = -52; // swipe past this → snap open
+
+function SwipeableRow({ children, onEdit, onDelete }) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const [revealed, setRevealed] = useState(false);
+  const isOpen = useRef(false);
 
-  const reveal = () => {
-    setRevealed(true);
+  const snapOpen = () => {
+    isOpen.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.spring(translateX, { toValue: -128, useNativeDriver: true, bounciness: 0 }).start();
+    Animated.spring(translateX, { toValue: OPEN_X, useNativeDriver: true, bounciness: 4, speed: 20 }).start();
   };
 
-  const hide = () => {
-    setRevealed(false);
-    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+  const snapClose = () => {
+    isOpen.current = false;
+    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 4, speed: 20 }).start();
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Claim the gesture only for clear horizontal swipes
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderMove: (_, g) => {
+        const base = isOpen.current ? OPEN_X : 0;
+        // Only allow left swipe (negative direction), clamp to [OPEN_X, 0]
+        translateX.setValue(Math.min(0, Math.max(OPEN_X, base + g.dx)));
+      },
+      onPanResponderRelease: (_, g) => {
+        const base = isOpen.current ? OPEN_X : 0;
+        const current = base + g.dx;
+        // Snap based on position or fast flick velocity
+        if (current < SNAP_THRESHOLD || g.vx < -0.4) snapOpen();
+        else snapClose();
+      },
+      onPanResponderTerminate: () => snapClose(),
+    })
+  ).current;
 
   return (
     <View style={{ overflow: 'hidden' }}>
+      {/* Action buttons sit behind the row */}
       <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'stretch' }]}>
         <TouchableOpacity
           style={[styles.swipeAction, { backgroundColor: '#3B82F6' }]}
-          onPress={() => { hide(); onEdit(); }}
+          onPress={() => { snapClose(); setTimeout(onEdit, 180); }}
         >
           <Ionicons name="create-outline" size={20} color="#fff" />
           <Text style={styles.swipeActionText}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.swipeAction, { backgroundColor: '#EF4444' }]}
-          onPress={() => { hide(); onDelete(); }}
+          onPress={() => { snapClose(); setTimeout(onDelete, 180); }}
         >
           <Ionicons name="trash-outline" size={20} color="#fff" />
           <Text style={styles.swipeActionText}>Delete</Text>
         </TouchableOpacity>
       </View>
-      <Animated.View style={{ transform: [{ translateX }] }}>
-        <TouchableOpacity activeOpacity={1} onPress={revealed ? hide : undefined} onLongPress={!revealed ? reveal : undefined} delayLongPress={300}>
+
+      {/* Row content — slides with finger */}
+      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => { if (isOpen.current) snapClose(); }}
+          delayPressIn={60}
+        >
           {children}
         </TouchableOpacity>
       </Animated.View>
@@ -464,7 +496,7 @@ const TransactionList = ({
               )}
             </View>
           </View>
-          <Text style={[styles.swipeHint, { color: C.text3 }]}>‹</Text>
+          <Ionicons name="chevron-back" size={12} color={C.text3} style={{ opacity: 0.4 }} />
         </View>
       </SwipeableRow>
     );
@@ -596,7 +628,7 @@ const TransactionList = ({
         ))}
       </View>
 
-      <Text style={[styles.swipeHintLabel, { color: C.text3 }]}>Long-press a row to edit or delete</Text>
+      <Text style={[styles.swipeHintLabel, { color: C.text3 }]}>Swipe a row left to edit or delete</Text>
     </View>
   );
 
