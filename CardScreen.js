@@ -22,6 +22,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useTheme } from './ThemeContext';
+import MeshBackground from './MeshBackground';
 
 // AsyncStorage key — stores only non-sensitive card metadata
 const CARDS_META_KEY  = 'cards_meta_v2';
@@ -643,6 +644,7 @@ export default function CardScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
+      <MeshBackground blobs="cards" isDark={C.isDark} />
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <View>

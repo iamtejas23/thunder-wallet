@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
+import MeshBackground from './MeshBackground';
 import { useTheme } from './ThemeContext';
 import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
@@ -672,6 +673,7 @@ function DashboardScreen({ wallet }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <MeshBackground blobs="default" isDark={C.isDark} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
         <AppHeader onSettingsPress={() => navigation.navigate('Settings')} />
 
@@ -1029,6 +1031,7 @@ function AnalyticsScreen({ wallet }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <MeshBackground blobs="analytics" isDark={C.isDark} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
@@ -1380,6 +1383,7 @@ function ActivityScreen({ wallet }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <MeshBackground blobs="activity" isDark={C.isDark} />
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
@@ -1419,44 +1423,59 @@ function ActivityScreen({ wallet }) {
 
 // ─── Custom Tab Bar ───────────────────────────────────────────────────────────
 const TAB_CFG = {
-  Dashboard: { on: 'home',      off: 'home-outline',      label: 'Home',      color: '#60A5FA' },
-  Activity:  { on: 'receipt',   off: 'receipt-outline',   label: 'Activity',  color: '#34D399' },
-  Bills:     { on: 'pricetag',  off: 'pricetag-outline',  label: 'Bills',     color: '#FB923C' },
-  Analytics: { on: 'analytics', off: 'analytics-outline', label: 'Analytics', color: '#A78BFA' },
-  // Settings has no entry here — it stays hidden from the tab bar but navigable
+  Dashboard: { on: 'home',      off: 'home-outline',      label: 'HOME'     },
+  Activity:  { on: 'receipt',   off: 'receipt-outline',   label: 'ACTIVITY' },
+  Bills:     { on: 'pricetag',  off: 'pricetag-outline',  label: 'BILLS'    },
+  Analytics: { on: 'bar-chart', off: 'bar-chart-outline', label: 'MORE'     },
 };
 
 function CustomTabBar({ state, navigation }) {
   const { C } = useTheme();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const TAB_BAR_BG    = C.isDark ? '#000000' : '#FFFFFF';
+  const TAB_ACTIVE_FG = C.isDark ? '#FFFFFF'              : '#0F172A';
+  const TAB_INACTIVE  = C.isDark ? 'rgba(255,255,255,0.38)' : 'rgba(15,23,42,0.38)';
+  const SPOTLIGHT     = C.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.07)';
+  const RING_COLOR    = C.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.18)';
+  const RING_ACTIVE   = C.isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)';
+  const BTN_BG        = C.isDark ? '#111111'              : '#F1F5F9';
+  const BTN_INNER     = C.isDark ? '#161616'              : '#E2E8F0';
+  const CARD_ICON     = C.isDark ? '#FFFFFF'              : '#0F172A';
+  const CARD_ICON_OFF = C.isDark ? 'rgba(255,255,255,0.65)' : 'rgba(15,23,42,0.50)';
+  const GLOW_RING     = C.isDark ? 'rgba(255,255,255,0.30)' : 'rgba(15,23,42,0.20)';
+  const GLOW_RING_OFF = C.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.10)';
+
+  const pulseAnim    = useRef(new Animated.Value(1)).current;
+  const swipeAnim    = useRef(new Animated.Value(0)).current;
   const cardScaleAnim = useRef(new Animated.Value(1)).current;
   const activeRouteName = state.routes[state.index].name;
-  const isCardsActive = activeRouteName === 'Cards';
-  const BG = C.isDark ? '#0D0F1E' : '#FFFFFF';
+  const isCardsActive   = activeRouteName === 'Cards';
+
+  // Tab press scale animations — one per regular slot
+  const tabScales = useRef(
+    state.routes.filter(r => r.name !== 'Cards').map(() => new Animated.Value(1))
+  ).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.22, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.30, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     ).start();
   }, []);
 
   const handleCardPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Card swipe animation: slide left → reset right → spring to center
     swipeAnim.setValue(0);
     cardScaleAnim.setValue(1);
     Animated.parallel([
       Animated.sequence([
-        Animated.timing(swipeAnim, { toValue: -28, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(swipeAnim, { toValue: 22,  duration: 0,   useNativeDriver: true }),
-        Animated.spring(swipeAnim,  { toValue: 0,   friction: 5, tension: 160, useNativeDriver: true }),
+        Animated.timing(swipeAnim, { toValue: -26, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(swipeAnim, { toValue: 20,  duration: 0,   useNativeDriver: true }),
+        Animated.spring(swipeAnim, { toValue: 0,   friction: 5, tension: 160, useNativeDriver: true }),
       ]),
       Animated.sequence([
-        Animated.timing(cardScaleAnim, { toValue: 0.82, duration: 130, useNativeDriver: true }),
+        Animated.timing(cardScaleAnim, { toValue: 0.80, duration: 120, useNativeDriver: true }),
         Animated.spring(cardScaleAnim, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
       ]),
     ]).start();
@@ -1464,107 +1483,138 @@ function CustomTabBar({ state, navigation }) {
   };
 
   const regularTabs = state.routes.filter(r => r.name !== 'Cards');
-  const leftTabs  = regularTabs.slice(0, 2);
-  const rightTabs = regularTabs.slice(2);
+  const leftTabs    = regularTabs.slice(0, 2);
+  const rightTabs   = regularTabs.slice(2);
 
-  const renderTab = (route) => {
+  const bounceTab = (scaleAnim) => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.84, duration: 90, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 260, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const renderTab = (route, scaleAnim) => {
     const focused = activeRouteName === route.name;
-    const cfg = TAB_CFG[route.name];
+    const cfg     = TAB_CFG[route.name];
     if (!cfg) return null;
     return (
       <TouchableOpacity
         key={route.key}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate(route.name); }}
-        style={{ alignItems: 'center', flex: 1, justifyContent: 'center', paddingBottom: 10, paddingTop: 10 }}
-        activeOpacity={0.7}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          bounceTab(scaleAnim);
+          navigation.navigate(route.name);
+        }}
+        style={{ alignItems: 'center', flex: 1, justifyContent: 'center', paddingVertical: 10 }}
+        activeOpacity={1}
       >
-        <View style={{
-          alignItems: 'center', justifyContent: 'center',
-          width: 46, height: 30, borderRadius: 15,
-          backgroundColor: focused ? `${cfg.color}1E` : 'transparent',
-        }}>
-          <Ionicons name={focused ? cfg.on : cfg.off} size={21} color={focused ? cfg.color : C.text3} />
-        </View>
-        <Text style={{ color: focused ? cfg.color : C.text3, fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.2 }}>
-          {cfg.label}
-        </Text>
-        {focused && <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: cfg.color, marginTop: 3 }} />}
+        <Animated.View style={{ alignItems: 'center', transform: [{ scale: scaleAnim }] }}>
+          {/* Circular spotlight highlight when active */}
+          <View style={{
+            width: 46, height: 40, borderRadius: 23,
+            backgroundColor: focused ? SPOTLIGHT : 'transparent',
+            alignItems: 'center', justifyContent: 'center',
+            marginBottom: 3,
+          }}>
+            <Ionicons
+              name={focused ? cfg.on : cfg.off}
+              size={22}
+              color={focused ? TAB_ACTIVE_FG : TAB_INACTIVE}
+            />
+          </View>
+          <Text style={{
+            color: focused ? TAB_ACTIVE_FG : TAB_INACTIVE,
+            fontSize: 9,
+            fontWeight: '700',
+            letterSpacing: 0.6,
+          }}>
+            {cfg.label}
+          </Text>
+        </Animated.View>
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-      {/* Tab bar body */}
+      {/* Bar */}
       <View style={{
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: BG,
-        borderTopLeftRadius: 26, borderTopRightRadius: 26,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: TAB_BAR_BG,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        borderTopWidth: 1,
+        borderTopColor: C.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
         height: 72,
         paddingHorizontal: 4,
-        elevation: 20,
-        shadowColor: C.isDark ? '#7C3AED' : '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: C.isDark ? 0.22 : 0.08,
-        shadowRadius: 18,
+        elevation: 28,
+        shadowColor: C.isDark ? '#000' : '#94A3B8',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: C.isDark ? 0.55 : 0.15,
+        shadowRadius: 20,
       }}>
-        {leftTabs.map(renderTab)}
-        {/* Space for floating button */}
-        <View style={{ width: 72 }} />
-        {rightTabs.map(renderTab)}
+        {leftTabs.map((r, i) => renderTab(r, tabScales[i]))}
+        {/* Gap for center button */}
+        <View style={{ width: 70 }} />
+        {rightTabs.map((r, i) => renderTab(r, tabScales[i + leftTabs.length]))}
       </View>
 
-      {/* Floating card button — sits above the bar */}
+      {/* ── Center CARDS button (elevated, sits above bar) ── */}
       <View style={{
         position: 'absolute',
         alignSelf: 'center',
-        bottom: 30,
+        bottom: 22,
         alignItems: 'center',
         justifyContent: 'center',
-        width: 72,
-        height: 72,
+        width: 70,
+        height: 70,
       }}>
-        {/* Glow ring (only when active) */}
-        <Animated.View style={{
-          position: 'absolute',
-          width: 72, height: 72, borderRadius: 36,
-          backgroundColor: isCardsActive ? 'rgba(124,58,237,0.28)' : 'rgba(124,58,237,0.14)',
-          transform: [{ scale: pulseAnim }],
-        }} />
-
-        <TouchableOpacity onPress={handleCardPress} activeOpacity={0.88} style={{ alignItems: 'center', justifyContent: 'center' }}>
-          {/* Card stack shadows */}
+        <TouchableOpacity
+          onPress={handleCardPress}
+          activeOpacity={0.88}
+          style={{ alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* Outer ring border */}
           <View style={{
-            position: 'absolute',
-            width: 56, height: 56, borderRadius: 28,
-            backgroundColor: isCardsActive ? '#5B21B6' : '#6D28D9',
-            top: 4, left: 4,
-            opacity: 0.5,
-          }} />
-          {/* Main button */}
-          <View style={{
-            width: 60, height: 60, borderRadius: 30,
-            backgroundColor: '#7C3AED',
+            width: 62, height: 62, borderRadius: 31,
+            borderWidth: 1.5,
+            borderColor: isCardsActive ? RING_ACTIVE : RING_COLOR,
             alignItems: 'center', justifyContent: 'center',
-            borderWidth: 3, borderColor: BG,
-            elevation: 14,
-            shadowColor: '#7C3AED',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.65,
-            shadowRadius: 16,
+            backgroundColor: BTN_BG,
+            elevation: 20,
+            shadowColor: C.isDark ? '#fff' : '#000',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: isCardsActive ? 0.12 : 0.04,
+            shadowRadius: 14,
           }}>
-            <Animated.View style={{
-              transform: [{ translateX: swipeAnim }, { scale: cardScaleAnim }],
+            {/* Inner circle */}
+            <View style={{
+              width: 50, height: 50, borderRadius: 25,
+              backgroundColor: BTN_INNER,
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: C.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
             }}>
-              <Ionicons name="card" size={26} color="#fff" />
-            </Animated.View>
+              <Animated.View style={{
+                transform: [{ translateX: swipeAnim }, { scale: cardScaleAnim }],
+              }}>
+                <Ionicons name="card" size={24} color={isCardsActive ? CARD_ICON : CARD_ICON_OFF} />
+              </Animated.View>
+            </View>
           </View>
         </TouchableOpacity>
 
-        {/* Active indicator dot */}
-        {isCardsActive && (
-          <View style={{ position: 'absolute', bottom: -6, width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#A78BFA' }} />
-        )}
+        {/* Label below button */}
+        <Text style={{
+          color: isCardsActive ? TAB_ACTIVE_FG : TAB_INACTIVE,
+          fontSize: 9,
+          fontWeight: '700',
+          letterSpacing: 0.6,
+          marginTop: 4,
+        }}>
+          CARDS
+        </Text>
       </View>
     </View>
   );
