@@ -35,11 +35,11 @@ export default function MeshBackground({ blobs = 'default', isDark = true }) {
   const { c1, c2, c3 } = palette[blobs] ?? palette.default;
 
   // Dark theme: white lines; Light theme: dark lines
-  const lineColor  = isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.055)';
-  // Blob opacity is higher in dark (vivid glow), softer in light
-  const o1 = isDark ? '0.14' : '0.09';
-  const o2 = isDark ? '0.10' : '0.07';
-  const o3 = isDark ? '0.07' : '0.05';
+  const lineColor  = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+  // Blob opacity
+  const o1 = isDark ? '0.32' : '0.18';
+  const o2 = isDark ? '0.24' : '0.14';
+  const o3 = isDark ? '0.18' : '0.10';
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -51,7 +51,7 @@ export default function MeshBackground({ blobs = 'default', isDark = true }) {
               d="M 44 0 L 0 0 0 44"
               fill="none"
               stroke={lineColor}
-              strokeWidth="0.8"
+              strokeWidth="1.0"
             />
           </Pattern>
 
