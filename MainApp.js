@@ -31,6 +31,8 @@ import TransactionModal from './TransactionModal';
 import BillsScreen, { BILLS_KEY, getBillingPeriod } from './BillsScreen';
 import CardScreen from './CardScreen';
 import { scheduleDailyReview, scheduleBillReminders, requestNotificationPermission } from './NotificationService';
+import { useUpdateChecker } from './UpdateChecker';
+import UpdateModal from './UpdateModal';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
@@ -1623,6 +1625,7 @@ function CustomTabBar({ state, navigation }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 function MainApp() {
   const { C } = useTheme();
+  const { hasUpdate, latestVersion, downloadUrl, dismiss } = useUpdateChecker();
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
   const [savings, setSavings] = useState([]);
@@ -1954,6 +1957,13 @@ function MainApp() {
         visible={!!confettiGoal}
         goalName={confettiGoal?.name || ''}
         onDismiss={() => setConfettiGoal(null)}
+      />
+
+      <UpdateModal
+        visible={hasUpdate}
+        latestVersion={latestVersion}
+        downloadUrl={downloadUrl}
+        onDismiss={dismiss}
       />
     </View>
   );
