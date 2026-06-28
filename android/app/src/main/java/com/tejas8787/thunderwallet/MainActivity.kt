@@ -2,6 +2,7 @@ package com.tejas8787.thunderwallet
 
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -17,6 +18,8 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    // Block screenshots and screen recording on all screens (OS-level, zero JS overhead)
+    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
   }
 
   /**
