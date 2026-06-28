@@ -20,7 +20,8 @@
       "bundleIdentifier": "com.tejas8787.thunderwallet",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock Thunder Wallet",
-        "NSCameraUsageDescription": "Used for biometric authentication"
+        "NSCameraUsageDescription": "Used for biometric authentication",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -36,7 +37,9 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM"
+        "USE_EXACT_ALARM",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
