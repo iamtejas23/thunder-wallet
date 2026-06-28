@@ -30,7 +30,7 @@
         "resourceClass": "m-medium"
       },
       "android": {
-        "buildType": "aab"
+        "buildType": "app-bundle"
       }
     }
   },
