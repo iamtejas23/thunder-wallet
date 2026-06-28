@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Clipboard,
   Dimensions,
   Easing,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -76,43 +76,49 @@ function xorDecode(encoded, key) {
 }
 
 async function migrateFromLegacy() {
-  const raw = await AsyncStorage.getItem(CARDS_LEGACY_KEY);
-  if (!raw) return null;
-  const KEY = 'tw_card_k3y_2025';
-  const old = JSON.parse(raw);
-  const cards = old.map(c => ({
-    id:         c.id || String(Date.now() + Math.random()),
-    holderName: c.holderName || '',
-    expiry:     c.expiry || '',
-    type:       c.type || 'CARD',
-    number:     c._num ? xorDecode(c._num, KEY) : (c.number !== '****' ? c.number : ''),
-    cvv:        c._cvv ? xorDecode(c._cvv, KEY) : (c.cvv    !== '***'  ? c.cvv    : ''),
-  }));
-  // Write migrated data into secure storage
-  const meta = cards.map(({ number, cvv, ...rest }) => rest);
-  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
-  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
-  // Wipe the old insecure data
-  await AsyncStorage.removeItem(CARDS_LEGACY_KEY);
-  return cards;
+  try {
+    const raw = await AsyncStorage.getItem(CARDS_LEGACY_KEY);
+    if (!raw) return null;
+    const KEY = 'tw_card_k3y_2025';
+    const old = JSON.parse(raw);
+    const cards = old.map(c => ({
+      id:         c.id || String(Date.now() + Math.random()),
+      holderName: c.holderName || '',
+      expiry:     c.expiry || '',
+      type:       c.type || 'CARD',
+      number:     c._num ? xorDecode(c._num, KEY) : (c.number !== '****' ? c.number : ''),
+      cvv:        c._cvv ? xorDecode(c._cvv, KEY) : (c.cvv    !== '***'  ? c.cvv    : ''),
+    }));
+    // Write secure data first — if this fails, old data remains intact
+    for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
+    const meta = cards.map(({ number, cvv, ...rest }) => rest);
+    await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+    await AsyncStorage.removeItem(CARDS_LEGACY_KEY);
+    return cards;
+  } catch {
+    return null;
+  }
 }
 
 // ── Load all cards: metadata from AsyncStorage + secrets from SecureStore ─────
 async function loadAllCards() {
-  const migrated = await migrateFromLegacy();
-  if (migrated) return migrated;
-
-  const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
-  if (!metaRaw) return [];
-  const meta = JSON.parse(metaRaw);
-  return Promise.all(meta.map(async m => ({ ...m, ...(await readSecure(m.id)) })));
+  try {
+    const migrated = await migrateFromLegacy();
+    if (migrated) return migrated;
+    const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
+    if (!metaRaw) return [];
+    const meta = JSON.parse(metaRaw);
+    return Promise.all(meta.map(async m => ({ ...m, ...(await readSecure(m.id)) })));
+  } catch {
+    return [];
+  }
 }
 
-// ── Save all cards: metadata to AsyncStorage, secrets to SecureStore ──────────
+// ── Save all cards: secrets first so a partial failure leaves metadata intact ──
 async function saveAllCards(cards) {
+  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
   const meta = cards.map(({ number, cvv, ...rest }) => rest);
   await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
-  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
 }
 
 // ── Delete one card: wipe SecureStore entry + update metadata ─────────────────
@@ -209,8 +215,10 @@ function VirtualCard({ card, flipped = false, onFlip }) {
   const backRotate  = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
   const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
 
-  const maskedNum = card.number.replace(/\s/g, '').padEnd(16, '0');
-  const groups = [maskedNum.slice(0, 4), `••••`, `••••`, maskedNum.slice(12, 16)];
+  const rawNum = (card.number || '').replace(/\s/g, '');
+  const first4 = rawNum.slice(0, 4).padEnd(4, '•');
+  const last4  = rawNum.length >= 4 ? rawNum.slice(-4) : '••••';
+  const groups = [first4, '••••', '••••', last4];
 
   // Prefer manually selected type over auto-detection
   const cardType = card.type || detectCardType(card.number);
@@ -244,7 +252,7 @@ function VirtualCard({ card, flipped = false, onFlip }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View>
             <Text style={cs.cardLabel}>CARD HOLDER</Text>
-            <Text style={cs.cardValue}>{card.holderName.toUpperCase() || 'YOUR NAME'}</Text>
+            <Text style={cs.cardValue}>{(card.holderName || '').toUpperCase() || 'YOUR NAME'}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={cs.cardLabel}>EXPIRES</Text>
@@ -264,11 +272,11 @@ function VirtualCard({ card, flipped = false, onFlip }) {
         <View style={cs.sigStripe}>
           <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 3 }}>
             <Text style={{ color: '#000', fontSize: 13, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 6, letterSpacing: 4 }}>
-              {'•'.repeat(card.cvv.length)}
+              {'•'.repeat((card.cvv || '').length || 3)}
             </Text>
           </View>
           <View style={{ alignItems: 'center', justifyContent: 'center', paddingLeft: 12, paddingRight: 4 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>{card.cvv}</Text>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>{card.cvv || '•••'}</Text>
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8, fontWeight: '700' }}>CVV</Text>
           </View>
         </View>
@@ -295,7 +303,7 @@ const CARD_TYPES = [
 ];
 
 // ── Form ───────────────────────────────────────────────────────────────────────
-function CardForm({ initialCard, onSave, onCancel }) {
+function CardForm({ initialCard, onSave, onCancel, saving = false }) {
   const { C } = useTheme();
   const [holderName, setHolderName] = useState(initialCard?.holderName || '');
   const [cardNumber, setCardNumber] = useState(initialCard?.number || '');
@@ -426,10 +434,10 @@ function CardForm({ initialCard, onSave, onCancel }) {
         </View>
 
         {/* Save button */}
-        <TouchableOpacity onPress={handleSave} style={fs.saveBtn} activeOpacity={0.85}>
+        <TouchableOpacity onPress={handleSave} disabled={saving} style={[fs.saveBtn, saving && { opacity: 0.6 }]} activeOpacity={0.85}>
           <Ionicons name="shield-checkmark" size={18} color="#fff" />
           <Text style={{ color: '#fff', fontSize: 16, fontWeight: '900', marginLeft: 8 }}>
-            {initialCard ? 'Update Card' : 'Save Card Securely'}
+            {saving ? 'Saving…' : initialCard ? 'Update Card' : 'Save Card Securely'}
           </Text>
         </TouchableOpacity>
 
@@ -476,10 +484,10 @@ async function authenticateWithBiometric() {
   }
 }
 
-// ── Copy helper using Share ────────────────────────────────────────────────────
-async function copyToClipboard(label, value) {
+// ── Copy to clipboard ─────────────────────────────────────────────────────────
+function copyToClipboard(label, value) {
   try {
-    await Share.share({ message: value, title: label });
+    Clipboard.setString(value || '');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   } catch {}
 }
@@ -509,9 +517,9 @@ function RevealedPanel({ card, onHide, C }) {
     if (countdown === 0) onHide();
   }, [countdown]);
 
-  const fullNum = card.number.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
+  const fullNum = (card.number || '').replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
   const rows = [
-    { label: 'Card Number', value: fullNum,      icon: 'card-outline',   copyVal: card.number.replace(/\s/g,'') },
+    { label: 'Card Number', value: fullNum,      icon: 'card-outline',   copyVal: (card.number || '').replace(/\s/g,'') },
     { label: 'Card Holder', value: card.holderName, icon: 'person-outline', copyVal: card.holderName },
     { label: 'Expiry Date', value: card.expiry,   icon: 'calendar-outline', copyVal: card.expiry },
     { label: 'CVV',         value: card.cvv,       icon: 'lock-closed-outline', copyVal: card.cvv },
@@ -579,6 +587,7 @@ export default function CardScreen() {
   const [loaded, setLoaded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -598,29 +607,43 @@ export default function CardScreen() {
   };
 
   const handleSave = async (card) => {
-    const next = editing
-      ? cards.map(c => c.id === card.id ? card : c)
-      : [...cards, card];
-    await saveAllCards(next);
-    setCards(next);
-    setActiveIdx(editing ? activeIdx : next.length - 1);
-    setEditing(false);
-    setAdding(false);
-    setFlipped(false);
-    setRevealed(false);
+    if (saving) return;
+    setSaving(true);
+    try {
+      const next = editing
+        ? cards.map(c => c.id === card.id ? card : c)
+        : [...cards, card];
+      await saveAllCards(next);
+      setCards(next);
+      setActiveIdx(editing ? activeIdx : next.length - 1);
+      setEditing(false);
+      setAdding(false);
+      setFlipped(false);
+      setRevealed(false);
+    } catch {
+      Alert.alert('Save Failed', 'Could not save your card. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = () => {
-    Alert.alert('Remove Card', 'Are you sure you want to remove this card?', [
+    const idxToDelete = activeIdx;
+    const cardName = cards[idxToDelete]?.holderName || 'this card';
+    Alert.alert('Remove Card', `Remove ${cardName}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          const next = await deleteOneCard(cards, activeIdx);
-          setCards(next);
-          setActiveIdx(Math.max(0, activeIdx - 1));
-          setFlipped(false);
-          setRevealed(false);
+          try {
+            const next = await deleteOneCard(cards, idxToDelete);
+            setCards(next);
+            setActiveIdx(Math.max(0, idxToDelete - 1));
+            setFlipped(false);
+            setRevealed(false);
+          } catch {
+            Alert.alert('Error', 'Could not remove the card. Please try again.');
+          }
         },
       },
     ]);
@@ -670,6 +693,7 @@ export default function CardScreen() {
             initialCard={editing ? card : null}
             onSave={handleSave}
             onCancel={cards.length > 0 ? () => { setEditing(false); setAdding(false); } : null}
+            saving={saving}
           />
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -718,7 +742,7 @@ export default function CardScreen() {
               {!revealed && (
                 <View style={[ms.panel, { backgroundColor: C.card, borderColor: C.border }]}>
                   <Row label="Card Holder" value={card.holderName} C={C} />
-                  <Row label="Card Number" value={`•••• •••• •••• ${card.number.replace(/\s/g,'').slice(-4)}`} C={C} />
+                  <Row label="Card Number" value={`•••• •••• •••• ${(card.number || '').replace(/\s/g,'').slice(-4) || '••••'}`} C={C} />
                   <Row label="Expiry" value={card.expiry} C={C} />
                   <Row label="Network" value={card.type || detectCardType(card.number)} C={C} last />
                 </View>
@@ -735,7 +759,7 @@ export default function CardScreen() {
               {/* Actions */}
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                 <TouchableOpacity
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditing(true); setAdding(false); setRevealed(false); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditing(true); setAdding(false); setFlipped(false); setRevealed(false); }}
                   style={[ms.actionBtn, { backgroundColor: C.cardInner, borderColor: C.border, flex: 1 }]}
                 >
                   <Ionicons name="pencil" size={16} color={C.text2} />
@@ -768,7 +792,7 @@ export default function CardScreen() {
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{c.holderName}</Text>
                       <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
-                        •••• {c.number.replace(/\s/g, '').slice(-4)} · {c.expiry}
+                        •••• {(c.number || '').replace(/\s/g, '').slice(-4) || '••••'} · {c.expiry}
                       </Text>
                     </View>
                     {i === activeIdx && <Ionicons name="checkmark-circle" size={18} color={C.accent} />}
