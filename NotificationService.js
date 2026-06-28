@@ -1,6 +1,9 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NOTIF_ENABLED_KEY = 'notificationsEnabled';
+const CHANNEL_DAILY     = 'thunder-daily-review';
+const CHANNEL_BILLS     = 'thunder-bill-reminders';
 
 // Detect Expo Go reliably via expo-constants (always safe to import)
 let IS_EXPO_GO = false;
@@ -26,8 +29,30 @@ if (!IS_EXPO_GO) {
   } catch (_) {}
 }
 
+// Android 8+ requires explicit channels — without one, notifications are silently dropped.
+async function ensureChannels() {
+  if (Platform.OS !== 'android' || !Notifications) return;
+  await Promise.all([
+    Notifications.setNotificationChannelAsync(CHANNEL_DAILY, {
+      name: 'Day in Review',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 200, 300],
+      lightColor: '#60A5FA',
+      sound: null,
+    }),
+    Notifications.setNotificationChannelAsync(CHANNEL_BILLS, {
+      name: 'Bill Reminders',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 200, 300],
+      lightColor: '#FB923C',
+      sound: null,
+    }),
+  ]);
+}
+
 export async function requestNotificationPermission() {
   if (!Notifications) return false;
+  await ensureChannels();
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
 }
@@ -50,6 +75,7 @@ const DAILY_REVIEW_ID = 'thunder_daily_review';
 
 export async function scheduleDailyReview(stats) {
   if (!Notifications) return;
+  await ensureChannels();
   await cancelDailyReview();
   const enabled = await isNotificationsEnabled();
   if (!enabled) return;
@@ -68,14 +94,17 @@ export async function scheduleDailyReview(stats) {
 
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_REVIEW_ID,
-    content: { title: 'Day in Review ⚡', body },
+    content: {
+      title: 'Day in Review ⚡',
+      body,
+      channelId: CHANNEL_DAILY,
+    },
     trigger: { type: 'calendar', hour: 21, minute: 0, repeats: true },
   });
 }
 
 export async function cancelDailyReview() {
   if (!Notifications) return;
-  // Cancel only the daily review — not bill reminders
   try {
     await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_ID);
   } catch (_) {}
@@ -83,10 +112,12 @@ export async function cancelDailyReview() {
 
 export async function sendGoalReachedNotification(goalName) {
   if (!Notifications) return;
+  await ensureChannels();
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: `Goal Reached! 🎉`,
+      title: 'Goal Reached! 🎉',
       body: `You hit your "${goalName}" savings goal. Celebrate — you earned it.`,
+      channelId: CHANNEL_DAILY,
     },
     trigger: null,
   });
@@ -94,6 +125,7 @@ export async function sendGoalReachedNotification(goalName) {
 
 export async function scheduleBillReminders(bills) {
   if (!Notifications) return;
+  await ensureChannels();
   try {
     // Cancel all existing bill reminders before rescheduling
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -103,37 +135,34 @@ export async function scheduleBillReminders(bills) {
       }
     }
 
-    // Nothing to schedule — cancellation above already cleaned up
     if (!bills?.length) return;
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     for (const bill of bills) {
-      // Skip only if explicitly deactivated (bills don't have isActive field — treat absence as active)
       if (bill.isActive === false) continue;
       const isPaidThisMonth = !!bill.paidMonths?.[currentMonth];
       if (isPaidThisMonth) continue;
 
-      // Schedule reminder 1 day before due date at 9 AM (monthly repeat)
       const reminderDay = bill.dueDay - 1 < 1 ? 28 : bill.dueDay - 1;
-      const trigger = { type: 'calendar', day: reminderDay, hour: 9, minute: 0, repeats: true };
 
       await Notifications.scheduleNotificationAsync({
         content: {
           title: `Bill Due Tomorrow: ${bill.name}`,
           body: `₹${bill.amount.toLocaleString('en-IN')} due on the ${bill.dueDay}th. Tap to mark as paid.`,
           data: { type: 'bill_reminder', billId: bill.id },
+          channelId: CHANNEL_BILLS,
         },
-        trigger,
+        trigger: { type: 'calendar', day: reminderDay, hour: 9, minute: 0, repeats: true },
       });
 
-      // Also schedule on the due day itself at 9 AM
       await Notifications.scheduleNotificationAsync({
         content: {
           title: `Bill Due Today: ${bill.name} ⚡`,
           body: `₹${bill.amount.toLocaleString('en-IN')} is due today. Don't forget to pay!`,
           data: { type: 'bill_reminder', billId: bill.id },
+          channelId: CHANNEL_BILLS,
         },
         trigger: { type: 'calendar', day: bill.dueDay, hour: 9, minute: 0, repeats: true },
       });
