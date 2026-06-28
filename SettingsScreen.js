@@ -307,8 +307,22 @@ const SettingsScreen = ({ resetAllData }) => {
             iconColor={C.purple}
             iconBg={C.purpleBg}
             label="Data sharing"
-            showSep={false}
             right={<Text style={{ color: C.income, fontSize: 13, fontWeight: '700' }}>Never</Text>}
+          />
+          <Row
+            C={C}
+            icon="camera-off"
+            iconColor="#34D399"
+            iconBg="rgba(52,211,153,0.12)"
+            label="Screenshot Protection"
+            sublabel="Screenshots are disabled to protect your data"
+            showSep={false}
+            right={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
+                <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '700' }}>Active</Text>
+              </View>
+            }
           />
         </SettingsCard>
 
