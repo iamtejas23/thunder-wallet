@@ -1,10 +1,9 @@
 import * as React from 'react';
-import { Alert, Animated, Dimensions, Easing, Image, Platform, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Easing, Image, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
-import * as ScreenCapture from 'expo-screen-capture';
 import { ThemeProvider } from './ThemeContext';
 import MainApp from './MainApp';
 import OnboardingScreen from './OnboardingScreen';
@@ -349,26 +348,6 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = React.useState(false);
   const [showPin, setShowPin] = React.useState(false);
   const [pinUnlocked, setPinUnlocked] = React.useState(false);
-
-  // Activate JS-layer screen capture protection (iOS secure text field trick +
-  // Android FLAG_SECURE via native module when linked after build).
-  // The native MainActivity.kt already sets FLAG_SECURE on Android at startup.
-  React.useEffect(() => {
-    ScreenCapture.preventScreenCaptureAsync().catch(() => {});
-
-    // iOS: fire an alert when a screenshot is actually taken so the user
-    // understands the content is intentionally protected.
-    if (Platform.OS === 'ios') {
-      const sub = ScreenCapture.addScreenshotListener(() => {
-        Alert.alert(
-          'Screenshot Blocked',
-          'Screenshots are disabled to protect your data.',
-          [{ text: 'OK' }],
-        );
-      });
-      return () => sub.remove();
-    }
-  }, []);
 
   React.useEffect(() => {
     (async () => {
