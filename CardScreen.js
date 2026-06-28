@@ -590,8 +590,8 @@ export default function CardScreen() {
 
   const loadCards = async () => {
     try {
-      const loaded = await loadAllCards();
-      setCards(loaded);
+      const data = await loadAllCards();
+      setCards(data);
     } catch {}
     setLoaded(true);
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -642,6 +642,8 @@ export default function CardScreen() {
   const showForm = adding || (cards.length === 0 && !editing) || editing;
   const card = cards[activeIdx];
 
+  if (!showForm && !card) return null;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
       <MeshBackground blobs="cards" isDark={C.isDark} />
@@ -674,7 +676,7 @@ export default function CardScreen() {
 
             {/* Card */}
             <View style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 8, marginTop: 4 }}>
-              <VirtualCard card={card} flipped={flipped} onFlip={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFlipped(v => !v); setRevealed(false); }} />
+              <VirtualCard key={card.id} card={card} flipped={flipped} onFlip={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFlipped(v => !v); setRevealed(false); }} />
             </View>
 
             {/* Dot indicators */}
@@ -761,7 +763,7 @@ export default function CardScreen() {
                     style={[ms.cardRow, { backgroundColor: i === activeIdx ? C.accentBg : C.card, borderColor: i === activeIdx ? C.accentBorder : C.border }]}
                   >
                     <View style={{ width: 36, height: 24, borderRadius: 5, backgroundColor: '#4F2FDB', alignItems: 'center', justifyContent: 'center' }}>
-                      <CardBrandMark type={detectCardType(c.number)} size="small" />
+                      <CardBrandMark type={c.type || detectCardType(c.number)} size="small" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{c.holderName}</Text>
