@@ -311,7 +311,7 @@ const SettingsScreen = ({ resetAllData }) => {
           />
           <Row
             C={C}
-            icon="camera-off"
+            icon="shield-checkmark-outline"
             iconColor="#34D399"
             iconBg="rgba(52,211,153,0.12)"
             label="Screenshot Protection"
