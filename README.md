@@ -1,114 +1,171 @@
-
 # Thunder Wallet
 
-Expense Tracker App 📊💸 Expense Tracker is a mobile app built with React Native that helps you manage your expenses effectively. Keep track of your transactions, categorize them, and monitor your balance on-the-go!
+**Premium offline-first expense manager for Android.**  
+No cloud. No account. No ads. Your money stays on your device — always.
 
+[![Latest Release](https://img.shields.io/github/v/release/iamtejas23/thunder-wallet?color=60A5FA&label=latest)](https://github.com/iamtejas23/thunder-wallet/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-34D399)](LICENSE)
+[![React Native](https://img.shields.io/badge/React%20Native-0.81-A78BFA)](https://reactnative.dev)
+[![Expo SDK](https://img.shields.io/badge/Expo%20SDK-54-60A5FA)](https://expo.dev)
 
-## Features 🚀
+---
 
-- Add Transactions: Easily add new transactions, specifying the category and amount.
-- Transaction Details: View detailed information about each transaction, including the date.
-- Sort Transactions: Toggle between sorting transactions by date or month.
-- Delete Transactions: Remove unwanted transactions with a simple tap.
+## Download
 
+| Platform | Status | Link |
+|---|---|---|
+| Android | ✅ Available | [Latest APK →](https://github.com/iamtejas23/thunder-wallet/releases/latest) |
+| iOS | 🔜 Coming soon | Apple Developer account pending |
 
-## Getting Started 🛠️ 
-Installation
+---
 
-Install thunder-wallet with npm
+## Features
+
+**Core**
+- Add income & expense transactions with category, note, and date
+- Monthly budget with daily breakdown and streak tracking
+- Financial Health Score (0–100) based on savings rate + budget adherence
+- Animated balance counter — you physically feel the money move
+- Swipe-to-edit / delete on any transaction row (no libraries, pure PanResponder)
+
+**Analytics**
+- Interactive donut chart by category
+- Day-of-week spending heatmap
+- Month vs. last month comparison
+- What-If Simulator — slide categories to see annual savings projection
+- Per-category budget bars with overspend warnings
+
+**Bills**
+- Track subscriptions (Netflix, Jio, Rent, etc.) with due dates
+- Local notifications fire 1 day before and on the due day — monthly, automatic
+- Tap "Pay" to instantly log the expense transaction
+
+**Cards Vault**
+- Store card numbers and CVVs in Android Keystore / iOS Secure Enclave
+- Biometric gate before revealing sensitive data
+- Card flip animation to show details
+
+**Savings Goals**
+- Set named goals with target amounts and deadlines
+- Progress bars + confetti explosion when you hit a goal
+
+**Security & Privacy**
+- 4-digit PIN + fingerprint/face unlock on app open
+- Zero network permissions — data cannot leave the device
+- 100% offline, works without internet forever
+
+**App Experience**
+- Dark mesh grid background across all screens
+- Dark splash screen with breathing SVG mesh animation
+- Pure black bottom nav with circular spotlight active state
+- Full dark / light theme support
+- In-app update checker — notified when a new version drops
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React Native 0.81.5 + Expo SDK 54 (New Architecture) |
+| Navigation | React Navigation v7 (Bottom Tabs) |
+| Storage | AsyncStorage + expo-secure-store (Keystore/Enclave) |
+| Notifications | expo-notifications (calendar triggers, exact alarms) |
+| Biometrics | expo-local-authentication |
+| Graphics | react-native-svg (mesh backgrounds, splash) |
+| Build | GitHub Actions → APK, EAS Build → iOS |
+
+---
+
+## Getting Started (Local Dev)
 
 ```bash
 git clone https://github.com/iamtejas23/thunder-wallet.git
 cd thunder-wallet
-```
-Install Dependencies:
-```bash
 npm install
+npx expo start --clear
 ```
-Run the App:
+
+> **Note:** Requires Node 18 or 20. Node 24 is not supported by Expo SDK 54.
+
+**Run on Android emulator:**
 ```bash
-npm start
+# Terminal 1 — start emulator
+emulator -avd <YourAVD> -gpu swiftshader_indirect -no-snapshot-load
+
+# Terminal 2 — start app (press 'a' once Metro is ready)
+npx expo start --clear
 ```
 
-## Running on Android Emulator (Local Dev) 🤖
+---
 
-Open **two terminals** and run one command in each:
+## Building a Release APK
 
-**Terminal 1 — Start the emulator:**
-```bash
-emulator -avd FreshPixel5 -gpu swiftshader_indirect -no-snapshot-load
-```
-> Wait until the emulator fully boots and the home screen is visible before moving to Terminal 2.
-
-**Terminal 2 — Start the app:**
-```bash
-cd ~/family/thunder-wallet && npx expo start --clear
-```
-> Once Metro is running, press **`a`** to open the app on the emulator. No QR code needed.
-
-## Build Lightweight Release APK
-
-Use this magic command from the project root to build a small Android release APK:
+Builds are automated via GitHub Actions. Push a version tag and the APK is published to GitHub Releases automatically:
 
 ```bash
-cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a -Pandroid.enableProguardInReleaseBuilds=true -Pandroid.enableShrinkResourcesInReleaseBuilds=true -Pexpo.useLegacyPackaging=true
-```
-
-APK output path:
-
-```bash
-android/app/build/outputs/apk/release/app-release.apk
-```
-```
-git add .
-geminicommit
+# 1. Bump version in app.json (version + versionCode)
+# 2. Commit and push
 git push origin master
-git tag 1.0.24
-git push origin 1.0.24
+
+# 3. Tag and push — CI does the rest
+git tag v1.0.65
+git push origin v1.0.65
 ```
 
-This build keeps the APK lightweight by building only `arm64-v8a`, using Hermes, enabling Proguard/resource shrinking, disabling extra GIF/WebP support, and compressing native libraries.
+The workflow (`.github/workflows/android-release.yml`) builds a lightweight `arm64-v8a` APK and attaches it to the GitHub Release.
 
-## GitHub Actions Release APK
+**Manual local build:**
+```bash
+cd android && ./gradlew assembleRelease \
+  -PreactNativeArchitectures=arm64-v8a \
+  -Pexpo.useLegacyPackaging=true \
+  --no-daemon
+# Output: android/app/build/outputs/apk/release/app-release.apk
+```
 
-Yes, GitHub Actions can build the lightweight APK and attach it to GitHub Releases automatically.
+---
 
-Release plan:
-
-1. Update the app version in `package.json`, `app.json`, and `android/app/build.gradle`.
-2. Commit and push your changes.
-3. Create and push a version tag:
+## iOS Build (EAS)
 
 ```bash
-git tag 1.0.24
-git push origin 1.0.24
+# Simulator build — no Apple Developer account needed
+npx eas-cli build --platform ios --profile simulator
+
+# Real device / TestFlight — requires Apple Developer account ($99/yr)
+npx eas-cli build --platform ios --profile preview
 ```
 
-4. GitHub Actions runs `.github/workflows/android-release.yml`.
-5. The workflow builds the same lightweight `arm64-v8a` release APK.
-6. The APK is uploaded to the matching GitHub Release as:
+---
 
-```bash
-thunder-wallet-1.0.24.apk
+## Project Structure
+
+```
+thunder-wallet/
+├── App.js                  # Splash screen + app entry
+├── MainApp.js              # Tab navigator + all screens + business logic
+├── MeshBackground.js       # SVG mesh grid + color blobs (shared background)
+├── UpdateChecker.js        # GitHub Releases version check hook
+├── UpdateModal.js          # In-app update bottom sheet
+├── NotificationService.js  # Daily review + bill reminder scheduling
+├── ThemeContext.js         # Dark / light theme provider
+├── CardScreen.js           # Secure card vault
+├── BillsScreen.js          # Bills tracker
+├── SettingsScreen.js       # Settings + update checker
+├── PinScreen.js            # PIN setup + verification
+├── OnboardingScreen.js     # First-launch onboarding
+├── docs/                   # GitHub Pages landing page
+└── .github/workflows/      # CI: Android APK build + release
 ```
 
-The workflow can also be run manually from the Actions tab. To publish a manual build to GitHub Releases, enter a `release_tag` value such as `1.0.24`; without a `release_tag`, the APK is uploaded only as a workflow artifact.
+---
 
-Note: this project currently signs release APKs with the checked-in debug keystore, which is okay for direct testing/sharing. For Play Store or production signing, add a real release keystore through GitHub Secrets and update the Gradle signing config.
+## Contributing
 
+Issues and PRs are welcome. The entire codebase is plain React Native — no unusual abstractions.
 
-## Contributing 👩‍💻👨‍💻
+## License
 
-Contributions are welcome! Feel free to open issues or submit pull requests to improve the app.
+MIT — see [LICENSE](LICENSE).
 
-## Download the App 📲
-
-- **iOS:** [Comming Soon...!](link-to-your-app-on-app-store).
-- **Android:** Available (https://github.com/iamtejas23/thunder-wallet/releases/tag/1.0.0).
-
-Enjoy tracking your expenses with the Expense Tracker app! 💰📊
-
-## License 📄
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-
+Built by [@iamtejas23](https://github.com/iamtejas23)
