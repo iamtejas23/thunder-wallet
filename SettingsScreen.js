@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
 import MeshBackground from './MeshBackground';
+import UpdateModal from './UpdateModal';
 import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
 
@@ -75,6 +76,35 @@ const SettingsScreen = ({ resetAllData }) => {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [pinEnabled, setPinEnabled] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [updateResult, setUpdateResult] = useState(null);
+
+  const handleCheckUpdate = useCallback(async () => {
+    setChecking(true);
+    try {
+      const current = Constants.expoConfig?.version ?? '0.0.0';
+      const res = await fetch('https://api.github.com/repos/iamtejas23/thunder-wallet/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!res.ok) throw new Error('network');
+      const data = await res.json();
+      const tag = data.tag_name ?? '';
+      const url = data.assets?.[0]?.browser_download_url ?? data.html_url ?? '';
+      const parse = v => v.replace(/^v/, '').split('.').map(Number);
+      const [rA, rB, rC] = parse(tag);
+      const [lA, lB, lC] = parse(current);
+      const isNewer = rA > lA || (rA === lA && rB > lB) || (rA === lA && rB === lB && rC > lC);
+      if (isNewer) {
+        setUpdateResult({ latestVersion: tag, downloadUrl: url });
+      } else {
+        Alert.alert('You\'re up to date', `Thunder Wallet v${current} is the latest version.`);
+      }
+    } catch {
+      Alert.alert('Check failed', 'Could not reach GitHub. Try again later.');
+    } finally {
+      setChecking(false);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -332,6 +362,20 @@ const SettingsScreen = ({ resetAllData }) => {
         <SettingsCard C={C}>
           <Row
             C={C}
+            icon="refresh"
+            iconColor="#34D399"
+            iconBg="rgba(52,211,153,0.12)"
+            label="Check for Updates"
+            sublabel={checking ? 'Checking…' : `Current: v${Constants.expoConfig?.version ?? '?'}`}
+            onPress={checking ? undefined : handleCheckUpdate}
+            right={
+              checking
+                ? <Ionicons name="ellipsis-horizontal" size={16} color={C.text3} />
+                : <Ionicons name="chevron-forward" size={16} color={C.text3} />
+            }
+          />
+          <Row
+            C={C}
             icon="person-circle"
             iconColor={C.blue}
             iconBg={C.blueBg}
@@ -363,6 +407,13 @@ const SettingsScreen = ({ resetAllData }) => {
         </Text>
 
       </ScrollView>
+
+      <UpdateModal
+        visible={!!updateResult}
+        latestVersion={updateResult?.latestVersion}
+        downloadUrl={updateResult?.downloadUrl}
+        onDismiss={() => setUpdateResult(null)}
+      />
     </SafeAreaView>
   );
 };
