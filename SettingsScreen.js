@@ -175,21 +175,6 @@ const SettingsScreen = ({ resetAllData }) => {
     );
   }
 
-  const FEATURES = [
-    { icon: 'pie-chart',      color: '#F87171', label: 'Spending chart'    },
-    { icon: 'trophy',         color: '#FCD34D', label: 'Savings goals'     },
-    { icon: 'card',           color: '#60A5FA', label: 'Bills tracker'     },
-    { icon: 'wallet',         color: '#34D399', label: 'Piggy bank'        },
-    { icon: 'flame',          color: '#FB923C', label: 'Budget streak'     },
-    { icon: 'flask',          color: '#A78BFA', label: 'What-If simulator' },
-    { icon: 'repeat',         color: '#4ECDC4', label: 'Recurring tags'    },
-    { icon: 'options',        color: '#60A5FA', label: 'Category budgets'  },
-    { icon: 'notifications',  color: '#FCD34D', label: 'Daily review'      },
-    { icon: 'lock-closed',    color: '#A78BFA', label: 'PIN & biometrics'  },
-    { icon: 'color-palette',  color: '#F87171', label: 'Dark / light'      },
-    { icon: 'shield-checkmark', color: '#34D399', label: 'Fully offline'   },
-  ];
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <MeshBackground blobs="analytics" isDark={C.isDark} />
@@ -343,19 +328,6 @@ const SettingsScreen = ({ resetAllData }) => {
             right={<Ionicons name="chevron-forward" size={16} color="#F87171" />}
           />
         </SettingsCard>
-
-        {/* ── Features grid ── */}
-        <SectionLabel text="What's Inside" C={C} />
-        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginBottom: 24, padding: 14 }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {FEATURES.map((f) => (
-              <View key={f.label} style={{ alignItems: 'center', backgroundColor: `${f.color}12`, borderColor: `${f.color}28`, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7 }}>
-                <Ionicons name={f.icon} size={13} color={f.color} />
-                <Text style={{ color: f.color, fontSize: 12, fontWeight: '700' }}>{f.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
 
         {/* ── About ── */}
         <SectionLabel text="About" C={C} />
