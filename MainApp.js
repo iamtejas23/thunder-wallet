@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -1433,6 +1433,7 @@ const TAB_CFG = {
 
 function CustomTabBar({ state, navigation }) {
   const { C } = useTheme();
+  const insets = useSafeAreaInsets();
   const TAB_BAR_BG    = C.isDark ? '#000000' : '#FFFFFF';
   const TAB_ACTIVE_FG = C.isDark ? '#FFFFFF'              : '#0F172A';
   const TAB_INACTIVE  = C.isDark ? 'rgba(255,255,255,0.38)' : 'rgba(15,23,42,0.38)';
@@ -1548,7 +1549,8 @@ function CustomTabBar({ state, navigation }) {
         borderTopRightRadius: 24,
         borderTopWidth: 1,
         borderTopColor: C.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
-        height: 72,
+        height: 72 + insets.bottom,
+        paddingBottom: insets.bottom,
         paddingHorizontal: 4,
         elevation: 28,
         shadowColor: C.isDark ? '#000' : '#94A3B8',
@@ -1566,7 +1568,7 @@ function CustomTabBar({ state, navigation }) {
       <View style={{
         position: 'absolute',
         alignSelf: 'center',
-        bottom: 22,
+        bottom: 22 + insets.bottom,
         alignItems: 'center',
         justifyContent: 'center',
         width: 70,
