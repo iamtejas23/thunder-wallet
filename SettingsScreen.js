@@ -71,10 +71,11 @@ function Row({ icon, iconColor, iconBg, label, sublabel, right, onPress, showSep
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
-const SettingsScreen = ({ resetAllData }) => {
+const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange }) => {
   const { C, toggleTheme, isDark } = useTheme();
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [pinEnabled, setPinEnabled] = useState(false);
+  const [hideBalanceEnabled, setHideBalanceEnabled] = useState(hideBalanceFeature ?? false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [checking, setChecking] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
@@ -108,12 +109,14 @@ const SettingsScreen = ({ resetAllData }) => {
 
   useEffect(() => {
     (async () => {
-      const [notif, pin] = await Promise.all([
+      const [notif, pin, hideBalance] = await Promise.all([
         isNotificationsEnabled(),
         AsyncStorage.getItem(PIN_ENABLED_KEY),
+        AsyncStorage.getItem('hideBalanceFeature'),
       ]);
       setNotifEnabled(notif);
       setPinEnabled(pin === 'true');
+      setHideBalanceEnabled(hideBalance === 'true');
     })();
   }, []);
 
@@ -145,6 +148,13 @@ const SettingsScreen = ({ resetAllData }) => {
         },
       ]);
     }
+  };
+
+  const handleHideBalanceToggle = async (val) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setHideBalanceEnabled(val);
+    onHideBalanceChange?.(val);
+    await AsyncStorage.setItem('hideBalanceFeature', val ? 'true' : 'false');
   };
 
   const handleReset = () => {
@@ -270,12 +280,28 @@ const SettingsScreen = ({ resetAllData }) => {
             iconBg={C.purpleBg}
             label="PIN & Biometric Lock"
             sublabel="Require auth to open app"
-            showSep={false}
             right={
               <Switch
                 value={pinEnabled}
                 onValueChange={handlePinToggle}
                 trackColor={{ false: C.border, true: C.purple }}
+                thumbColor="#fff"
+              />
+            }
+          />
+          <Row
+            C={C}
+            icon="eye-off"
+            iconColor="#60A5FA"
+            iconBg="rgba(96,165,250,0.12)"
+            label="Hide Balance"
+            sublabel="Mask amounts on Home with eye toggle"
+            showSep={false}
+            right={
+              <Switch
+                value={hideBalanceEnabled}
+                onValueChange={handleHideBalanceToggle}
+                trackColor={{ false: C.border, true: '#60A5FA' }}
                 thumbColor="#fff"
               />
             }

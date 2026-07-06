@@ -40,6 +40,7 @@ const BUDGET_KEY = 'monthlyBudget';
 const GOALS_KEY = 'savingsGoals';
 const CAT_BUDGETS_KEY = 'categoryBudgets';
 const SAVINGS_KEY = 'savings_v1';
+const HIDE_BALANCE_KEY = 'hideBalanceFeature';
 const DEFAULT_MONTHLY_BUDGET = 30000;
 const CHART_COLORS = ['#F87171', '#60A5FA', '#FCD34D', '#34D399', '#A78BFA', '#FB923C'];
 
@@ -554,7 +555,7 @@ function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, 
 }
 
 // ─── Credit Balance Card ──────────────────────────────────────────────────────
-function CreditBalanceCard({ stats }) {
+function CreditBalanceCard({ stats, visible, onToggleVisible }) {
   const { isDark } = useTheme();
   const isHealthy = stats.balance >= 0;
   const statusColor = isHealthy ? '#34D399' : '#F87171';
@@ -612,10 +613,20 @@ function CreditBalanceCard({ stats }) {
 
       {/* ── Row 2: balance (hero) ── */}
       <View>
-        <Text style={{ color: card.labelText, fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 3 }}>
-          Current Balance
-        </Text>
-        <AnimatedBalance value={stats.balance} color="#FFFFFF" fontSize={36} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <Text style={{ color: card.labelText, fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' }}>
+            Current Balance
+          </Text>
+          {onToggleVisible && (
+            <TouchableOpacity onPress={onToggleVisible} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={visible ? 'eye' : 'eye-off'} size={13} color={card.labelText} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {visible
+          ? <AnimatedBalance value={stats.balance} color="#FFFFFF" fontSize={36} />
+          : <Text style={{ color: '#FFFFFF', fontSize: 36, fontWeight: '900', letterSpacing: 1 }}>••••••</Text>
+        }
       </View>
 
       {/* ── Row 3: chip + nfc + income / expenses ── */}
@@ -638,7 +649,7 @@ function CreditBalanceCard({ stats }) {
         {/* income */}
         <View style={{ flex: 1 }}>
           <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Income</Text>
-          <Text style={{ color: '#34D399', fontSize: 13, fontWeight: '900' }}>{compactCurrency.format(stats.income)}</Text>
+          <Text style={{ color: '#34D399', fontSize: 13, fontWeight: '900' }}>{visible ? compactCurrency.format(stats.income) : '••••'}</Text>
         </View>
 
         {/* separator */}
@@ -647,7 +658,7 @@ function CreditBalanceCard({ stats }) {
         {/* expenses */}
         <View style={{ flex: 1 }}>
           <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Expenses</Text>
-          <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '900' }}>{compactCurrency.format(stats.expense)}</Text>
+          <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '900' }}>{visible ? compactCurrency.format(stats.expense) : '••••'}</Text>
         </View>
       </View>
 
@@ -660,12 +671,19 @@ function CreditBalanceCard({ stats }) {
 function DashboardScreen({ wallet }) {
   const { C } = useTheme();
   const navigation = useNavigation();
-  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, categoryBudgets, openCategoryBudgetModal } = wallet;
+  const { insight, monthlyBudget, stats, adjustMonthlyBudget, openTransactionModal, goals, deleteGoal, openGoalModal, categoryBudgets, openCategoryBudgetModal, hideBalanceFeature } = wallet;
   const healthScore = calculateHealthScore(stats, monthlyBudget);
   const scoreColor = healthScore >= 70 ? C.income : healthScore >= 40 ? C.amber : C.expense;
   const scoreLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Work';
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState(String(monthlyBudget));
+  const [balanceVisible, setBalanceVisible] = useState(false);
+
+  // When feature is disabled, always show balances; when re-enabled, start hidden again
+  useEffect(() => {
+    if (!hideBalanceFeature) setBalanceVisible(true);
+    else setBalanceVisible(false);
+  }, [hideBalanceFeature]);
 
   const commitBudget = async () => {
     const val = Number.parseFloat(budgetInput);
@@ -680,7 +698,7 @@ function DashboardScreen({ wallet }) {
         <AppHeader onSettingsPress={() => navigation.navigate('Settings')} />
 
         {/* Credit Balance Card */}
-        <CreditBalanceCard stats={stats} />
+        <CreditBalanceCard stats={stats} visible={balanceVisible} onToggleVisible={hideBalanceFeature ? () => setBalanceVisible(v => !v) : null} />
 
         {/* Health Score */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 16, borderWidth: 1, marginTop: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -729,7 +747,7 @@ function DashboardScreen({ wallet }) {
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 }}>Monthly Budget</Text>
-                {editingBudget ? (
+                {editingBudget && balanceVisible ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                     <Text style={{ color: C.accent, fontSize: 22, fontWeight: '900' }}>₹</Text>
                     <TextInput
@@ -743,9 +761,15 @@ function DashboardScreen({ wallet }) {
                     />
                   </View>
                 ) : (
-                  <TouchableOpacity onPress={() => { setBudgetInput(String(monthlyBudget)); setEditingBudget(true); }}>
-                    <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{currency.format(monthlyBudget)}</Text>
-                    <Text style={{ color: C.text3, fontSize: 10, marginTop: 2 }}>Tap to edit</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!balanceVisible) return;
+                      setBudgetInput(String(monthlyBudget));
+                      setEditingBudget(true);
+                    }}
+                  >
+                    <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{balanceVisible ? currency.format(monthlyBudget) : '••••••'}</Text>
+                    {balanceVisible && <Text style={{ color: C.text3, fontSize: 10, marginTop: 2 }}>Tap to edit</Text>}
                   </TouchableOpacity>
                 )}
               </View>
@@ -757,11 +781,13 @@ function DashboardScreen({ wallet }) {
                 <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>By Category</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ color: stats.remainingBudget >= 0 ? C.income : C.expense, fontSize: 13, fontWeight: '800', marginTop: 10 }}>
-              {stats.remainingBudget >= 0 ? `${currency.format(stats.remainingBudget)} remaining` : `${currency.format(Math.abs(stats.remainingBudget))} over budget`}
+            <Text style={{ color: balanceVisible ? (stats.remainingBudget >= 0 ? C.income : C.expense) : C.text3, fontSize: 13, fontWeight: '800', marginTop: 10 }}>
+              {balanceVisible
+                ? (stats.remainingBudget >= 0 ? `${currency.format(stats.remainingBudget)} remaining` : `${currency.format(Math.abs(stats.remainingBudget))} over budget`)
+                : '•••• remaining'}
             </Text>
             <View style={{ backgroundColor: C.card, borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
-              <View style={{ backgroundColor: stats.remainingBudget < 0 ? C.expense : C.accent, borderRadius: 6, height: 8, opacity: 0.6, width: `${stats.budgetUsedPercent}%` }} />
+              <View style={{ backgroundColor: stats.remainingBudget < 0 ? C.expense : C.accent, borderRadius: 6, height: 8, opacity: 0.6, width: balanceVisible ? `${stats.budgetUsedPercent}%` : '0%' }} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderColor: C.border, borderRadius: 12, borderWidth: 1, marginTop: 12, padding: 12 }}>
               <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderRadius: 18, height: 34, justifyContent: 'center', width: 34 }}>
@@ -1649,17 +1675,19 @@ function MainApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState(DEFAULT_MONTHLY_BUDGET);
   const [confettiGoal, setConfettiGoal] = useState(null);
+  const [hideBalanceFeature, setHideBalanceFeature] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [savedTx, savedBudget, savedGoals, savedCatBudgets, savedBills, savedSavings] = await Promise.all([
+        const [savedTx, savedBudget, savedGoals, savedCatBudgets, savedBills, savedSavings, savedHideBalance] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(BUDGET_KEY),
           AsyncStorage.getItem(GOALS_KEY),
           AsyncStorage.getItem(CAT_BUDGETS_KEY),
           AsyncStorage.getItem(BILLS_KEY),
           AsyncStorage.getItem(SAVINGS_KEY),
+          AsyncStorage.getItem(HIDE_BALANCE_KEY),
         ]);
         if (savedTx) {
           const parsed = JSON.parse(savedTx).map(normalizeTransaction);
@@ -1671,6 +1699,7 @@ function MainApp() {
         if (savedCatBudgets) setCategoryBudgets(JSON.parse(savedCatBudgets));
         if (savedBills) setBills(JSON.parse(savedBills));
         if (savedSavings) setSavings(JSON.parse(savedSavings));
+        if (savedHideBalance !== null) setHideBalanceFeature(savedHideBalance === 'true');
       } catch { Alert.alert('Load error', 'Could not load wallet data. Please restart the app.'); }
       // Request notification permission once so bill reminders can fire
       requestNotificationPermission().catch(() => {});
@@ -1900,6 +1929,7 @@ function MainApp() {
     stats, streak, transactions,
     bills, addBill, deleteBill, markBillPaid, markBillUnpaid,
     savings, openSavingsModal,
+    hideBalanceFeature, setHideBalanceFeature,
   };
 
   return (
@@ -1922,7 +1952,7 @@ function MainApp() {
         )}</Tab.Screen>
         <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
         {/* Settings hidden from tab bar — opened via gear icon in dashboard header */}
-        <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} />}</Tab.Screen>
+        <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} hideBalanceFeature={hideBalanceFeature} onHideBalanceChange={setHideBalanceFeature} />}</Tab.Screen>
       </Tab.Navigator>
 
       <TransactionModal
