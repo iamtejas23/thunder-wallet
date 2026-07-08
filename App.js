@@ -4,10 +4,21 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
+import { useFonts } from 'expo-font';
 import { ThemeProvider } from './ThemeContext';
 import MainApp from './MainApp';
 import OnboardingScreen from './OnboardingScreen';
 import PinScreen, { PIN_ENABLED_KEY } from './PinScreen';
+import {
+  DMSans_100Thin,
+  DMSans_300Light,
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+  DMSans_800ExtraBold,
+  DMSans_900Black,
+} from './Typography';
 
 const ONBOARDING_KEY = 'onboardingDone';
 const { width, height } = Dimensions.get('window');
@@ -349,6 +360,17 @@ export default function App() {
   const [showPin, setShowPin] = React.useState(false);
   const [pinUnlocked, setPinUnlocked] = React.useState(false);
 
+  const [fontsLoaded] = useFonts({
+    DMSans_100Thin,
+    DMSans_300Light,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    DMSans_800ExtraBold,
+    DMSans_900Black,
+  });
+
   React.useEffect(() => {
     (async () => {
       try {
@@ -364,7 +386,7 @@ export default function App() {
     })();
   }, []);
 
-  if (!ready) return <SplashScreen />;
+  if (!ready || !fontsLoaded) return <SplashScreen />;
 
   if (showOnboarding) {
     return (
@@ -431,11 +453,11 @@ const s = StyleSheet.create({
   // Logo container — white/blue border
   logo: { width: 110, height: 110 },
 
-  // Typography — both lines bold, white, same size
+  // Typography
   titleTop: {
     color: WHITE,
+    fontFamily: 'DMSans_900Black',
     fontSize: 36,
-    fontWeight: '900',
     letterSpacing: 10,
     textShadowColor: 'rgba(96,165,250,0.45)',
     textShadowOffset: { width: 0, height: 0 },
@@ -443,8 +465,8 @@ const s = StyleSheet.create({
   },
   titleBot: {
     color: 'rgba(255,255,255,0.82)',
+    fontFamily: 'DMSans_800ExtraBold',
     fontSize: 36,
-    fontWeight: '800',
     letterSpacing: 10,
     marginTop: 2,
     textShadowColor: 'rgba(167,139,250,0.35)',
@@ -459,8 +481,8 @@ const s = StyleSheet.create({
   },
   tagline: {
     color: 'rgba(255,255,255,0.32)',
+    fontFamily: 'DMSans_600SemiBold',
     fontSize: 9,
-    fontWeight: '700',
     letterSpacing: 3.8,
   },
 

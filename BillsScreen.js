@@ -114,7 +114,7 @@ function BrandLogo({ fa5Brand, brandLetter, letterColor, letterBg, icon, color, 
     const fontSize = wrap <= 40 ? 11 : 13;
     return (
       <View style={{ alignItems: 'center', backgroundColor: letterBg || color, borderRadius: radius, height: wrap, justifyContent: 'center', width: wrap }}>
-        <Text style={{ color: letterColor || '#fff', fontSize, fontWeight: '900', letterSpacing: 0.5 }}>{brandLetter}</Text>
+        <Text style={{ color: letterColor || '#fff', fontSize, fontFamily: 'DMSans_900Black', letterSpacing: 0.5 }}>{brandLetter}</Text>
       </View>
     );
   }
@@ -188,8 +188,8 @@ function HeroCard({ summary, billCount, C }) {
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <ProgressRing progress={progress} size={100} strokeWidth={8} color={ringColor} />
           <View style={{ position: 'absolute', alignItems: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900' }}>{Math.round(progress * 100)}%</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: '700' }}>CLEARED</Text>
+            <Text style={{ color: '#fff', fontSize: 20, fontFamily: 'DMSans_900Black' }}>{Math.round(progress * 100)}%</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontFamily: 'DMSans_700Bold' }}>CLEARED</Text>
           </View>
         </View>
       </View>
@@ -222,10 +222,10 @@ function HeroCard({ summary, billCount, C }) {
       {billCount > 0 && (
         <View style={{ marginTop: 14 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'DMSans_700Bold' }}>
               {summary.paidCount}/{billCount} bills cleared
             </Text>
-            {allPaid && <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '800' }}>All Clear! 🎉</Text>}
+            {allPaid && <Text style={{ color: '#34D399', fontSize: 11, fontFamily: 'DMSans_800ExtraBold' }}>All Clear! 🎉</Text>}
           </View>
           <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, height: 6, overflow: 'hidden' }}>
             <View style={{
@@ -244,9 +244,9 @@ function StatChip({ icon, label, value, color }) {
     <View style={{ flex: 1, backgroundColor: `${color}15`, borderColor: `${color}30`, borderRadius: 12, borderWidth: 1, padding: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
         <Ionicons name={icon} size={12} color={color} />
-        <Text style={{ color, fontSize: 10, fontWeight: '800' }}>{label}</Text>
+        <Text style={{ color, fontSize: 10, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
       </View>
-      {!!value && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>{value}</Text>}
+      {!!value && <Text style={{ color: '#fff', fontSize: 14, fontFamily: 'DMSans_900Black' }}>{value}</Text>}
     </View>
   );
 }
@@ -266,10 +266,10 @@ const heroStyles = StyleSheet.create({
     width: 160, height: 160, borderRadius: 80,
     backgroundColor: 'rgba(124,58,237,0.25)',
   },
-  eyebrow: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  title:   { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 2 },
-  totalAmount: { color: '#A78BFA', fontSize: 34, fontWeight: '900', letterSpacing: -0.5, marginTop: 8 },
-  subtitle: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  eyebrow: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2 },
+  title:   { color: '#fff', fontSize: 22, fontFamily: 'DMSans_900Black', marginTop: 2 },
+  totalAmount: { color: '#A78BFA', fontSize: 34, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 8 },
+  subtitle: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'DMSans_700Bold', marginTop: 2 },
 });
 
 // ─── Upcoming timeline ─────────────────────────────────────────────────────────
@@ -288,7 +288,7 @@ function UpcomingTimeline({ bills, C }) {
 
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+      <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
         Upcoming Payments
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
@@ -310,10 +310,10 @@ function UpcomingTimeline({ bills, C }) {
               gap: 8,
             }}>
               <BrandLogo fa5Brand={b.fa5Brand} brandLetter={b.brandLetter} letterColor={b.letterColor} letterBg={b.letterBg} icon={b.icon} color={b.color} size={16} bgSize={36} />
-              <Text style={{ color: color, fontSize: 12, fontWeight: '900' }}>{dayLabel}</Text>
-              <Text style={{ color: C.text1, fontSize: 11, fontWeight: '800', textAlign: 'center' }} numberOfLines={1}>{b.name}</Text>
-              <Text style={{ color: C.text3, fontSize: 10, fontWeight: '600' }}>{dateStr}</Text>
-              <Text style={{ color: b.color, fontSize: 12, fontWeight: '800' }}>
+              <Text style={{ color: color, fontSize: 12, fontFamily: 'DMSans_900Black' }}>{dayLabel}</Text>
+              <Text style={{ color: C.text1, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', textAlign: 'center' }} numberOfLines={1}>{b.name}</Text>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_600SemiBold' }}>{dateStr}</Text>
+              <Text style={{ color: b.color, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>
                 {currency.format(b.amount)}
               </Text>
             </View>
@@ -338,7 +338,7 @@ function AlertBanner({ icon, message, color, bg, border }) {
   return (
     <Animated.View style={[{ backgroundColor: bg, borderColor: border, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, marginBottom: 8 }, { transform: [{ scale: scaleAnim }] }]}>
       <Ionicons name={icon} size={18} color={color} />
-      <Text style={{ color, fontSize: 13, fontWeight: '800', flex: 1 }}>{message}</Text>
+      <Text style={{ color, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', flex: 1 }}>{message}</Text>
     </Animated.View>
   );
 }
@@ -410,19 +410,19 @@ function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
           {/* Text */}
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{bill.name}</Text>
+              <Text style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold' }} numberOfLines={1}>{bill.name}</Text>
               <View style={{ backgroundColor: sc.bg, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2 }}>
-                <Text style={{ color: sc.color, fontSize: 10, fontWeight: '800' }}>{sc.label}</Text>
+                <Text style={{ color: sc.color, fontSize: 10, fontFamily: 'DMSans_800ExtraBold' }}>{sc.label}</Text>
               </View>
               {cycle > 1 && (
                 <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 7, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ color: C.text3, fontSize: 9, fontWeight: '800' }}>{CYCLE_LABELS[cycle] || `Every ${cycle}M`}</Text>
+                  <Text style={{ color: C.text3, fontSize: 9, fontFamily: 'DMSans_800ExtraBold' }}>{CYCLE_LABELS[cycle] || `Every ${cycle}M`}</Text>
                 </View>
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ color: bill.color, fontSize: 18, fontWeight: '900' }}>{currency.format(bill.amount)}</Text>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600' }}>{dateText}</Text>
+              <Text style={{ color: bill.color, fontSize: 18, fontFamily: 'DMSans_900Black' }}>{currency.format(bill.amount)}</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold' }}>{dateText}</Text>
             </View>
             {!!bill.notes && (
               <Text style={{ color: C.text3, fontSize: 11, marginTop: 3 }} numberOfLines={1}>{bill.notes}</Text>
@@ -443,7 +443,7 @@ function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
               activeOpacity={0.8}
             >
               <Ionicons name={isPaid ? 'close-circle-outline' : 'checkmark'} size={13} color={isPaid ? C.text3 : '#000'} />
-              <Text style={{ color: isPaid ? C.text3 : '#000', fontSize: 11, fontWeight: '800' }}>
+              <Text style={{ color: isPaid ? C.text3 : '#000', fontSize: 11, fontFamily: 'DMSans_800ExtraBold' }}>
                 {isPaid ? 'Unmark' : 'Pay'}
               </Text>
             </TouchableOpacity>
@@ -564,8 +564,8 @@ function AddBillModal({ visible, onClose, onAdd }) {
 
           {step === 'preset' ? (
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-              <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Add Bill</Text>
-              <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 16, marginTop: 2 }}>Choose Bill Type</Text>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Add Bill</Text>
+              <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 16, marginTop: 2 }}>Choose Bill Type</Text>
 
               {/* Category filter pills */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16, paddingBottom: 2 }}>
@@ -580,7 +580,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                       paddingHorizontal: 14, paddingVertical: 6,
                     }}
                   >
-                    <Text style={{ color: catFilter === cat ? (C.isDark ? '#000' : '#fff') : C.text2, fontSize: 12, fontWeight: '800' }}>{cat}</Text>
+                    <Text style={{ color: catFilter === cat ? (C.isDark ? '#000' : '#fff') : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{cat}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -594,7 +594,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                     style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 16, borderWidth: 1, gap: 6, paddingHorizontal: 14, paddingVertical: 12, minWidth: '28%', flex: 1 }}
                   >
                     <BrandLogo fa5Brand={p.fa5Brand} brandLetter={p.brandLetter} letterColor={p.letterColor} letterBg={p.letterBg} icon={p.icon} color={p.color} size={20} bgSize={42} />
-                    <Text style={{ color: C.text1, fontSize: 11, fontWeight: '800', textAlign: 'center' }}>{p.name}</Text>
+                    <Text style={{ color: C.text1, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', textAlign: 'center' }}>{p.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -604,25 +604,25 @@ function AddBillModal({ visible, onClose, onAdd }) {
               {/* Back */}
               <TouchableOpacity onPress={() => setStep('preset')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
                 <Ionicons name="chevron-back" size={18} color={C.text3} />
-                <Text style={{ color: C.text3, fontSize: 13, fontWeight: '700' }}>Back</Text>
+                <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Back</Text>
               </TouchableOpacity>
 
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 22 }}>
                 <BrandLogo fa5Brand={preset.fa5Brand} brandLetter={preset.brandLetter} letterColor={preset.letterColor} letterBg={preset.letterBg} icon={preset.icon} color={preset.color} size={26} bgSize={54} />
                 <View>
-                  <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Bill</Text>
-                  <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900' }}>Bill Details</Text>
+                  <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Bill</Text>
+                  <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black' }}>Bill Details</Text>
                 </View>
               </View>
 
               {/* Amount — hero input */}
               <View style={{ alignItems: 'center', marginBottom: 22 }}>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>Amount</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>Amount</Text>
                 <View style={[formStyles.amountHero, { borderColor: `${preset.color}50` }]}>
-                  <Text style={{ color: preset.color, fontSize: 28, fontWeight: '900', marginRight: 4 }}>₹</Text>
+                  <Text style={{ color: preset.color, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginRight: 4 }}>₹</Text>
                   <TextInput
-                    style={{ color: C.text1, fontSize: 36, fontWeight: '900', minWidth: 80 }}
+                    style={{ color: C.text1, fontSize: 36, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, minWidth: 80 }}
                     placeholder="0"
                     placeholderTextColor={C.text3}
                     keyboardType="decimal-pad"
@@ -658,11 +658,11 @@ function AddBillModal({ visible, onClose, onAdd }) {
                       height: 42, justifyContent: 'center', width: 44,
                     }}
                   >
-                    <Text style={{ color: dueDay === d ? preset.color : C.text2, fontSize: 13, fontWeight: '800' }}>{d}</Text>
+                    <Text style={{ color: dueDay === d ? preset.color : C.text2, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{d}</Text>
                   </TouchableOpacity>
                 ))}
                 <TextInput
-                  style={[{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, color: C.text1, fontSize: 13, fontWeight: '800', height: 42, paddingHorizontal: 8, textAlign: 'center', width: 56 }]}
+                  style={[{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', height: 42, paddingHorizontal: 8, textAlign: 'center', width: 56 }]}
                   placeholder="Day"
                   placeholderTextColor={C.text3}
                   keyboardType="number-pad"
@@ -671,7 +671,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                   maxLength={2}
                 />
               </View>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600', marginBottom: 16 }}>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold', marginBottom: 16 }}>
                 You'll be reminded the day before and on the {ordinal(parseInt(dueDay, 10) || 1)}
               </Text>
 
@@ -690,7 +690,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                       paddingHorizontal: 16, paddingVertical: 9,
                     }}
                   >
-                    <Text style={{ color: cycle === value ? preset.color : C.text2, fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                    <Text style={{ color: cycle === value ? preset.color : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -712,7 +712,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                 activeOpacity={0.85}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#000" />
-                <Text style={{ color: '#000', fontSize: 16, fontWeight: '900' }}>Add Bill</Text>
+                <Text style={{ color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' }}>Add Bill</Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -723,7 +723,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
 }
 
 const formStyles = StyleSheet.create({
-  label:    { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  label:    { fontSize: 11, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   input:    { borderRadius: 13, borderWidth: 1, fontSize: 15, marginBottom: 16, minHeight: 50, paddingHorizontal: 14 },
   amountHero: {
     alignItems: 'center',
@@ -774,10 +774,10 @@ function FilterTabs({ filter, setFilter, summary, billCount, C }) {
             paddingVertical: 9,
           }}
         >
-          <Text style={{ color: filter === key ? (C.isDark ? '#000' : '#fff') : C.text2, fontSize: 13, fontWeight: '800' }}>{label}</Text>
+          <Text style={{ color: filter === key ? (C.isDark ? '#000' : '#fff') : C.text2, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
           {count > 0 && (
             <View style={{ backgroundColor: filter === key ? 'rgba(0,0,0,0.15)' : C.border, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }}>
-              <Text style={{ color: filter === key ? (C.isDark ? '#000' : '#fff') : C.text3, fontSize: 10, fontWeight: '900' }}>{count}</Text>
+              <Text style={{ color: filter === key ? (C.isDark ? '#000' : '#fff') : C.text3, fontSize: 10, fontFamily: 'DMSans_900Black' }}>{count}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -804,7 +804,7 @@ function EmptyState({ onAdd, C }) {
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 28, borderWidth: 1, height: 72, width: 72, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="receipt-outline" size={32} color={C.text3} />
         </View>
-        <Text style={{ color: C.text1, fontSize: 18, fontWeight: '900', textAlign: 'center' }}>No bills yet</Text>
+        <Text style={{ color: C.text1, fontSize: 18, fontFamily: 'DMSans_900Black', textAlign: 'center' }}>No bills yet</Text>
         <Text style={{ color: C.text2, fontSize: 13, lineHeight: 20, textAlign: 'center' }}>
           Track recurring bills like electricity, Netflix, and rent to never miss a payment.
         </Text>
@@ -814,7 +814,7 @@ function EmptyState({ onAdd, C }) {
             style={{ backgroundColor: C.accent, borderRadius: 14, flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 22, paddingVertical: 13 }}
           >
             <Ionicons name="add-circle-outline" size={18} color={C.isDark ? '#000' : '#fff'} />
-            <Text style={{ color: C.isDark ? '#000' : '#fff', fontSize: 14, fontWeight: '900' }}>Add your first bill</Text>
+            <Text style={{ color: C.isDark ? '#000' : '#fff', fontSize: 14, fontFamily: 'DMSans_900Black' }}>Add your first bill</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -891,15 +891,15 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
       {/* Page header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <View>
-          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Tracker</Text>
-          <Text style={{ color: C.text1, fontSize: 28, fontWeight: '900', marginTop: 2 }}>Bills</Text>
+          <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Tracker</Text>
+          <Text style={{ color: C.text1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 2 }}>Bills</Text>
         </View>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowModal(true); }}
           style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Ionicons name="add" size={17} color={C.accent} />
-          <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>Add Bill</Text>
+          <Text style={{ color: C.accent, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>Add Bill</Text>
         </TouchableOpacity>
       </View>
 

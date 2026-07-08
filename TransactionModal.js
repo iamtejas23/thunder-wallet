@@ -252,7 +252,7 @@ const TransactionModal = ({
 
             {/* Note */}
             <Text style={[styles.label, { color: C.text1 }]}>
-              Note <Text style={{ color: C.text3, fontSize: 11, fontWeight: '500', textTransform: 'none' }}>(optional)</Text>
+              Note <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_500Medium', textTransform: 'none' }}>(optional)</Text>
             </Text>
             <TextInput
               style={[styles.input, styles.noteInput, { backgroundColor: C.cardInner, borderColor: C.border, color: C.text1 }]}
@@ -302,26 +302,26 @@ const styles = StyleSheet.create({
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, maxHeight: '93%', padding: 20, paddingBottom: 34 },
   handle: { alignSelf: 'center', borderRadius: 3, height: 4, marginBottom: 16, width: 40 },
   modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
-  modalTitle: { fontSize: 24, fontWeight: '900', marginTop: 2 },
+  eyebrow: { fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' },
+  modalTitle: { fontSize: 24, fontFamily: 'DMSans_900Black', marginTop: 2 },
   closeBtn: { alignItems: 'center', borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
   segment: { borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, marginBottom: 20, padding: 5 },
   segBtn: { alignItems: 'center', borderRadius: 10, flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 44 },
-  segText: { fontSize: 14, fontWeight: '800' },
-  label: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, marginBottom: 8, textTransform: 'uppercase' },
+  segText: { fontSize: 14, fontFamily: 'DMSans_800ExtraBold' },
+  label: { fontSize: 12, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.6, marginBottom: 8, textTransform: 'uppercase' },
   catChip: { alignItems: 'center', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 9 },
   catIconWrap: { alignItems: 'center', borderRadius: 8, height: 24, justifyContent: 'center', width: 24 },
-  catText: { fontSize: 13, fontWeight: '700' },
+  catText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
   input: { borderRadius: 12, borderWidth: 1, fontSize: 15, marginBottom: 16, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
   amountWrap: { alignItems: 'center', borderRadius: 14, borderWidth: 2, flexDirection: 'row', marginBottom: 12, minHeight: 60, paddingHorizontal: 16 },
-  rupee: { fontSize: 22, fontWeight: '900', marginRight: 8 },
-  amountInput: { flex: 1, fontSize: 28, fontWeight: '900' },
+  rupee: { fontSize: 22, fontFamily: 'DMSans_900Black', marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   presetChip: { alignItems: 'center', borderRadius: 20, borderWidth: 1, justifyContent: 'center', minHeight: 34, paddingHorizontal: 14 },
-  presetText: { fontSize: 13, fontWeight: '800' },
+  presetText: { fontSize: 13, fontFamily: 'DMSans_800ExtraBold' },
   noteInput: { minHeight: 72, paddingTop: 12, textAlignVertical: 'top' },
   saveBtn: { alignItems: 'center', borderRadius: 14, elevation: 6, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 8, minHeight: 56, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.35, shadowRadius: 16 },
-  saveBtnText: { fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  saveBtnText: { fontSize: 16, fontFamily: 'DMSans_900Black', letterSpacing: 0.3 },
 });
 
 export default TransactionModal;

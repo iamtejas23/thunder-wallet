@@ -134,7 +134,7 @@ function CardBrandMark({ type, size = 'large' }) {
 
   if (type === 'VISA') return (
     <View style={wrap}>
-      <Text style={{ color: '#fff', fontWeight: '900', fontStyle: 'italic', fontSize: isLarge ? 22 : 13, letterSpacing: 1 }}>VISA</Text>
+      <Text style={{ color: '#fff', fontFamily: 'DMSans_900Black', fontStyle: 'italic', fontSize: isLarge ? 22 : 13, letterSpacing: 1 }}>VISA</Text>
     </View>
   );
   if (type === 'MASTERCARD') return (
@@ -143,18 +143,18 @@ function CardBrandMark({ type, size = 'large' }) {
         <View style={{ width: isLarge ? 24 : 16, height: isLarge ? 24 : 16, borderRadius: isLarge ? 12 : 8, backgroundColor: '#EB001B' }} />
         <View style={{ width: isLarge ? 24 : 16, height: isLarge ? 24 : 16, borderRadius: isLarge ? 12 : 8, backgroundColor: '#F79E1B', marginLeft: isLarge ? -9 : -6 }} />
       </View>
-      {isLarge && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', marginLeft: 4 }}>mastercard</Text>}
+      {isLarge && <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'DMSans_800ExtraBold', marginLeft: 4 }}>mastercard</Text>}
     </View>
   );
   if (type === 'AMEX') return (
     <View style={wrap}>
-      <Text style={{ color: '#fff', fontWeight: '900', fontSize: isLarge ? 13 : 9, letterSpacing: 2 }}>AMERICAN{'\n'}EXPRESS</Text>
+      <Text style={{ color: '#fff', fontFamily: 'DMSans_900Black', fontSize: isLarge ? 13 : 9, letterSpacing: 2 }}>AMERICAN{'\n'}EXPRESS</Text>
     </View>
   );
   if (type === 'RUPAY') return (
     <View style={[wrap, { flexDirection: 'row', alignItems: 'center' }]}>
-      <Text style={{ color: '#F7A800', fontWeight: '900', fontSize: isLarge ? 13 : 9, letterSpacing: 1 }}>Ru</Text>
-      <Text style={{ color: '#fff',    fontWeight: '900', fontSize: isLarge ? 13 : 9, letterSpacing: 1 }}>Pay</Text>
+      <Text style={{ color: '#F7A800', fontFamily: 'DMSans_900Black', fontSize: isLarge ? 13 : 9, letterSpacing: 1 }}>Ru</Text>
+      <Text style={{ color: '#fff',    fontFamily: 'DMSans_900Black', fontSize: isLarge ? 13 : 9, letterSpacing: 1 }}>Pay</Text>
     </View>
   );
   return null;
@@ -219,7 +219,7 @@ function VirtualCard({ card, flipped = false, onFlip }) {
       }]}>
         <Animated.View style={[cs.cardGlow, { backgroundColor: c2, opacity: glowOpacity }]} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 0.5 }}>Thunder Bank</Text>
+          <Text style={{ color: '#fff', fontFamily: 'DMSans_800ExtraBold', fontSize: 16, letterSpacing: 0.5 }}>Thunder Bank</Text>
           <CardBrandMark type={cardType} size="large" />
         </View>
         <View style={cs.chip}><View style={cs.chipInner} /></View>
@@ -237,7 +237,7 @@ function VirtualCard({ card, flipped = false, onFlip }) {
             <Text style={cs.cardValue}>{card.expiry || 'MM/YY'}</Text>
           </View>
         </View>
-        <Text style={{ position: 'absolute', bottom: 6, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 9, fontWeight: '600' }}>
+        <Text style={{ position: 'absolute', bottom: 6, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 9, fontFamily: 'DMSans_600SemiBold' }}>
           Tap to flip · view CVV
         </Text>
       </Animated.View>
@@ -252,14 +252,14 @@ function VirtualCard({ card, flipped = false, onFlip }) {
         <View style={cs.magStripe} />
         <View style={cs.sigStripe}>
           <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 3 }}>
-            <Text style={{ color: '#000', fontSize: 13, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 6, letterSpacing: 4 }}>
+            <Text style={{ color: '#000', fontSize: 13, fontFamily: 'DMSans_800ExtraBold', paddingHorizontal: 10, paddingVertical: 6, letterSpacing: 4 }}>
               {cvvDots}
             </Text>
           </View>
           {/* FIX: show dots, not real CVV — biometric gate protects the real value */}
           <View style={{ alignItems: 'center', justifyContent: 'center', paddingLeft: 12, paddingRight: 4 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>{cvvDots}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8, fontWeight: '700' }}>CVV</Text>
+            <Text style={{ color: '#fff', fontFamily: 'DMSans_900Black', fontSize: 12 }}>{cvvDots}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8, fontFamily: 'DMSans_700Bold' }}>CVV</Text>
           </View>
         </View>
         <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 14, textAlign: 'center', paddingHorizontal: 16 }}>
@@ -353,7 +353,7 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
         </View>
 
         {/* Card network selector */}
-        <Text style={{ color: C.text2, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>
+        <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>
           Card Network
         </Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
@@ -371,7 +371,7 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
                 }}
               >
                 <CardBrandMark type={id} size="small" />
-                <Text style={{ color: selected ? accent : C.text3, fontSize: 9, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 }}>
+                <Text style={{ color: selected ? accent : C.text3, fontSize: 9, fontFamily: 'DMSans_800ExtraBold', marginTop: 4, letterSpacing: 0.5 }}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -467,14 +467,14 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
           activeOpacity={0.85}
         >
           <Ionicons name="shield-checkmark" size={18} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '900', marginLeft: 8 }}>
+          <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'DMSans_900Black', marginLeft: 8 }}>
             {saving ? 'Saving…' : initialCard ? 'Update Card' : 'Save Card Securely'}
           </Text>
         </TouchableOpacity>
 
         {onCancel && (
           <TouchableOpacity onPress={onCancel} style={{ alignItems: 'center', marginTop: 14, paddingVertical: 8 }}>
-            <Text style={{ color: C.text3, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+            <Text style={{ color: C.text3, fontSize: 14, fontFamily: 'DMSans_700Bold' }}>Cancel</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -485,7 +485,7 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
 function FormField({ label, C, children, right }) {
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ color: C.text2, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8, textTransform: 'uppercase' }}>
+      <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.8, marginBottom: 8, textTransform: 'uppercase' }}>
         {label}
       </Text>
       <View style={[fs.inputWrap, { backgroundColor: C.cardInner, borderColor: C.border }]}>
@@ -559,9 +559,9 @@ function RevealedPanel({ card, onHide, C }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Ionicons name="eye" size={13} color="#A78BFA" />
-            <Text style={{ color: '#A78BFA', fontSize: 12, fontWeight: '800' }}>Details revealed</Text>
+            <Text style={{ color: '#A78BFA', fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>Details revealed</Text>
           </View>
-          <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700' }}>Hides in {countdown}s</Text>
+          <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold' }}>Hides in {countdown}s</Text>
         </View>
         <View style={{ height: 3, backgroundColor: C.border, borderRadius: 2 }}>
           <View style={{ height: 3, borderRadius: 2, backgroundColor: '#7C3AED', width: `${(countdown / 30) * 100}%` }} />
@@ -582,8 +582,8 @@ function RevealedPanel({ card, onHide, C }) {
               <Ionicons name={icon} size={15} color="#A78BFA" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{label}</Text>
-              <Text selectable style={{ color: C.text1, fontSize: 15, fontWeight: '800', letterSpacing: label === 'Card Number' ? 1.5 : 0 }}>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', marginBottom: 2 }}>{label}</Text>
+              <Text selectable style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold', letterSpacing: label === 'Card Number' ? 1.5 : 0 }}>
                 {value}
               </Text>
             </View>
@@ -603,7 +603,7 @@ function RevealedPanel({ card, onHide, C }) {
         style={{ alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 }}
       >
         <Ionicons name="eye-off-outline" size={14} color={C.text3} />
-        <Text style={{ color: C.text3, fontSize: 12, fontWeight: '700' }}>Hide Details</Text>
+        <Text style={{ color: C.text3, fontSize: 12, fontFamily: 'DMSans_700Bold' }}>Hide Details</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -733,8 +733,8 @@ export default function CardScreen() {
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <View>
-          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Thunder Wallet</Text>
-          <Text style={{ color: C.text1, fontSize: 24, fontWeight: '900', marginTop: 2 }}>My Cards</Text>
+          <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Thunder Wallet</Text>
+          <Text style={{ color: C.text1, fontSize: 24, fontFamily: 'DMSans_900Black', marginTop: 2 }}>My Cards</Text>
         </View>
         {!showForm && (
           <TouchableOpacity
@@ -742,7 +742,7 @@ export default function CardScreen() {
             style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 8 }}
           >
             <Ionicons name="add" size={16} color={C.accent} />
-            <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>Add Card</Text>
+            <Text style={{ color: C.accent, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>Add Card</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -814,7 +814,7 @@ export default function CardScreen() {
                 ) : (
                   <Ionicons name={revealed ? 'eye-off' : 'finger-print'} size={20} color={revealed ? '#A78BFA' : '#fff'} />
                 )}
-                <Text style={{ color: revealed ? '#A78BFA' : '#fff', fontSize: 15, fontWeight: '900' }}>
+                <Text style={{ color: revealed ? '#A78BFA' : '#fff', fontSize: 15, fontFamily: 'DMSans_900Black' }}>
                   {authLoading ? 'Authenticating…' : revealed ? 'Hide Details' : 'View Card Details'}
                 </Text>
               </TouchableOpacity>
@@ -835,7 +835,7 @@ export default function CardScreen() {
               {/* Security badge */}
               <View style={[ms.secBadge, { backgroundColor: 'rgba(52,211,153,0.08)', borderColor: 'rgba(52,211,153,0.2)', marginTop: 12 }]}>
                 <Ionicons name="lock-closed" size={13} color="#34D399" />
-                <Text style={{ color: '#34D399', fontSize: 11, fontWeight: '700', marginLeft: 6, flex: 1 }}>
+                <Text style={{ color: '#34D399', fontSize: 11, fontFamily: 'DMSans_700Bold', marginLeft: 6, flex: 1 }}>
                   Fingerprint required to view details · Auto-hides in 30s
                 </Text>
               </View>
@@ -850,7 +850,7 @@ export default function CardScreen() {
                   style={[ms.actionBtn, { backgroundColor: C.cardInner, borderColor: C.border, flex: 1 }]}
                 >
                   <Ionicons name="pencil" size={16} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 14, fontWeight: '800', marginLeft: 6 }}>Edit Card</Text>
+                  <Text style={{ color: C.text2, fontSize: 14, fontFamily: 'DMSans_800ExtraBold', marginLeft: 6 }}>Edit Card</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -858,7 +858,7 @@ export default function CardScreen() {
                   style={[ms.actionBtn, { backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', flex: 1 }]}
                 >
                   <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '800', marginLeft: 6 }}>Remove</Text>
+                  <Text style={{ color: '#EF4444', fontSize: 14, fontFamily: 'DMSans_800ExtraBold', marginLeft: 6 }}>Remove</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -866,7 +866,7 @@ export default function CardScreen() {
             {/* All Cards list */}
             {cards.length > 1 && (
               <View style={{ marginHorizontal: 24 }}>
-                <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
+                <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
                   All Cards
                 </Text>
                 {cards.map((c, i) => {
@@ -886,10 +886,10 @@ export default function CardScreen() {
                         <CardBrandMark type={cType} size="small" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }} numberOfLines={1}>
+                        <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }} numberOfLines={1}>
                           {c.holderName || '—'}
                         </Text>
-                        <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
+                        <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold', marginTop: 1 }}>
                           •••• {(c.number || '').replace(/\s/g, '').slice(-4) || '••••'} · {c.expiry || '—'}
                         </Text>
                       </View>
@@ -909,8 +909,8 @@ export default function CardScreen() {
 function Row({ label, value, C, last }) {
   return (
     <View style={[ms.row, !last && { borderBottomWidth: 1, borderBottomColor: C.border }]}>
-      <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 100 }}>{label}</Text>
-      <Text style={{ color: C.text1, fontSize: 14, fontWeight: '800', flex: 1 }} numberOfLines={1}>{value}</Text>
+      <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold', width: 100 }}>{label}</Text>
+      <Text style={{ color: C.text1, fontSize: 14, fontFamily: 'DMSans_800ExtraBold', flex: 1 }} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
@@ -939,21 +939,21 @@ const cs = StyleSheet.create({
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
   },
   cardNum: {
-    color: '#fff', fontSize: 17, fontWeight: '700',
+    color: '#fff', fontSize: 17, fontFamily: 'DMSans_700Bold',
     letterSpacing: 2.5, marginBottom: 20, fontVariant: ['tabular-nums'],
   },
   cardLabel: {
-    color: 'rgba(255,255,255,0.55)', fontSize: 8, fontWeight: '800',
+    color: 'rgba(255,255,255,0.55)', fontSize: 8, fontFamily: 'DMSans_800ExtraBold',
     letterSpacing: 1.5, marginBottom: 3, textTransform: 'uppercase',
   },
-  cardValue: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  cardValue: { color: '#fff', fontSize: 13, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.5 },
   magStripe: { height: 44, backgroundColor: '#1a1a1a', marginHorizontal: -22, marginTop: -22, marginBottom: 16 },
   sigStripe: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 5, padding: 6 },
 });
 
 const fs = StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 13, borderWidth: 1, paddingHorizontal: 14, minHeight: 52 },
-  input:     { flex: 1, fontSize: 15, fontWeight: '700', paddingVertical: 14 },
+  input:     { flex: 1, fontSize: 15, fontFamily: 'DMSans_700Bold', paddingVertical: 14 },
   eyeBtn:    { padding: 8 },
   saveBtn: {
     alignItems: 'center', backgroundColor: '#7C3AED', borderRadius: 16,

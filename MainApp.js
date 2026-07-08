@@ -217,11 +217,11 @@ const confettiStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: '#111827', borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', padding: 32, alignItems: 'center', marginHorizontal: 32, gap: 8 },
   trophy: { fontSize: 64 },
-  heading: { color: '#F9FAFB', fontSize: 28, fontWeight: '900' },
-  goalName: { color: '#FCD34D', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  heading: { color: '#F9FAFB', fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5 },
+  goalName: { color: '#FCD34D', fontSize: 18, fontFamily: 'DMSans_800ExtraBold', textAlign: 'center' },
   sub: { color: 'rgba(249,250,251,0.5)', fontSize: 14, textAlign: 'center', marginTop: 4 },
   btn: { backgroundColor: '#FCD34D', borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14, marginTop: 16 },
-  btnText: { color: '#000', fontSize: 16, fontWeight: '900' },
+  btnText: { color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' },
 });
 
 // ─── Animated Balance Number ──────────────────────────────────────────────────
@@ -240,7 +240,7 @@ function AnimatedBalance({ value, color, fontSize = 38 }) {
   }, [value]);
 
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(displayed);
-  return <Text style={{ color, fontSize, fontWeight: '900', letterSpacing: -0.5 }}>{formatted}</Text>;
+  return <Text style={{ color, fontSize, fontFamily: 'DMSans_900Black', letterSpacing: -0.5 }}>{formatted}</Text>;
 }
 
 // ─── AppHeader ────────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ function AppHeader({ onSettingsPress }) {
           <Image source={require('./assets/logo.png')} style={{ borderRadius: 12, height: 42, width: 42 }} />
         </View>
         <View>
-          <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900' }}>Thunder Wallet</Text>
+          <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black' }}>Thunder Wallet</Text>
           <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Your money, under control</Text>
         </View>
       </View>
@@ -284,10 +284,10 @@ function GoalCard({ goal, onDelete, C }) {
       </View>
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <Text style={{ color: C.text1, fontSize: 14, fontWeight: '800' }} numberOfLines={1}>{goal.name}</Text>
+          <Text style={{ color: C.text1, fontSize: 14, fontFamily: 'DMSans_800ExtraBold' }} numberOfLines={1}>{goal.name}</Text>
           {isComplete && (
             <View style={{ backgroundColor: `${C.income}20`, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ color: C.income, fontSize: 11, fontWeight: '800' }}>Goal Reached! 🎉</Text>
+              <Text style={{ color: C.income, fontSize: 11, fontFamily: 'DMSans_800ExtraBold' }}>Goal Reached! 🎉</Text>
             </View>
           )}
         </View>
@@ -295,11 +295,11 @@ function GoalCard({ goal, onDelete, C }) {
           <View style={{ backgroundColor: isComplete ? C.income : goal.color, borderRadius: 6, height: 7, width: `${progress}%` }} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '600' }}>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_600SemiBold' }}>
             {compactCurrency.format(Math.min(goal.savedAmount, goal.target))} / {compactCurrency.format(goal.target)} · {Math.round(progress)}%
           </Text>
           {daysLeft !== null && (
-            <Text style={{ color: daysLeft < 7 ? C.expense : C.text3, fontSize: 11, fontWeight: '700' }}>
+            <Text style={{ color: daysLeft < 7 ? C.expense : C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold' }}>
               {daysLeft === 0 ? 'Due today' : `${daysLeft}d left`}
             </Text>
           )}
@@ -348,42 +348,42 @@ function AddGoalModal({ visible, onClose, onAdd }) {
         <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' }} onPress={() => { reset(); onClose(); }} />
         <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20, paddingBottom: 36 }}>
           <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginBottom: 16, width: 40 }} />
-          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Goal</Text>
-          <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 20, marginTop: 2 }}>Add Savings Goal</Text>
+          <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Goal</Text>
+          <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 20, marginTop: 2 }}>Add Savings Goal</Text>
 
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Icon & Color</Text>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Icon & Color</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
             {GOAL_PRESETS.map((p, i) => (
               <TouchableOpacity key={i} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedPreset(i); }} style={{ alignItems: 'center', gap: 4 }}>
                 <View style={{ alignItems: 'center', backgroundColor: selectedPreset === i ? `${p.color}25` : C.cardInner, borderColor: selectedPreset === i ? p.color : C.border, borderRadius: 14, borderWidth: selectedPreset === i ? 2 : 1, height: 52, justifyContent: 'center', width: 52 }}>
                   <Ionicons name={p.icon} size={24} color={selectedPreset === i ? p.color : C.text2} />
                 </View>
-                <Text style={{ color: selectedPreset === i ? p.color : C.text3, fontSize: 10, fontWeight: '700' }}>{p.label}</Text>
+                <Text style={{ color: selectedPreset === i ? p.color : C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold' }}>{p.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Goal Name</Text>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Goal Name</Text>
           <TextInput style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 15, marginBottom: 14, minHeight: 48, paddingHorizontal: 14 }} placeholder="e.g. New iPhone, Goa Trip…" placeholderTextColor={C.text3} value={name} onChangeText={setName} />
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Target Amount</Text>
+              <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Target Amount</Text>
               <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: `${GOAL_PRESETS[selectedPreset].color}40`, borderRadius: 12, borderWidth: 2, flexDirection: 'row', minHeight: 50, paddingHorizontal: 12 }}>
-                <Text style={{ color: GOAL_PRESETS[selectedPreset].color, fontSize: 18, fontWeight: '900', marginRight: 6 }}>₹</Text>
-                <TextInput style={{ color: C.text1, flex: 1, fontSize: 18, fontWeight: '800' }} placeholder="0" placeholderTextColor={C.text3} keyboardType="decimal-pad" value={target} onChangeText={setTarget} />
+                <Text style={{ color: GOAL_PRESETS[selectedPreset].color, fontSize: 18, fontFamily: 'DMSans_900Black', marginRight: 6 }}>₹</Text>
+                <TextInput style={{ color: C.text1, flex: 1, fontSize: 18, fontFamily: 'DMSans_800ExtraBold' }} placeholder="0" placeholderTextColor={C.text3} keyboardType="decimal-pad" value={target} onChangeText={setTarget} />
               </View>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Already Saved</Text>
+              <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Already Saved</Text>
               <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', minHeight: 50, paddingHorizontal: 12 }}>
-                <Text style={{ color: C.text3, fontSize: 18, fontWeight: '900', marginRight: 6 }}>₹</Text>
-                <TextInput style={{ color: C.text1, flex: 1, fontSize: 18, fontWeight: '800' }} placeholder="0" placeholderTextColor={C.text3} keyboardType="decimal-pad" value={savedAmount} onChangeText={setSavedAmount} />
+                <Text style={{ color: C.text3, fontSize: 18, fontFamily: 'DMSans_900Black', marginRight: 6 }}>₹</Text>
+                <TextInput style={{ color: C.text1, flex: 1, fontSize: 18, fontFamily: 'DMSans_800ExtraBold' }} placeholder="0" placeholderTextColor={C.text3} keyboardType="decimal-pad" value={savedAmount} onChangeText={setSavedAmount} />
               </View>
             </View>
           </View>
 
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginTop: 14, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Deadline (optional)</Text>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginTop: 14, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Deadline (optional)</Text>
           <TextInput style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 14, minHeight: 48, paddingHorizontal: 12 }} placeholder="DD/MM/YYYY" placeholderTextColor={C.text3} value={deadline} onChangeText={setDeadline} />
 
           <TouchableOpacity
@@ -391,7 +391,7 @@ function AddGoalModal({ visible, onClose, onAdd }) {
             onPress={handleAdd}
           >
             <Ionicons name="trophy" size={20} color="#000" />
-            <Text style={{ color: '#000', fontSize: 16, fontWeight: '900' }}>Create Goal</Text>
+            <Text style={{ color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' }}>Create Goal</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -425,18 +425,18 @@ function AddSavingsModal({ visible, type, onClose, onSave }) {
         <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' }} onPress={() => { reset(); onClose(); }} />
         <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20, paddingBottom: 36 }}>
           <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginBottom: 16, width: 40 }} />
-          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>
             {isDeposit ? 'Add Savings' : 'Withdraw Savings'}
           </Text>
-          <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 20, marginTop: 2 }}>
+          <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 20, marginTop: 2 }}>
             {isDeposit ? 'Deposit to Savings' : 'Withdraw from Savings'}
           </Text>
 
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Amount</Text>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Amount</Text>
           <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: `${accentColor}50`, borderRadius: 14, borderWidth: 2, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14, marginBottom: 14 }}>
-            <Text style={{ color: accentColor, fontSize: 22, fontWeight: '900', marginRight: 8 }}>₹</Text>
+            <Text style={{ color: accentColor, fontSize: 22, fontFamily: 'DMSans_900Black', marginRight: 8 }}>₹</Text>
             <TextInput
-              style={{ color: C.text1, flex: 1, fontSize: 22, fontWeight: '800' }}
+              style={{ color: C.text1, flex: 1, fontSize: 22, fontFamily: 'DMSans_800ExtraBold' }}
               placeholder="0"
               placeholderTextColor={C.text3}
               keyboardType="decimal-pad"
@@ -446,7 +446,7 @@ function AddSavingsModal({ visible, type, onClose, onSave }) {
             />
           </View>
 
-          <Text style={{ color: C.text2, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Note (optional)</Text>
+          <Text style={{ color: C.text2, fontSize: 11, fontFamily: 'DMSans_700Bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Note (optional)</Text>
           <TextInput
             style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 12, borderWidth: 1, color: C.text1, fontSize: 15, minHeight: 48, paddingHorizontal: 14, marginBottom: 20 }}
             placeholder={isDeposit ? 'e.g. Monthly savings, bonus…' : 'e.g. Emergency, purchase…'}
@@ -460,7 +460,7 @@ function AddSavingsModal({ visible, type, onClose, onSave }) {
             onPress={handleSave}
           >
             <Ionicons name={isDeposit ? 'arrow-down-circle' : 'arrow-up-circle'} size={20} color="#000" />
-            <Text style={{ color: '#000', fontSize: 16, fontWeight: '900' }}>
+            <Text style={{ color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' }}>
               {isDeposit ? 'Add to Savings' : 'Withdraw'}
             </Text>
           </TouchableOpacity>
@@ -493,18 +493,18 @@ function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
         <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' }} onPress={onClose} />
         <View style={{ backgroundColor: C.card, borderTopColor: C.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, padding: 20, paddingBottom: 36, maxHeight: '85%' }}>
           <View style={{ alignSelf: 'center', backgroundColor: C.border, borderRadius: 3, height: 4, marginBottom: 16, width: 40 }} />
-          <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Budgets</Text>
-          <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginBottom: 4, marginTop: 2 }}>Category Limits</Text>
+          <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Budgets</Text>
+          <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 4, marginTop: 2 }}>Category Limits</Text>
           <Text style={{ color: C.text2, fontSize: 13, marginBottom: 20 }}>Set monthly limits per category. Leave blank for no limit.</Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {BUDGET_CATEGORIES.map((cat) => (
               <View key={cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <Text style={{ color: C.text1, fontSize: 14, fontWeight: '700', width: 100 }}>{cat}</Text>
+                <Text style={{ color: C.text1, fontSize: 14, fontFamily: 'DMSans_700Bold', width: 100 }}>{cat}</Text>
                 <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, flex: 1, flexDirection: 'row', minHeight: 44, paddingHorizontal: 10 }}>
-                  <Text style={{ color: C.text3, fontSize: 16, fontWeight: '800', marginRight: 4 }}>₹</Text>
+                  <Text style={{ color: C.text3, fontSize: 16, fontFamily: 'DMSans_800ExtraBold', marginRight: 4 }}>₹</Text>
                   <TextInput
-                    style={{ color: C.text1, flex: 1, fontSize: 16, fontWeight: '700' }}
+                    style={{ color: C.text1, flex: 1, fontSize: 16, fontFamily: 'DMSans_700Bold' }}
                     placeholder="No limit"
                     placeholderTextColor={C.text3}
                     keyboardType="decimal-pad"
@@ -517,7 +517,7 @@ function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
           </ScrollView>
 
           <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.accent, borderRadius: 14, minHeight: 52, justifyContent: 'center', marginTop: 16 }} onPress={handleSave}>
-            <Text style={{ color: C.isDark ? '#000' : '#fff', fontSize: 16, fontWeight: '900' }}>Save Limits</Text>
+            <Text style={{ color: C.isDark ? '#000' : '#fff', fontSize: 16, fontFamily: 'DMSans_900Black' }}>Save Limits</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -595,7 +595,7 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <Ionicons name="flash" size={14} color="#A78BFA" />
-          <Text style={{ color: card.brandText, fontSize: 14, fontWeight: '800', letterSpacing: 0.2 }}>
+          <Text style={{ color: card.brandText, fontSize: 14, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.2 }}>
             Thunder Wallet
           </Text>
         </View>
@@ -605,7 +605,7 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
           borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4,
         }}>
           <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: statusColor }} />
-          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '800' }}>
+          <Text style={{ color: statusColor, fontSize: 10, fontFamily: 'DMSans_800ExtraBold' }}>
             {isHealthy ? 'Healthy' : 'Overspent'}
           </Text>
         </View>
@@ -614,7 +614,7 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
       {/* ── Row 2: balance (hero) ── */}
       <View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <Text style={{ color: card.labelText, fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' }}>
+          <Text style={{ color: card.labelText, fontSize: 9, fontFamily: 'DMSans_700Bold', letterSpacing: 1.4, textTransform: 'uppercase' }}>
             Current Balance
           </Text>
           {onToggleVisible && (
@@ -625,7 +625,7 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
         </View>
         {visible
           ? <AnimatedBalance value={stats.balance} color="#FFFFFF" fontSize={36} />
-          : <Text style={{ color: '#FFFFFF', fontSize: 36, fontWeight: '900', letterSpacing: 1 }}>••••••</Text>
+          : <Text style={{ color: '#FFFFFF', fontSize: 36, fontFamily: 'DMSans_900Black', letterSpacing: 1 }}>••••••</Text>
         }
       </View>
 
@@ -648,8 +648,8 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
 
         {/* income */}
         <View style={{ flex: 1 }}>
-          <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Income</Text>
-          <Text style={{ color: '#34D399', fontSize: 13, fontWeight: '900' }}>{visible ? compactCurrency.format(stats.income) : '••••'}</Text>
+          <Text style={{ color: card.subText, fontSize: 9, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Income</Text>
+          <Text style={{ color: '#34D399', fontSize: 13, fontFamily: 'DMSans_900Black' }}>{visible ? compactCurrency.format(stats.income) : '••••'}</Text>
         </View>
 
         {/* separator */}
@@ -657,8 +657,8 @@ function CreditBalanceCard({ stats, visible, onToggleVisible }) {
 
         {/* expenses */}
         <View style={{ flex: 1 }}>
-          <Text style={{ color: card.subText, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Expenses</Text>
-          <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '900' }}>{visible ? compactCurrency.format(stats.expense) : '••••'}</Text>
+          <Text style={{ color: card.subText, fontSize: 9, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Expenses</Text>
+          <Text style={{ color: '#F87171', fontSize: 13, fontFamily: 'DMSans_900Black' }}>{visible ? compactCurrency.format(stats.expense) : '••••'}</Text>
         </View>
       </View>
 
@@ -709,11 +709,11 @@ function DashboardScreen({ wallet }) {
                 strokeDasharray={`${(healthScore / 100) * 119.4} 119.4`}
                 strokeLinecap="round" rotation="-90" origin="23,23" />
             </Svg>
-            <Text style={{ position: 'absolute', color: scoreColor, fontSize: 11, fontWeight: '900' }}>{healthScore}</Text>
+            <Text style={{ position: 'absolute', color: scoreColor, fontSize: 11, fontFamily: 'DMSans_900Black' }}>{healthScore}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text2, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Financial Health</Text>
-            <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginBottom: 5 }}>{scoreLabel}</Text>
+            <Text style={{ color: C.text2, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>Financial Health</Text>
+            <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black', marginBottom: 5 }}>{scoreLabel}</Text>
             <View style={{ backgroundColor: C.cardInner, borderRadius: 3, height: 4, overflow: 'hidden' }}>
               <View style={{ borderRadius: 3, height: 4, width: `${healthScore}%`, backgroundColor: scoreColor }} />
             </View>
@@ -729,14 +729,14 @@ function DashboardScreen({ wallet }) {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}
           >
             <Ionicons name="add-circle" size={18} color={C.income} />
-            <Text style={{ color: C.income, fontSize: 13, fontWeight: '900' }}>Income</Text>
+            <Text style={{ color: C.income, fontSize: 13, fontFamily: 'DMSans_900Black' }}>Income</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.expenseBg, borderColor: `${C.expense}30`, borderRadius: 14, borderWidth: 1, paddingVertical: 14 }}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}
           >
             <Ionicons name="remove-circle" size={18} color={C.expense} />
-            <Text style={{ color: C.expense, fontSize: 13, fontWeight: '900' }}>Expense</Text>
+            <Text style={{ color: C.expense, fontSize: 13, fontFamily: 'DMSans_900Black' }}>Expense</Text>
           </TouchableOpacity>
         </View>
 
@@ -746,12 +746,12 @@ function DashboardScreen({ wallet }) {
           <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 14, borderWidth: 1, marginTop: 14, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 }}>Monthly Budget</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.8 }}>Monthly Budget</Text>
                 {editingBudget && balanceVisible ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <Text style={{ color: C.accent, fontSize: 22, fontWeight: '900' }}>₹</Text>
+                    <Text style={{ color: C.accent, fontSize: 22, fontFamily: 'DMSans_900Black' }}>₹</Text>
                     <TextInput
-                      style={{ color: C.text1, fontSize: 22, fontWeight: '900', flex: 1 }}
+                      style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', flex: 1 }}
                       value={budgetInput}
                       onChangeText={setBudgetInput}
                       keyboardType="number-pad"
@@ -768,7 +768,7 @@ function DashboardScreen({ wallet }) {
                       setEditingBudget(true);
                     }}
                   >
-                    <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>{balanceVisible ? currency.format(monthlyBudget) : '••••••'}</Text>
+                    <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginTop: 2 }}>{balanceVisible ? currency.format(monthlyBudget) : '••••••'}</Text>
                     {balanceVisible && <Text style={{ color: C.text3, fontSize: 10, marginTop: 2 }}>Tap to edit</Text>}
                   </TouchableOpacity>
                 )}
@@ -778,10 +778,10 @@ function DashboardScreen({ wallet }) {
                 onPress={openCategoryBudgetModal}
               >
                 <Ionicons name="options" size={14} color={C.accent} />
-                <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>By Category</Text>
+                <Text style={{ color: C.accent, fontSize: 11, fontFamily: 'DMSans_800ExtraBold' }}>By Category</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ color: balanceVisible ? (stats.remainingBudget >= 0 ? C.income : C.expense) : C.text3, fontSize: 13, fontWeight: '800', marginTop: 10 }}>
+            <Text style={{ color: balanceVisible ? (stats.remainingBudget >= 0 ? C.income : C.expense) : C.text3, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', marginTop: 10 }}>
               {balanceVisible
                 ? (stats.remainingBudget >= 0 ? `${currency.format(stats.remainingBudget)} remaining` : `${currency.format(Math.abs(stats.remainingBudget))} over budget`)
                 : '•••• remaining'}
@@ -794,7 +794,7 @@ function DashboardScreen({ wallet }) {
                 <Ionicons name={insight.icon} size={15} color={C.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{insight.title}</Text>
+                <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{insight.title}</Text>
                 <Text style={{ color: C.text2, fontSize: 12, lineHeight: 17, marginTop: 2 }}>{insight.body}</Text>
               </View>
             </View>
@@ -804,7 +804,7 @@ function DashboardScreen({ wallet }) {
         {/* Category Budget Progress */}
         {Object.keys(categoryBudgets).length > 0 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-            <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginBottom: 14 }}>Category Limits</Text>
+            <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black', marginBottom: 14 }}>Category Limits</Text>
             {Object.entries(categoryBudgets).filter(([, limit]) => limit > 0).map(([cat, limit]) => {
               const spent = stats.categorySpend?.[cat] || 0;
               const pct = Math.min((spent / limit) * 100, 100);
@@ -812,8 +812,8 @@ function DashboardScreen({ wallet }) {
               return (
                 <View key={cat} style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{cat}</Text>
-                    <Text style={{ color: over ? C.expense : C.text2, fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{cat}</Text>
+                    <Text style={{ color: over ? C.expense : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>
                       {compactCurrency.format(spent)} / {compactCurrency.format(limit)}
                     </Text>
                   </View>
@@ -830,12 +830,12 @@ function DashboardScreen({ wallet }) {
         <View style={{ marginTop: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Savings</Text>
-              <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>Goals</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Savings</Text>
+              <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginTop: 2 }}>Goals</Text>
             </View>
             <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10 }} onPress={openGoalModal}>
               <Ionicons name="add" size={16} color={C.accent} />
-              <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>New Goal</Text>
+              <Text style={{ color: C.accent, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>New Goal</Text>
             </TouchableOpacity>
           </View>
           {goals.length === 0 ? (
@@ -843,7 +843,7 @@ function DashboardScreen({ wallet }) {
               <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 24, height: 56, justifyContent: 'center', marginBottom: 12, width: 56 }}>
                 <Ionicons name="trophy-outline" size={26} color={C.text3} />
               </View>
-              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '800' }}>Set your first goal</Text>
+              <Text style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold' }}>Set your first goal</Text>
               <Text style={{ color: C.text2, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Saving for a phone, trip, or dream? Track it here.</Text>
             </TouchableOpacity>
           ) : (
@@ -851,7 +851,7 @@ function DashboardScreen({ wallet }) {
               {goals.map((g) => <GoalCard key={g.id} goal={g} onDelete={wallet.deleteGoal} C={C} />)}
               <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.card, borderColor: C.border, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', paddingVertical: 14 }} onPress={openGoalModal}>
                 <Ionicons name="add-circle-outline" size={18} color={C.text3} />
-                <Text style={{ color: C.text3, fontSize: 13, fontWeight: '700' }}>Add another goal</Text>
+                <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Add another goal</Text>
               </TouchableOpacity>
             </>
           )}
@@ -867,8 +867,8 @@ function DashboardScreen({ wallet }) {
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <View>
-                  <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Piggy Bank</Text>
-                  <Text style={{ color: C.text1, fontSize: 22, fontWeight: '900', marginTop: 2 }}>Savings</Text>
+                  <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Piggy Bank</Text>
+                  <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginTop: 2 }}>Savings</Text>
                 </View>
                 {/* action buttons */}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -877,14 +877,14 @@ function DashboardScreen({ wallet }) {
                     onPress={() => openSavingsModal('withdrawal')}
                   >
                     <Ionicons name="arrow-up" size={13} color="#F87171" />
-                    <Text style={{ color: '#F87171', fontSize: 12, fontWeight: '800' }}>Withdraw</Text>
+                    <Text style={{ color: '#F87171', fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>Withdraw</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{ alignItems: 'center', backgroundColor: 'rgba(52,211,153,0.12)', borderColor: 'rgba(52,211,153,0.3)', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 12, paddingVertical: 8 }}
                     onPress={() => openSavingsModal('deposit')}
                   >
                     <Ionicons name="arrow-down" size={13} color="#34D399" />
-                    <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '800' }}>Deposit</Text>
+                    <Text style={{ color: '#34D399', fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>Deposit</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -893,8 +893,8 @@ function DashboardScreen({ wallet }) {
               <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View>
-                    <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Total Saved</Text>
-                    <Text style={{ color: total >= 0 ? '#34D399' : '#F87171', fontSize: 30, fontWeight: '900' }}>
+                    <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Total Saved</Text>
+                    <Text style={{ color: total >= 0 ? '#34D399' : '#F87171', fontSize: 30, fontFamily: 'DMSans_900Black', letterSpacing: -0.5 }}>
                       {currency.format(Math.abs(total))}
                     </Text>
                     {total < 0 && <Text style={{ color: '#F87171', fontSize: 11, marginTop: 2 }}>Withdrawals exceed deposits</Text>}
@@ -908,15 +908,15 @@ function DashboardScreen({ wallet }) {
                 {savings.length > 0 && (
                   <View style={{ flexDirection: 'row', gap: 12, marginTop: 14, paddingTop: 14, borderTopColor: C.border, borderTopWidth: 1 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Deposited</Text>
-                      <Text style={{ color: '#34D399', fontSize: 15, fontWeight: '900', marginTop: 2 }}>
+                      <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Deposited</Text>
+                      <Text style={{ color: '#34D399', fontSize: 15, fontFamily: 'DMSans_900Black', marginTop: 2 }}>
                         {compactCurrency.format(savings.filter((e) => e.type === 'deposit').reduce((s, e) => s + e.amount, 0))}
                       </Text>
                     </View>
                     <View style={{ width: 1, backgroundColor: C.border }} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Withdrawn</Text>
-                      <Text style={{ color: '#F87171', fontSize: 15, fontWeight: '900', marginTop: 2 }}>
+                      <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Withdrawn</Text>
+                      <Text style={{ color: '#F87171', fontSize: 15, fontFamily: 'DMSans_900Black', marginTop: 2 }}>
                         {compactCurrency.format(savings.filter((e) => e.type === 'withdrawal').reduce((s, e) => s + e.amount, 0))}
                       </Text>
                     </View>
@@ -932,10 +932,10 @@ function DashboardScreen({ wallet }) {
                       <Ionicons name={entry.type === 'deposit' ? 'arrow-down-circle' : 'arrow-up-circle'} size={20} color={entry.type === 'deposit' ? '#34D399' : '#F87171'} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{entry.note || (entry.type === 'deposit' ? 'Deposit' : 'Withdrawal')}</Text>
+                      <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{entry.note || (entry.type === 'deposit' ? 'Deposit' : 'Withdrawal')}</Text>
                       <Text style={{ color: C.text3, fontSize: 11, marginTop: 2 }}>{new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                     </View>
-                    <Text style={{ color: entry.type === 'deposit' ? '#34D399' : '#F87171', fontSize: 14, fontWeight: '900' }}>
+                    <Text style={{ color: entry.type === 'deposit' ? '#34D399' : '#F87171', fontSize: 14, fontFamily: 'DMSans_900Black' }}>
                       {entry.type === 'deposit' ? '+' : '-'}{compactCurrency.format(entry.amount)}
                     </Text>
                   </View>
@@ -948,7 +948,7 @@ function DashboardScreen({ wallet }) {
                   <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 20, height: 48, justifyContent: 'center', marginBottom: 10, width: 48 }}>
                     <Ionicons name="wallet-outline" size={22} color={C.text3} />
                   </View>
-                  <Text style={{ color: C.text1, fontSize: 15, fontWeight: '800' }}>Start saving today</Text>
+                  <Text style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold' }}>Start saving today</Text>
                   <Text style={{ color: C.text2, fontSize: 13, marginTop: 4 }}>Tap to make your first deposit.</Text>
                 </TouchableOpacity>
               )}
@@ -1063,8 +1063,8 @@ function AnalyticsScreen({ wallet }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
-            <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Analytics</Text>
-            <Text style={{ color: C.text1, fontSize: 28, fontWeight: '900', marginTop: 2 }}>Spending Map</Text>
+            <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Analytics</Text>
+            <Text style={{ color: C.text1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 2 }}>Spending Map</Text>
           </View>
           <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 20, height: 42, justifyContent: 'center', width: 42 }}>
             <Ionicons name="pie-chart" size={20} color={C.purple} />
@@ -1082,8 +1082,8 @@ function AnalyticsScreen({ wallet }) {
               <View style={{ alignItems: 'center', backgroundColor: s.bg, borderRadius: 9, height: 28, justifyContent: 'center', marginBottom: 8, width: 28 }}>
                 <Ionicons name={s.icon} size={14} color={s.color} />
               </View>
-              <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</Text>
-              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '900', marginTop: 3 }} numberOfLines={1}>{s.value}</Text>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</Text>
+              <Text style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_900Black', marginTop: 3 }} numberOfLines={1}>{s.value}</Text>
             </View>
           ))}
         </View>
@@ -1094,8 +1094,8 @@ function AnalyticsScreen({ wallet }) {
             <InteractiveDonutChart data={pieData} total={stats.expense} selectedSegment={selectedSegment} onSelectSegment={setSelectedSegment} C={C} />
             {selectedSegment === null && (
               <View style={{ position: 'absolute', alignItems: 'center' }}>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Spent</Text>
-                <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900', marginTop: 2 }}>{compactCurrency.format(stats.expense)}</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Spent</Text>
+                <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black', marginTop: 2 }}>{compactCurrency.format(stats.expense)}</Text>
                 {hasPieData && <Text style={{ color: C.text3, fontSize: 10, marginTop: 5 }}>Tap a slice</Text>}
               </View>
             )}
@@ -1105,11 +1105,11 @@ function AnalyticsScreen({ wallet }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.cardInner, borderColor: `${pieData[selectedSegment].color}45`, borderLeftColor: pieData[selectedSegment].color, borderLeftWidth: 3, borderRadius: 14, borderWidth: 1, marginTop: 4, padding: 16 }}>
               <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: pieData[selectedSegment].color, marginRight: 12 }} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>{pieData[selectedSegment].category}</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{pieData[selectedSegment].category}</Text>
                 <Text style={{ color: C.text2, fontSize: 12, marginTop: 3 }}>{Math.round(pieData[selectedSegment].percentage)}% of total spending</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: pieData[selectedSegment].color, fontSize: 18, fontWeight: '900' }}>{currency.format(pieData[selectedSegment].amount)}</Text>
+                <Text style={{ color: pieData[selectedSegment].color, fontSize: 18, fontFamily: 'DMSans_900Black' }}>{currency.format(pieData[selectedSegment].amount)}</Text>
                 <TouchableOpacity onPress={() => setSelectedSegment(null)} style={{ marginTop: 4 }}>
                   <Text style={{ color: C.text3, fontSize: 11 }}>✕ close</Text>
                 </TouchableOpacity>
@@ -1122,9 +1122,9 @@ function AnalyticsScreen({ wallet }) {
               {pieData.map((item, i) => (
                 <TouchableOpacity key={item.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedSegment(selectedSegment === i ? null : i); }}>
                   <View style={{ borderRadius: 5, height: 10, width: 10, backgroundColor: item.color, opacity: selectedSegment === i ? 1 : 0.7 }} />
-                  <Text style={{ color: selectedSegment === i ? C.text1 : C.text2, flex: 1, fontSize: 14, fontWeight: selectedSegment === i ? '800' : '600' }} numberOfLines={1}>{item.category}</Text>
-                  <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600', minWidth: 32, textAlign: 'right' }}>{Math.round(item.percentage)}%</Text>
-                  <Text style={{ color: item.color, fontSize: 13, fontWeight: '800', minWidth: 52, textAlign: 'right' }}>{compactCurrency.format(item.amount)}</Text>
+                  <Text style={{ color: selectedSegment === i ? C.text1 : C.text2, flex: 1, fontSize: 14, fontFamily: selectedSegment === i ? 'DMSans_800ExtraBold' : 'DMSans_600SemiBold' }} numberOfLines={1}>{item.category}</Text>
+                  <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_600SemiBold', minWidth: 32, textAlign: 'right' }}>{Math.round(item.percentage)}%</Text>
+                  <Text style={{ color: item.color, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', minWidth: 52, textAlign: 'right' }}>{compactCurrency.format(item.amount)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1141,14 +1141,14 @@ function AnalyticsScreen({ wallet }) {
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: simulateMode ? 14 : 0 }}>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Simulator</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900', marginTop: 2 }}>What If…</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Simulator</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black', marginTop: 2 }}>What If…</Text>
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: simulateMode ? C.accentBg : C.cardInner, borderColor: simulateMode ? C.accentBorder : C.border, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 }}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSimulateMode((v) => !v); setSimOverrides({}); }}
               >
-                <Text style={{ color: simulateMode ? C.accent : C.text2, fontSize: 12, fontWeight: '800' }}>{simulateMode ? 'Reset' : 'Simulate'}</Text>
+                <Text style={{ color: simulateMode ? C.accent : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{simulateMode ? 'Reset' : 'Simulate'}</Text>
               </TouchableOpacity>
             </View>
             {simulateMode && (
@@ -1160,8 +1160,8 @@ function AnalyticsScreen({ wallet }) {
                   return (
                     <View key={item.category} style={{ marginBottom: 14 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{item.category}</Text>
-                        <Text style={{ color: diff > 0 ? C.income : C.text2, fontSize: 12, fontWeight: '800' }}>
+                        <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{item.category}</Text>
+                        <Text style={{ color: diff > 0 ? C.income : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>
                           {compactCurrency.format(override)} {diff > 0 ? `(save ${compactCurrency.format(diff)})` : ''}
                         </Text>
                       </View>
@@ -1181,7 +1181,7 @@ function AnalyticsScreen({ wallet }) {
                 })}
                 {simSavings !== null && simSavings > 0 && (
                   <View style={{ backgroundColor: C.incomeBg, borderColor: `${C.income}30`, borderRadius: 12, borderWidth: 1, padding: 14, marginTop: 4 }}>
-                    <Text style={{ color: C.income, fontSize: 16, fontWeight: '900' }}>Save {currency.format(simSavings)}/month</Text>
+                    <Text style={{ color: C.income, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Save {currency.format(simSavings)}/month</Text>
                     <Text style={{ color: C.text2, fontSize: 12, marginTop: 4 }}>That's {currency.format(simSavings * 12)} per year with this plan.</Text>
                   </View>
                 )}
@@ -1198,8 +1198,8 @@ function AnalyticsScreen({ wallet }) {
                 <Text style={{ fontSize: 16 }}>🧠</Text>
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Smart Insights</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Smart Insights</Text>
               </View>
             </View>
             {smartInsights.map((ins, i) => (
@@ -1208,7 +1208,7 @@ function AnalyticsScreen({ wallet }) {
                   <Ionicons name={ins.icon} size={16} color={ins.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{ins.title}</Text>
+                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{ins.title}</Text>
                   <Text style={{ color: C.text2, fontSize: 12, lineHeight: 18, marginTop: 3 }}>{ins.body}</Text>
                 </View>
               </View>
@@ -1218,14 +1218,14 @@ function AnalyticsScreen({ wallet }) {
 
         {/* Income vs Expense */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-          <Text style={{ color: C.text1, fontSize: 17, fontWeight: '900', marginBottom: 14 }}>Income vs Expense</Text>
+          <Text style={{ color: C.text1, fontSize: 17, fontFamily: 'DMSans_900Black', marginBottom: 14 }}>Income vs Expense</Text>
           {[{ label: 'Income', amount: stats.monthIncome, color: C.income }, { label: 'Expense', amount: stats.monthExpense, color: C.expense }].map((bar) => {
             const max = Math.max(stats.monthIncome, stats.monthExpense, 1);
             return (
               <View key={bar.label} style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{bar.label}</Text>
-                  <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{compactCurrency.format(bar.amount)}</Text>
+                  <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{bar.label}</Text>
+                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(bar.amount)}</Text>
                 </View>
                 <View style={{ backgroundColor: C.cardInner, borderRadius: 6, height: 10, overflow: 'hidden' }}>
                   <View style={{ backgroundColor: bar.color, borderRadius: 6, height: 10, width: `${Math.max((bar.amount / max) * 100, bar.amount ? 4 : 0)}%` }} />
@@ -1243,16 +1243,16 @@ function AnalyticsScreen({ wallet }) {
                 <Ionicons name="swap-horizontal" size={16} color={C.blue} />
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Comparison</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>{monthComparison.curMonthLabel} vs {monthComparison.prevMonthLabel}</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Comparison</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{monthComparison.curMonthLabel} vs {monthComparison.prevMonthLabel}</Text>
               </View>
             </View>
             {/* Column headers */}
             <View style={{ flexDirection: 'row', marginBottom: 10 }}>
               <View style={{ flex: 1 }} />
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 74, textAlign: 'right' }}>{monthComparison.prevMonthLabel}</Text>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 74, textAlign: 'right' }}>{monthComparison.curMonthLabel}</Text>
-              <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', width: 48, textAlign: 'right' }}>Δ</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold', width: 74, textAlign: 'right' }}>{monthComparison.prevMonthLabel}</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold', width: 74, textAlign: 'right' }}>{monthComparison.curMonthLabel}</Text>
+              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold', width: 48, textAlign: 'right' }}>Δ</Text>
             </View>
             {[
               { label: 'Income', cur: monthComparison.curIncome, prev: monthComparison.prevIncome, change: monthComparison.incomeChange, positiveIsGood: true, color: C.income },
@@ -1266,11 +1266,11 @@ function AnalyticsScreen({ wallet }) {
                 <View key={row.label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
                   <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ backgroundColor: `${row.color}18`, borderRadius: 6, height: 8, width: 8 }} />
-                    <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>{row.label}</Text>
+                    <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_600SemiBold' }}>{row.label}</Text>
                   </View>
-                  <Text style={{ color: C.text3, fontSize: 13, fontWeight: '600', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.prev))}</Text>
-                  <Text style={{ color: row.color, fontSize: 13, fontWeight: '800', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.cur))}</Text>
-                  <Text style={{ color: changeColor, fontSize: 12, fontWeight: '800', width: 48, textAlign: 'right' }}>
+                  <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_600SemiBold', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.prev))}</Text>
+                  <Text style={{ color: row.color, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', width: 74, textAlign: 'right' }}>{compactCurrency.format(Math.abs(row.cur))}</Text>
+                  <Text style={{ color: changeColor, fontSize: 12, fontFamily: 'DMSans_800ExtraBold', width: 48, textAlign: 'right' }}>
                     {row.change === null ? '—' : `${changePrefix}${row.change}%`}
                   </Text>
                 </View>
@@ -1287,8 +1287,8 @@ function AnalyticsScreen({ wallet }) {
                 <Ionicons name="calendar" size={15} color={C.purple} />
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Spending by Weekday</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Spending by Weekday</Text>
               </View>
             </View>
             <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 6, height: 90 }}>
@@ -1303,13 +1303,13 @@ function AnalyticsScreen({ wallet }) {
                       width: '100%',
                     }} />
                   </View>
-                  <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 10, fontWeight: day.isPeak ? '900' : '600', marginTop: 6 }}>{day.label}</Text>
+                  <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 10, fontFamily: day.isPeak ? 'DMSans_900Black' : 'DMSans_600SemiBold', marginTop: 6 }}>{day.label}</Text>
                 </View>
               ))}
             </View>
             <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderColor: `${C.purple}30`, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 14, padding: 10 }}>
               <Ionicons name="alert-circle" size={14} color={C.purple} />
-              <Text style={{ color: C.purple, fontSize: 12, fontWeight: '700', flex: 1 }}>
+              <Text style={{ color: C.purple, fontSize: 12, fontFamily: 'DMSans_700Bold', flex: 1 }}>
                 {dowData.find((d) => d.isPeak)?.label}s are your highest-spend day
               </Text>
             </View>
@@ -1324,20 +1324,20 @@ function AnalyticsScreen({ wallet }) {
                 <Ionicons name="arrow-up-circle" size={16} color={C.expense} />
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Biggest Expenses</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Biggest Expenses</Text>
               </View>
             </View>
             {topExpenses.map((t, i) => (
               <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
                 <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 10, height: 34, justifyContent: 'center', width: 34 }}>
-                  <Text style={{ color: C.text3, fontSize: 13, fontWeight: '800' }}>#{i + 1}</Text>
+                  <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>#{i + 1}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }} numberOfLines={1}>{t.note || t.category}</Text>
+                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }} numberOfLines={1}>{t.note || t.category}</Text>
                   <Text style={{ color: C.text3, fontSize: 11, marginTop: 1 }}>{t.category} · {new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
                 </View>
-                <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>{currency.format(Math.abs(t.amount))}</Text>
+                <Text style={{ color: C.expense, fontSize: 14, fontFamily: 'DMSans_900Black' }}>{currency.format(Math.abs(t.amount))}</Text>
               </View>
             ))}
           </View>
@@ -1351,8 +1351,8 @@ function AnalyticsScreen({ wallet }) {
                 <Ionicons name="options" size={15} color={C.amber} />
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
-                <Text style={{ color: C.text1, fontSize: 16, fontWeight: '900' }}>Budget vs Actual</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Budget vs Actual</Text>
               </View>
             </View>
             {catBudgetRows.map((row, i) => {
@@ -1362,14 +1362,14 @@ function AnalyticsScreen({ wallet }) {
               return (
                 <View key={row.cat} style={{ paddingVertical: 10, borderTopColor: C.border, borderTopWidth: i === 0 ? 0 : 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text style={{ color: C.text1, fontSize: 13, fontWeight: '700' }}>{row.cat}</Text>
+                    <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{row.cat}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       {over && (
                         <View style={{ backgroundColor: C.expenseBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                          <Text style={{ color: C.expense, fontSize: 10, fontWeight: '800' }}>OVER</Text>
+                          <Text style={{ color: C.expense, fontSize: 10, fontFamily: 'DMSans_800ExtraBold' }}>OVER</Text>
                         </View>
                       )}
-                      <Text style={{ color: barColor, fontSize: 13, fontWeight: '800' }}>{compactCurrency.format(row.spent)}</Text>
+                      <Text style={{ color: barColor, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(row.spent)}</Text>
                       <Text style={{ color: C.text3, fontSize: 12 }}>/ {compactCurrency.format(row.budget)}</Text>
                     </View>
                   </View>
@@ -1385,12 +1385,12 @@ function AnalyticsScreen({ wallet }) {
         {/* Monthly History */}
         {monthlyBreakdown.length > 1 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-            <Text style={{ color: C.text1, fontSize: 17, fontWeight: '900', marginBottom: 14 }}>Monthly History</Text>
+            <Text style={{ color: C.text1, fontSize: 17, fontFamily: 'DMSans_900Black', marginBottom: 14 }}>Monthly History</Text>
             {monthlyBreakdown.map((m) => (
               <View key={m.key} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{m.label}</Text>
-                  <Text style={{ color: C.text1, fontSize: 13, fontWeight: '800' }}>{compactCurrency.format(m.total)}</Text>
+                  <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{m.label}</Text>
+                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(m.total)}</Text>
                 </View>
                 <View style={{ backgroundColor: C.cardInner, borderRadius: 6, height: 8, overflow: 'hidden' }}>
                   <View style={{ backgroundColor: C.blue, borderRadius: 6, height: 8, width: `${Math.max((m.total / maxMonthSpend) * 100, 3)}%` }} />
@@ -1415,8 +1415,8 @@ function ActivityScreen({ wallet }) {
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
-            <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>Activity</Text>
-            <Text style={{ color: C.text1, fontSize: 28, fontWeight: '900', marginTop: 2 }}>All Entries</Text>
+            <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Activity</Text>
+            <Text style={{ color: C.text1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 2 }}>All Entries</Text>
           </View>
           <View style={{ alignItems: 'center', backgroundColor: C.amberBg, borderRadius: 20, height: 42, justifyContent: 'center', width: 42 }}>
             <Ionicons name="receipt" size={20} color={C.amber} />
@@ -1425,11 +1425,11 @@ function ActivityScreen({ wallet }) {
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
           <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.expenseBg, borderColor: `${C.expense}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('expense'); }}>
             <Ionicons name="remove-circle" size={20} color={C.expense} />
-            <Text style={{ color: C.expense, fontSize: 14, fontWeight: '900' }}>Expense</Text>
+            <Text style={{ color: C.expense, fontSize: 14, fontFamily: 'DMSans_900Black' }}>Expense</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.incomeBg, borderColor: `${C.income}35`, borderRadius: 14, borderWidth: 1, minHeight: 52 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openTransactionModal('income'); }}>
             <Ionicons name="add-circle" size={20} color={C.income} />
-            <Text style={{ color: C.income, fontSize: 14, fontWeight: '900' }}>Income</Text>
+            <Text style={{ color: C.income, fontSize: 14, fontFamily: 'DMSans_900Black' }}>Income</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ alignItems: 'center', backgroundColor: C.expenseBg, borderColor: `${C.expense}30`, borderRadius: 14, borderWidth: 1, justifyContent: 'center', width: 52 }} onPress={clearTransactions}>
             <Ionicons name="trash-outline" size={19} color={C.expense} />
@@ -1554,7 +1554,7 @@ function CustomTabBar({ state, navigation }) {
           <Text style={{
             color: focused ? TAB_ACTIVE_FG : TAB_INACTIVE,
             fontSize: 9,
-            fontWeight: '700',
+            fontFamily: 'DMSans_700Bold',
             letterSpacing: 0.6,
           }}>
             {cfg.label}
@@ -1639,7 +1639,7 @@ function CustomTabBar({ state, navigation }) {
         <Text style={{
           color: isCardsActive ? TAB_ACTIVE_FG : TAB_INACTIVE,
           fontSize: 9,
-          fontWeight: '700',
+          fontFamily: 'DMSans_700Bold',
           letterSpacing: 0.6,
           marginTop: 4,
         }}>

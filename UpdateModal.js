@@ -123,7 +123,7 @@ export default function UpdateModal({ visible, latestVersion, downloadUrl, onDis
             <Text style={{
               color: C.text1,
               fontSize: 22,
-              fontWeight: '900',
+              fontFamily: 'DMSans_900Black',
               textAlign: 'center',
               letterSpacing: -0.4,
               marginBottom: 6,
@@ -139,7 +139,7 @@ export default function UpdateModal({ visible, latestVersion, downloadUrl, onDis
               marginBottom: 28,
             }}>
               {currentVersion ? `v${currentVersion} → ` : ''}
-              <Text style={{ color: '#60A5FA', fontWeight: '700' }}>v{remoteClean}</Text>
+              <Text style={{ color: '#60A5FA', fontFamily: 'DMSans_700Bold' }}>v{remoteClean}</Text>
               {'  ·  Thunder Wallet'}
             </Text>
 
@@ -159,14 +159,14 @@ export default function UpdateModal({ visible, latestVersion, downloadUrl, onDis
               }}
             >
               <Ionicons name="download-outline" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 0.2 }}>
                 Update Now
               </Text>
             </TouchableOpacity>
 
             {/* Later button */}
             <TouchableOpacity onPress={handleLater} activeOpacity={0.65} style={{ alignItems: 'center', paddingVertical: 10 }}>
-              <Text style={{ color: C.text3, fontSize: 14, fontWeight: '600' }}>Remind me later</Text>
+              <Text style={{ color: C.text3, fontSize: 14, fontFamily: 'DMSans_600SemiBold' }}>Remind me later</Text>
             </TouchableOpacity>
 
           </View>

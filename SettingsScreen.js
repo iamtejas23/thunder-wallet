@@ -24,7 +24,7 @@ import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPer
 
 function SectionLabel({ text, C }) {
   return (
-    <Text style={{ color: C.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 }}>
+    <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 }}>
       {text}
     </Text>
   );
@@ -48,8 +48,8 @@ function Row({ icon, iconColor, iconBg, label, sublabel, right, onPress, showSep
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={{ color: labelColor, fontSize: 15, fontWeight: '600' }}>{label}</Text>
-        {sublabel ? <Text style={{ color: C.text3, fontSize: 12, marginTop: 1 }}>{sublabel}</Text> : null}
+        <Text style={{ color: labelColor, fontSize: 15, fontFamily: 'DMSans_600SemiBold' }}>{label}</Text>
+        {sublabel ? <Text style={{ color: C.text3, fontSize: 12, fontFamily: 'DMSans_400Regular', marginTop: 1, lineHeight: 17 }}>{sublabel}</Text> : null}
       </View>
       {right}
     </View>
@@ -194,7 +194,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
       >
 
         {/* ── Page title ── */}
-        <Text style={{ color: C.text1, fontSize: 32, fontWeight: '900', marginBottom: 24, letterSpacing: -0.5 }}>
+        <Text style={{ color: C.text1, fontSize: 32, fontFamily: 'DMSans_900Black', marginBottom: 24, letterSpacing: -0.5 }}>
           Settings
         </Text>
 
@@ -203,11 +203,11 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
           <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 36, borderWidth: 1, height: 72, justifyContent: 'center', width: 72, marginBottom: 14 }}>
             <Image source={require('./assets/logo.png')} style={{ borderRadius: 16, height: 54, width: 54 }} resizeMode="cover" />
           </View>
-          <Text style={{ color: C.text1, fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>Thunder Wallet</Text>
+          <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black', letterSpacing: -0.3 }}>Thunder Wallet</Text>
           <Text style={{ color: C.text3, fontSize: 13, marginTop: 3 }}>Smart local expense manager</Text>
           <View style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 5, marginTop: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
             <Ionicons name="flash" size={11} color={C.accent} />
-            <Text style={{ color: C.accent, fontSize: 12, fontWeight: '800' }}>v{Constants.expoConfig?.version ?? '1.0.62'} · Free</Text>
+            <Text style={{ color: C.accent, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>v{Constants.expoConfig?.version ?? '1.0.62'} · Free</Text>
           </View>
         </View>
 
@@ -216,7 +216,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
         <SettingsCard C={C}>
           {/* Theme toggle — inline visual picker */}
           <View style={{ padding: 14 }}>
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600', marginBottom: 10, marginLeft: 2 }}>Theme</Text>
+            <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_600SemiBold', marginBottom: 10, marginLeft: 2 }}>Theme</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {/* Light */}
               <TouchableOpacity
@@ -227,7 +227,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
                 <View style={{ alignItems: 'center', backgroundColor: !isDark ? 'rgba(217,119,6,0.18)' : C.accentBg, borderRadius: 18, height: 40, justifyContent: 'center', width: 40 }}>
                   <Ionicons name="sunny" size={20} color={!isDark ? '#D97706' : C.text3} />
                 </View>
-                <Text style={{ color: !isDark ? '#D97706' : C.text2, fontSize: 13, fontWeight: '700' }}>Light</Text>
+                <Text style={{ color: !isDark ? '#D97706' : C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Light</Text>
                 {!isDark && (
                   <View style={{ alignItems: 'center', backgroundColor: '#D97706', borderRadius: 7, height: 14, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 14 }}>
                     <Ionicons name="checkmark" size={9} color="#fff" />
@@ -243,7 +243,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
                 <View style={{ alignItems: 'center', backgroundColor: isDark ? C.purpleBg : C.accentBg, borderRadius: 18, height: 40, justifyContent: 'center', width: 40 }}>
                   <Ionicons name="moon" size={18} color={isDark ? C.purple : C.text3} />
                 </View>
-                <Text style={{ color: isDark ? C.purple : C.text2, fontSize: 13, fontWeight: '700' }}>Dark</Text>
+                <Text style={{ color: isDark ? C.purple : C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Dark</Text>
                 {isDark && (
                   <View style={{ alignItems: 'center', backgroundColor: C.purple, borderRadius: 7, height: 14, justifyContent: 'center', position: 'absolute', right: 8, top: 8, width: 14 }}>
                     <Ionicons name="checkmark" size={9} color="#fff" />
@@ -317,7 +317,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             iconColor={C.income}
             iconBg={C.incomeBg}
             label="Storage"
-            right={<Text style={{ color: C.text3, fontSize: 13, fontWeight: '600' }}>On-device only</Text>}
+            right={<Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_600SemiBold' }}>On-device only</Text>}
           />
           <Row
             C={C}
@@ -325,7 +325,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             iconColor={C.blue}
             iconBg={C.blueBg}
             label="Works offline"
-            right={<Text style={{ color: C.text3, fontSize: 13, fontWeight: '600' }}>Always</Text>}
+            right={<Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_600SemiBold' }}>Always</Text>}
           />
           <Row
             C={C}
@@ -333,7 +333,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             iconColor={C.purple}
             iconBg={C.purpleBg}
             label="Data sharing"
-            right={<Text style={{ color: C.income, fontSize: 13, fontWeight: '700' }}>Never</Text>}
+            right={<Text style={{ color: C.income, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Never</Text>}
           />
           <Row
             C={C}
@@ -346,7 +346,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             right={
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
-                <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '700' }}>Active</Text>
+                <Text style={{ color: '#34D399', fontSize: 12, fontFamily: 'DMSans_700Bold' }}>Active</Text>
               </View>
             }
           />
@@ -396,7 +396,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
               <TouchableOpacity onPress={() => Linking.openURL('https://github.com/iamtejas23')} activeOpacity={0.7}>
                 <View style={{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 5 }}>
                   <Ionicons name="logo-github" size={13} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 12, fontWeight: '700' }}>GitHub</Text>
+                  <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_700Bold' }}>GitHub</Text>
                 </View>
               </TouchableOpacity>
             }
