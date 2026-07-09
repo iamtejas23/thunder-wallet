@@ -1,6 +1,6 @@
 {
   "name": "thunder-wallet",
-  "version": "1.0.69",
+  "version": "1.0.70",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
