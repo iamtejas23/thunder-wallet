@@ -174,15 +174,22 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsBackingUp(true);
     try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Backup failed', 'Sharing is not available on this device.');
+        return;
+      }
       const pairs = await AsyncStorage.multiGet(BACKUP_KEYS);
       const data = {};
       pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
       const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
-      const path = FileSystem.cacheDirectory + `thunder-wallet-backup-${Date.now()}.json`;
+      const dir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+      if (!dir) throw new Error('No writable directory available on this device.');
+      const path = `${dir}thunder-wallet-backup-${Date.now()}.json`;
       await FileSystem.writeAsStringAsync(path, payload, { encoding: FileSystem.EncodingType.UTF8 });
       await Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Save Thunder Wallet Backup' });
     } catch (e) {
-      Alert.alert('Backup failed', 'Could not create backup file.');
+      Alert.alert('Backup failed', e?.message ?? 'Could not create backup file.');
     } finally {
       setIsBackingUp(false);
     }
@@ -410,6 +417,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
             iconBg="rgba(249,115,22,0.12)"
             label="Daily Spending Limit"
             sublabel={dailySpendLimit > 0 ? `Alert at ₹${dailySpendLimit.toLocaleString('en-IN')} / day` : 'Disabled'}
+            showSep={pinEnabled}
             onPress={() => { setDailyLimitInput(dailySpendLimit > 0 ? String(dailySpendLimit) : ''); setShowDailyLimitModal(true); }}
             right={<Ionicons name="chevron-forward" size={16} color={C.text3} />}
           />
