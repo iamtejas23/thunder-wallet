@@ -3,9 +3,12 @@ import {
   Alert,
   Image,
   Linking,
+  Modal,
+  Platform,
   ScrollView,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -13,12 +16,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
 import MeshBackground from './MeshBackground';
 import UpdateModal from './UpdateModal';
 import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
+
+const BACKUP_KEYS = ['transactions', 'monthlyBudget', 'savingsGoals', 'categoryBudgets', 'bills_v2', 'savings_v1', 'hideBalanceFeature', 'dailySpendLimit'];
 
 // ── Primitives ─────────────────────────────────────────────────────────────────
 
@@ -71,14 +79,19 @@ function Row({ icon, iconColor, iconBg, label, sublabel, right, onPress, showSep
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
-const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange }) => {
+const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange, dailySpendLimit, onDailyLimitChange, onRestoreData }) => {
   const { C, toggleTheme, isDark } = useTheme();
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [pinEnabled, setPinEnabled] = useState(false);
   const [hideBalanceEnabled, setHideBalanceEnabled] = useState(hideBalanceFeature ?? false);
   const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showChangePin, setShowChangePin] = useState(false);
   const [checking, setChecking] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
+  const [dailyLimitInput, setDailyLimitInput] = useState('');
 
   const handleCheckUpdate = useCallback(async () => {
     setChecking(true);
@@ -157,6 +170,78 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
     await AsyncStorage.setItem('hideBalanceFeature', val ? 'true' : 'false');
   };
 
+  const handleBackup = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsBackingUp(true);
+    try {
+      const pairs = await AsyncStorage.multiGet(BACKUP_KEYS);
+      const data = {};
+      pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
+      const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
+      const path = FileSystem.cacheDirectory + `thunder-wallet-backup-${Date.now()}.json`;
+      await FileSystem.writeAsStringAsync(path, payload, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Save Thunder Wallet Backup' });
+    } catch (e) {
+      Alert.alert('Backup failed', 'Could not create backup file.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Restore from backup?',
+      'This will replace all current data with the backup. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Choose file', onPress: async () => {
+            setIsRestoring(true);
+            try {
+              const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
+              if (result.canceled) { setIsRestoring(false); return; }
+              const content = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.UTF8 });
+              const parsed = JSON.parse(content);
+              if (!parsed.version || !parsed.data) throw new Error('invalid');
+              const d = parsed.data;
+              const pairs = Object.entries(d).map(([k, v]) => [k, String(v)]);
+              await AsyncStorage.multiSet(pairs);
+              onRestoreData?.({
+                transactions: d.transactions ? JSON.parse(d.transactions) : undefined,
+                monthlyBudget: d.monthlyBudget ? Number.parseFloat(d.monthlyBudget) : undefined,
+                goals: d.savingsGoals ? JSON.parse(d.savingsGoals) : undefined,
+                categoryBudgets: d.categoryBudgets ? JSON.parse(d.categoryBudgets) : undefined,
+                bills: d.bills_v2 ? JSON.parse(d.bills_v2) : undefined,
+                savings: d.savings_v1 ? JSON.parse(d.savings_v1) : undefined,
+                hideBalanceFeature: d.hideBalanceFeature === 'true',
+                dailySpendLimit: d.dailySpendLimit ? Number.parseFloat(d.dailySpendLimit) : 0,
+              });
+              Alert.alert('Restore complete', 'Your data has been restored successfully.');
+            } catch {
+              Alert.alert('Restore failed', 'Invalid or corrupted backup file. Please choose a valid Thunder Wallet backup.');
+            } finally {
+              setIsRestoring(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveDailyLimit = () => {
+    const val = Number.parseFloat(dailyLimitInput);
+    if (dailyLimitInput.trim() === '' || val === 0) {
+      onDailyLimitChange?.(0);
+    } else if (!Number.isFinite(val) || val <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid amount or leave blank to disable.');
+      return;
+    } else {
+      onDailyLimitChange?.(val);
+    }
+    setShowDailyLimitModal(false);
+  };
+
   const handleReset = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
@@ -181,6 +266,19 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
         mode="setup"
         onSuccess={() => { setPinEnabled(true); setShowPinSetup(false); }}
         onCancel={() => setShowPinSetup(false)}
+      />
+    );
+  }
+
+  if (showChangePin) {
+    return (
+      <PinScreen
+        mode="change"
+        onSuccess={() => {
+          setShowChangePin(false);
+          Alert.alert('PIN updated', 'Your PIN has been changed successfully.');
+        }}
+        onCancel={() => setShowChangePin(false)}
       />
     );
   }
@@ -296,7 +394,6 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             iconBg="rgba(96,165,250,0.12)"
             label="Hide Balance"
             sublabel="Mask amounts on Home with eye toggle"
-            showSep={false}
             right={
               <Switch
                 value={hideBalanceEnabled}
@@ -306,6 +403,29 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
               />
             }
           />
+          <Row
+            C={C}
+            icon="warning"
+            iconColor="#F97316"
+            iconBg="rgba(249,115,22,0.12)"
+            label="Daily Spending Limit"
+            sublabel={dailySpendLimit > 0 ? `Alert at ₹${dailySpendLimit.toLocaleString('en-IN')} / day` : 'Disabled'}
+            onPress={() => { setDailyLimitInput(dailySpendLimit > 0 ? String(dailySpendLimit) : ''); setShowDailyLimitModal(true); }}
+            right={<Ionicons name="chevron-forward" size={16} color={C.text3} />}
+          />
+          {pinEnabled && (
+            <Row
+              C={C}
+              icon="key"
+              iconColor={C.purple}
+              iconBg={C.purpleBg}
+              label="Change PIN"
+              sublabel="Update your 4-digit unlock PIN"
+              showSep={false}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowChangePin(true); }}
+              right={<Ionicons name="chevron-forward" size={16} color={C.text3} />}
+            />
+          )}
         </SettingsCard>
 
         {/* ── Data & Privacy ── */}
@@ -342,12 +462,40 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
             iconBg="rgba(52,211,153,0.12)"
             label="Screenshot Protection"
             sublabel="Screenshots are disabled to protect your data"
-            showSep={false}
             right={
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
                 <Text style={{ color: '#34D399', fontSize: 12, fontFamily: 'DMSans_700Bold' }}>Active</Text>
               </View>
+            }
+          />
+          <Row
+            C={C}
+            icon="cloud-upload-outline"
+            iconColor="#60A5FA"
+            iconBg="rgba(96,165,250,0.12)"
+            label="Backup Data"
+            sublabel="Export all data as an encrypted JSON file"
+            onPress={isBackingUp ? undefined : handleBackup}
+            right={
+              isBackingUp
+                ? <Ionicons name="ellipsis-horizontal" size={16} color={C.text3} />
+                : <Ionicons name="chevron-forward" size={16} color={C.text3} />
+            }
+          />
+          <Row
+            C={C}
+            icon="cloud-download-outline"
+            iconColor="#A78BFA"
+            iconBg="rgba(167,139,250,0.12)"
+            label="Restore Data"
+            sublabel="Import from a Thunder Wallet backup file"
+            showSep={false}
+            onPress={isRestoring ? undefined : handleRestore}
+            right={
+              isRestoring
+                ? <Ionicons name="ellipsis-horizontal" size={16} color={C.text3} />
+                : <Ionicons name="chevron-forward" size={16} color={C.text3} />
             }
           />
         </SettingsCard>
@@ -426,6 +574,46 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange 
         downloadUrl={updateResult?.downloadUrl}
         onDismiss={() => setUpdateResult(null)}
       />
+
+      {/* ── Daily Limit Modal ── */}
+      <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setShowDailyLimitModal(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={{ backgroundColor: C.card, borderRadius: 22, padding: 28, width: 320, borderWidth: 1, borderColor: C.border }}>
+              <Text style={{ color: C.text1, fontSize: 18, fontFamily: 'DMSans_800ExtraBold', marginBottom: 4 }}>Daily Spending Limit</Text>
+              <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_400Regular', lineHeight: 19, marginBottom: 20 }}>
+                Get alerted when your daily expenses exceed this amount. Leave blank to disable.
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.cardInner, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 20 }}>
+                <Text style={{ color: '#F97316', fontSize: 22, fontFamily: 'DMSans_900Black', marginRight: 6 }}>₹</Text>
+                <TextInput
+                  style={{ flex: 1, color: C.text1, fontSize: 26, fontFamily: 'DMSans_900Black' }}
+                  value={dailyLimitInput}
+                  onChangeText={setDailyLimitInput}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={C.text3}
+                  autoFocus
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: C.cardInner, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}
+                  onPress={() => setShowDailyLimitModal(false)}
+                >
+                  <Text style={{ color: C.text2, fontFamily: 'DMSans_700Bold', fontSize: 15 }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: '#F97316', alignItems: 'center' }}
+                  onPress={handleSaveDailyLimit}
+                >
+                  <Text style={{ color: '#fff', fontFamily: 'DMSans_800ExtraBold', fontSize: 15 }}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };

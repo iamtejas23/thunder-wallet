@@ -30,7 +30,8 @@ const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
   const [digits, setDigits] = useState([]);
   const [confirmDigits, setConfirmDigits] = useState(null);
-  const [phase, setPhase] = useState(mode === 'setup' ? 'enter' : 'check');
+  const initialPhase = mode === 'setup' ? 'enter' : mode === 'change' ? 'verify' : 'check';
+  const [phase, setPhase] = useState(initialPhase);
   const [error, setError] = useState('');
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const hasBiometrics = useRef(false);
@@ -77,9 +78,7 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
 
     const next = [...digits, key];
     setDigits(next);
-
     if (next.length < 4) return;
-
     const pin = next.join('');
 
     if (mode === 'setup') {
@@ -101,6 +100,38 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
           setConfirmDigits(null);
         }
       }
+
+    } else if (mode === 'change') {
+      if (phase === 'verify') {
+        const saved = await AsyncStorage.getItem(PIN_KEY);
+        if (pin === saved) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setDigits([]);
+          setError('');
+          setPhase('enter');
+        } else {
+          shake();
+          setError('Wrong PIN. Try again.');
+          setDigits([]);
+        }
+      } else if (phase === 'enter') {
+        setConfirmDigits(pin);
+        setDigits([]);
+        setPhase('confirm');
+      } else {
+        if (pin === confirmDigits) {
+          await AsyncStorage.setItem(PIN_KEY, pin);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onSuccess();
+        } else {
+          shake();
+          setError("PINs don't match. Try again.");
+          setDigits([]);
+          setPhase('enter');
+          setConfirmDigits(null);
+        }
+      }
+
     } else {
       const saved = await AsyncStorage.getItem(PIN_KEY);
       if (pin === saved) {
@@ -114,9 +145,12 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
     }
   };
 
-  const title = mode === 'setup'
-    ? phase === 'enter' ? 'Create a 4-digit PIN' : 'Confirm your PIN'
-    : 'Enter PIN to unlock';
+  const title =
+    mode === 'setup'
+      ? phase === 'enter' ? 'Create a 4-digit PIN' : 'Confirm your PIN'
+      : mode === 'change'
+        ? phase === 'verify' ? 'Enter current PIN' : phase === 'enter' ? 'Enter new PIN' : 'Confirm new PIN'
+        : 'Enter PIN to unlock';
 
   return (
     <SafeAreaView style={styles.root}>

@@ -41,6 +41,7 @@ const GOALS_KEY = 'savingsGoals';
 const CAT_BUDGETS_KEY = 'categoryBudgets';
 const SAVINGS_KEY = 'savings_v1';
 const HIDE_BALANCE_KEY = 'hideBalanceFeature';
+const DAILY_LIMIT_KEY = 'dailySpendLimit';
 const DEFAULT_MONTHLY_BUDGET = 30000;
 const CHART_COLORS = ['#F87171', '#60A5FA', '#FCD34D', '#34D399', '#A78BFA', '#FB923C'];
 
@@ -1676,11 +1677,12 @@ function MainApp() {
   const [monthlyBudget, setMonthlyBudget] = useState(DEFAULT_MONTHLY_BUDGET);
   const [confettiGoal, setConfettiGoal] = useState(null);
   const [hideBalanceFeature, setHideBalanceFeature] = useState(false);
+  const [dailySpendLimit, setDailySpendLimit] = useState(0);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [savedTx, savedBudget, savedGoals, savedCatBudgets, savedBills, savedSavings, savedHideBalance] = await Promise.all([
+        const [savedTx, savedBudget, savedGoals, savedCatBudgets, savedBills, savedSavings, savedHideBalance, savedDailyLimit] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(BUDGET_KEY),
           AsyncStorage.getItem(GOALS_KEY),
@@ -1688,6 +1690,7 @@ function MainApp() {
           AsyncStorage.getItem(BILLS_KEY),
           AsyncStorage.getItem(SAVINGS_KEY),
           AsyncStorage.getItem(HIDE_BALANCE_KEY),
+          AsyncStorage.getItem(DAILY_LIMIT_KEY),
         ]);
         if (savedTx) {
           const parsed = JSON.parse(savedTx).map(normalizeTransaction);
@@ -1700,6 +1703,7 @@ function MainApp() {
         if (savedBills) setBills(JSON.parse(savedBills));
         if (savedSavings) setSavings(JSON.parse(savedSavings));
         if (savedHideBalance !== null) setHideBalanceFeature(savedHideBalance === 'true');
+        if (savedDailyLimit) { const dl = Number.parseFloat(savedDailyLimit); if (dl > 0) setDailySpendLimit(dl); }
       } catch { Alert.alert('Load error', 'Could not load wallet data. Please restart the app.'); }
       // Request notification permission once so bill reminders can fire
       requestNotificationPermission().catch(() => {});
@@ -1864,6 +1868,23 @@ function MainApp() {
       await persistTransactions(next);
       resetForm();
       setModalVisible(false);
+
+      // Daily spend limit check — only for new expenses, not edits
+      if (transactionType === 'expense' && !editingTransaction && dailySpendLimit > 0) {
+        const todayStr = localDateStr(new Date());
+        const todayTotal = next
+          .filter(t => localDateStr(new Date(t.date)) === todayStr && t.amount < 0)
+          .reduce((s, t) => s + Math.abs(t.amount), 0);
+        if (todayTotal >= dailySpendLimit) {
+          setTimeout(() => {
+            Alert.alert(
+              'Daily Limit Reached',
+              `You've spent ${currency.format(todayTotal)} today, exceeding your daily limit of ${currency.format(dailySpendLimit)}.`,
+              [{ text: 'OK' }]
+            );
+          }, 350);
+        }
+      }
     } catch { Alert.alert('Save error', 'Could not save transaction.'); }
   };
 
@@ -1930,6 +1951,18 @@ function MainApp() {
     bills, addBill, deleteBill, markBillPaid, markBillUnpaid,
     savings, openSavingsModal,
     hideBalanceFeature, setHideBalanceFeature,
+    dailySpendLimit, setDailySpendLimit,
+  };
+
+  const onRestoreData = (data) => {
+    if (data.transactions) setTransactions(data.transactions.map(normalizeTransaction));
+    if (data.monthlyBudget != null) setMonthlyBudget(data.monthlyBudget);
+    if (data.goals) setGoals(data.goals);
+    if (data.categoryBudgets) setCategoryBudgets(data.categoryBudgets);
+    if (data.bills) setBills(data.bills);
+    if (data.savings) setSavings(data.savings);
+    if (data.hideBalanceFeature != null) setHideBalanceFeature(data.hideBalanceFeature);
+    if (data.dailySpendLimit != null) setDailySpendLimit(data.dailySpendLimit);
   };
 
   return (
@@ -1952,7 +1985,16 @@ function MainApp() {
         )}</Tab.Screen>
         <Tab.Screen name="Analytics">{() => <AnalyticsScreen wallet={wallet} />}</Tab.Screen>
         {/* Settings hidden from tab bar — opened via gear icon in dashboard header */}
-        <Tab.Screen name="Settings">{() => <SettingsScreen resetAllData={resetAllData} hideBalanceFeature={hideBalanceFeature} onHideBalanceChange={setHideBalanceFeature} />}</Tab.Screen>
+        <Tab.Screen name="Settings">{() => (
+          <SettingsScreen
+            resetAllData={resetAllData}
+            hideBalanceFeature={hideBalanceFeature}
+            onHideBalanceChange={setHideBalanceFeature}
+            dailySpendLimit={dailySpendLimit}
+            onDailyLimitChange={(val) => { setDailySpendLimit(val); AsyncStorage.setItem(DAILY_LIMIT_KEY, String(val)); }}
+            onRestoreData={onRestoreData}
+          />
+        )}</Tab.Screen>
       </Tab.Navigator>
 
       <TransactionModal
