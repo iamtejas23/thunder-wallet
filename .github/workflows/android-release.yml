@@ -63,15 +63,22 @@ jobs:
         working-directory: android
         run: |
           chmod +x ./gradlew
+          SUCCESS=0
           for attempt in 1 2 3; do
-            ./gradlew clean assembleRelease \
+            if ./gradlew clean assembleRelease \
               -PreactNativeArchitectures=arm64-v8a \
               -Pexpo.useLegacyPackaging=true \
-              --no-daemon \
-              && break
+              --no-daemon; then
+              SUCCESS=1
+              break
+            fi
             echo "Attempt $attempt failed, retrying in 15s..."
             sleep 15
           done
+          if [ $SUCCESS -ne 1 ]; then
+            echo "All Gradle build attempts failed."
+            exit 1
+          fi
 
       - name: Resolve release name
         id: release
