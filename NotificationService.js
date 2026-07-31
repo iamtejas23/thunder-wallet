@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getBillingPeriod } from './BillsScreen';
 
 const NOTIF_ENABLED_KEY    = 'notificationsEnabled';
 const CHANNEL_DAILY        = 'thunder-daily-review';
@@ -180,12 +181,58 @@ export async function scheduleBillReminders(bills) {
 
   for (const bill of bills) {
     if (bill.isActive === false) continue;
+    const amtFmt = (bill.amount || 0).toLocaleString('en-IN');
+
+    // Day-based cycles — schedule one-shot reminders for the next due date
+    if (bill.cycleUnit === 'days') {
+      const { status, dueDate } = getBillingPeriod(bill);
+      if (status === 'paid' || !dueDate) continue;
+
+      try {
+        const dueAt = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 9, 0, 0);
+        const beforeAt = new Date(dueAt);
+        beforeAt.setDate(beforeAt.getDate() - 1);
+
+        if (beforeAt > now) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `${BILL_PREFIX}${bill.id}_before`,
+            content: {
+              title: `Bill Due Tomorrow: ${bill.name}`,
+              body: `₹${amtFmt} due tomorrow. Tap to mark as paid.`,
+              data: { type: 'bill_reminder', billId: bill.id },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: beforeAt,
+              channelId: CHANNEL_BILLS,
+            },
+          });
+        }
+
+        if (dueAt > now) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `${BILL_PREFIX}${bill.id}_due`,
+            content: {
+              title: `Bill Due Today: ${bill.name} ⚡`,
+              body: `₹${amtFmt} is due today. Don't forget to pay!`,
+              data: { type: 'bill_reminder', billId: bill.id },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: dueAt,
+              channelId: CHANNEL_BILLS,
+            },
+          });
+        }
+      } catch (_) {}
+      continue;
+    }
+
     const isPaidThisMonth = !!bill.paidMonths?.[currentMonth];
     if (isPaidThisMonth) continue;
 
     const dueDay    = Math.max(1, Math.min(bill.dueDay || 1, 28)); // clamp to 28 (safe for all months)
     const remindDay = Math.max(1, dueDay - 1);
-    const amtFmt    = (bill.amount || 0).toLocaleString('en-IN');
 
     try {
       // Day-before reminder

@@ -62,7 +62,44 @@ function currentMonthKey() {
 }
 
 // ─── Core billing period calculator ────────────────────────────────────────────
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getDayBasedBillingPeriod(bill) {
+  const cycleDays = Math.max(1, Number(bill.cycle) || 1);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const created = new Date(bill.createdAt || now);
+  let due = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+  if (!isFinite(due.getTime())) due = new Date(today);
+
+  let lastUnpaidDue = null;
+  let lastUnpaidKey = null;
+
+  for (let i = 0; i < 2000; i++) {
+    const key = dateKey(due);
+
+    if (due >= today) {
+      if (lastUnpaidDue) return { status: 'overdue', dueDate: lastUnpaidDue, periodKey: lastUnpaidKey, daysUntil: 0 };
+      if (bill.paidMonths?.[key]) return { status: 'paid', dueDate: due, periodKey: key, daysUntil: Math.round((due - today) / 86400000) };
+      const daysUntil = Math.round((due - today) / 86400000);
+      return { status: daysUntil <= 3 ? 'due-soon' : 'upcoming', dueDate: due, periodKey: key, daysUntil };
+    }
+
+    if (!bill.paidMonths?.[key]) { lastUnpaidDue = due; lastUnpaidKey = key; }
+    else { lastUnpaidDue = null; lastUnpaidKey = null; }
+
+    due = new Date(due.getFullYear(), due.getMonth(), due.getDate() + cycleDays);
+  }
+
+  return { status: 'upcoming', dueDate: today, periodKey: dateKey(today), daysUntil: 0 };
+}
+
 export function getBillingPeriod(bill) {
+  // Day-based cycles (every N days) — existing month-based bills omit cycleUnit
+  if (bill.cycleUnit === 'days') return getDayBasedBillingPeriod(bill);
+
   const cycle  = bill.cycle || 1;
   const dueDay = bill.dueDay || 1;
   const now    = new Date();
@@ -414,9 +451,13 @@ function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
               <View style={{ backgroundColor: sc.bg, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2 }}>
                 <Text style={{ color: sc.color, fontSize: 10, fontFamily: 'DMSans_800ExtraBold' }}>{sc.label}</Text>
               </View>
-              {cycle > 1 && (
+              {(bill.cycleUnit === 'days' || cycle > 1) && (
                 <View style={{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 7, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ color: C.text3, fontSize: 9, fontFamily: 'DMSans_800ExtraBold' }}>{CYCLE_LABELS[cycle] || `Every ${cycle}M`}</Text>
+                  <Text style={{ color: C.text3, fontSize: 9, fontFamily: 'DMSans_800ExtraBold' }}>
+                    {bill.cycleUnit === 'days'
+                      ? `Every ${cycle}d`
+                      : (CYCLE_LABELS[cycle] || `Every ${cycle}M`)}
+                  </Text>
                 </View>
               )}
             </View>
@@ -492,6 +533,8 @@ function AddBillModal({ visible, onClose, onAdd }) {
   const [amount,         setAmount]         = useState('');
   const [dueDay,         setDueDay]         = useState('1');
   const [cycle,          setCycle]          = useState(1);
+  const [cycleUnit,      setCycleUnit]      = useState('months');
+  const [cycleDays,      setCycleDays]      = useState('30');
   const [notes,          setNotes]          = useState('');
   const [catFilter,      setCatFilter]      = useState('All');
 
@@ -508,6 +551,8 @@ function AddBillModal({ visible, onClose, onAdd }) {
     setAmount('');
     setDueDay('1');
     setCycle(1);
+    setCycleUnit('months');
+    setCycleDays('30');
     setNotes('');
     setCatFilter('All');
   };
@@ -526,8 +571,20 @@ function AddBillModal({ visible, onClose, onAdd }) {
     if (!trimmedName) { Alert.alert('Name required', 'Enter a bill name.'); return; }
     const amt = parseFloat(amount);
     if (!isFinite(amt) || amt <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount.'); return; }
-    const day = parseInt(dueDay, 10);
-    if (!isFinite(day) || day < 1 || day > 31) { Alert.alert('Invalid due day', 'Enter a day between 1 and 31.'); return; }
+
+    let day = 1;
+    let cycleValue = cycle;
+    if (cycleUnit === 'days') {
+      const days = parseInt(cycleDays, 10);
+      if (!isFinite(days) || days < 1 || days > 3650) {
+        Alert.alert('Invalid cycle', 'Enter a number of days between 1 and 3650.');
+        return;
+      }
+      cycleValue = days;
+    } else {
+      day = parseInt(dueDay, 10);
+      if (!isFinite(day) || day < 1 || day > 31) { Alert.alert('Invalid due day', 'Enter a day between 1 and 31.'); return; }
+    }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onAdd({
@@ -535,7 +592,8 @@ function AddBillModal({ visible, onClose, onAdd }) {
       name:        trimmedName,
       amount:      amt,
       dueDay:      day,
-      cycle,
+      cycle:       cycleValue,
+      cycleUnit,
       icon:        selectedPreset?.icon        || 'receipt',
       color:       selectedPreset?.color       || '#94A3B8',
       fa5Brand:    selectedPreset?.fa5Brand    || null,
@@ -643,57 +701,115 @@ function AddBillModal({ visible, onClose, onAdd }) {
                 onChangeText={setName}
               />
 
-              {/* Due day quick picks */}
-              <Text style={[formStyles.label, { color: C.text2 }]}>Due Day of Month</Text>
-              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                {['1', '5', '10', '15', '20', '25', '28'].map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDueDay(d); }}
-                    style={{
-                      alignItems: 'center',
-                      backgroundColor: dueDay === d ? `${preset.color}25` : C.cardInner,
-                      borderColor: dueDay === d ? preset.color : C.border,
-                      borderRadius: 10, borderWidth: dueDay === d ? 1.5 : 1,
-                      height: 42, justifyContent: 'center', width: 44,
-                    }}
-                  >
-                    <Text style={{ color: dueDay === d ? preset.color : C.text2, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-                <TextInput
-                  style={[{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', height: 42, paddingHorizontal: 8, textAlign: 'center', width: 56 }]}
-                  placeholder="Day"
-                  placeholderTextColor={C.text3}
-                  keyboardType="number-pad"
-                  value={dueDay}
-                  onChangeText={setDueDay}
-                  maxLength={2}
-                />
-              </View>
-              <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold', marginBottom: 16 }}>
-                You'll be reminded the day before and on the {ordinal(parseInt(dueDay, 10) || 1)}
-              </Text>
+              {/* Due day — only for month-based cycles */}
+              {cycleUnit === 'months' && (
+                <>
+                  <Text style={[formStyles.label, { color: C.text2 }]}>Due Day of Month</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {['1', '5', '10', '15', '20', '25', '28'].map((d) => (
+                      <TouchableOpacity
+                        key={d}
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDueDay(d); }}
+                        style={{
+                          alignItems: 'center',
+                          backgroundColor: dueDay === d ? `${preset.color}25` : C.cardInner,
+                          borderColor: dueDay === d ? preset.color : C.border,
+                          borderRadius: 10, borderWidth: dueDay === d ? 1.5 : 1,
+                          height: 42, justifyContent: 'center', width: 44,
+                        }}
+                      >
+                        <Text style={{ color: dueDay === d ? preset.color : C.text2, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{d}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TextInput
+                      style={[{ alignItems: 'center', backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', height: 42, paddingHorizontal: 8, textAlign: 'center', width: 56 }]}
+                      placeholder="Day"
+                      placeholderTextColor={C.text3}
+                      keyboardType="number-pad"
+                      value={dueDay}
+                      onChangeText={setDueDay}
+                      maxLength={2}
+                    />
+                  </View>
+                  <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold', marginBottom: 16 }}>
+                    You'll be reminded the day before and on the {ordinal(parseInt(dueDay, 10) || 1)}
+                  </Text>
+                </>
+              )}
 
               {/* Billing cycle */}
               <Text style={[formStyles.label, { color: C.text2 }]}>Billing Cycle</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
                 {CYCLES.map(({ label, value }) => (
                   <TouchableOpacity
                     key={value}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCycle(value); }}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setCycle(value);
+                      setCycleUnit('months');
+                    }}
                     style={{
                       alignItems: 'center',
-                      backgroundColor: cycle === value ? `${preset.color}25` : C.cardInner,
-                      borderColor: cycle === value ? preset.color : C.border,
-                      borderRadius: 10, borderWidth: cycle === value ? 1.5 : 1,
+                      backgroundColor: cycleUnit === 'months' && cycle === value ? `${preset.color}25` : C.cardInner,
+                      borderColor: cycleUnit === 'months' && cycle === value ? preset.color : C.border,
+                      borderRadius: 10, borderWidth: cycleUnit === 'months' && cycle === value ? 1.5 : 1,
                       paddingHorizontal: 16, paddingVertical: 9,
                     }}
                   >
-                    <Text style={{ color: cycle === value ? preset.color : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
+                    <Text style={{ color: cycleUnit === 'months' && cycle === value ? preset.color : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setCycleUnit('days');
+                  }}
+                  style={{
+                    alignItems: 'center',
+                    backgroundColor: cycleUnit === 'days' ? `${preset.color}25` : C.cardInner,
+                    borderColor: cycleUnit === 'days' ? preset.color : C.border,
+                    borderRadius: 10, borderWidth: cycleUnit === 'days' ? 1.5 : 1,
+                    paddingHorizontal: 16, paddingVertical: 9,
+                  }}
+                >
+                  <Text style={{ color: cycleUnit === 'days' ? preset.color : C.text2, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>Custom Days</Text>
+                </TouchableOpacity>
               </ScrollView>
+
+              {cycleUnit === 'days' && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[formStyles.label, { color: C.text2 }]}>Every how many days?</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {['7', '15', '30', '45', '60'].map((d) => (
+                      <TouchableOpacity
+                        key={d}
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCycleDays(d); }}
+                        style={{
+                          alignItems: 'center',
+                          backgroundColor: cycleDays === d ? `${preset.color}25` : C.cardInner,
+                          borderColor: cycleDays === d ? preset.color : C.border,
+                          borderRadius: 10, borderWidth: cycleDays === d ? 1.5 : 1,
+                          height: 42, justifyContent: 'center', paddingHorizontal: 12,
+                        }}
+                      >
+                        <Text style={{ color: cycleDays === d ? preset.color : C.text2, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{d}d</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TextInput
+                      style={[{ backgroundColor: C.cardInner, borderColor: C.border, borderRadius: 10, borderWidth: 1, color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', height: 42, paddingHorizontal: 10, textAlign: 'center', width: 64 }]}
+                      placeholder="Days"
+                      placeholderTextColor={C.text3}
+                      keyboardType="number-pad"
+                      value={cycleDays}
+                      onChangeText={setCycleDays}
+                      maxLength={4}
+                    />
+                  </View>
+                  <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold' }}>
+                    Repeats every {parseInt(cycleDays, 10) || '—'} day{(parseInt(cycleDays, 10) || 0) === 1 ? '' : 's'} starting today
+                  </Text>
+                </View>
+              )}
 
               {/* Notes */}
               <Text style={[formStyles.label, { color: C.text2 }]}>Notes (optional)</Text>
