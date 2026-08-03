@@ -25,6 +25,8 @@ const expenseCategories = [
   { icon: 'game-controller', label: 'Entertainment', color: '#FCD34D' },
   { icon: 'cart', label: 'Groceries', color: '#FB923C' },
   { icon: 'school', label: 'Education', color: '#A78BFA' },
+  { icon: 'flame', label: 'Fuel', color: '#F97316' },
+  { icon: 'wallet', label: 'Savings', color: '#34D399' },
   { icon: 'ellipsis-horizontal-circle', label: 'Other', color: '#94A3B8' },
 ];
 

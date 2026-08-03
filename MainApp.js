@@ -472,7 +472,7 @@ function AddSavingsModal({ visible, type, onClose, onSave }) {
 }
 
 // ─── Category Budget Modal ────────────────────────────────────────────────────
-const BUDGET_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Rent', 'Health', 'Entertainment', 'Groceries', 'Education', 'Other'];
+const BUDGET_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Rent', 'Health', 'Entertainment', 'Groceries', 'Education', 'Fuel', 'Savings', 'Other'];
 
 function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
   const [budgets, setBudgets] = useState({ ...categoryBudgets });
@@ -1789,6 +1789,10 @@ function MainApp() {
     await persistBills([bill, ...bills]);
   };
 
+  const updateBill = async (updated) => {
+    await persistBills(bills.map((b) => (b.id === updated.id ? { ...b, ...updated, id: b.id } : b)));
+  };
+
   const deleteBill = async (id) => {
     // Remove every auto-created payment transaction for this bill (id: bill_<id>_YYYY-MM)
     const nextTx = transactions.filter((t) => !t.id.startsWith(`bill_${id}_`));
@@ -1948,7 +1952,7 @@ function MainApp() {
     deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal,
     openCategoryBudgetModal, categoryBudgets, searchQuery, setActiveFilter, setSearchQuery,
     stats, streak, transactions,
-    bills, addBill, deleteBill, markBillPaid, markBillUnpaid,
+    bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid,
     savings, openSavingsModal,
     hideBalanceFeature, setHideBalanceFeature,
     dailySpendLimit, setDailySpendLimit,
@@ -1978,6 +1982,7 @@ function MainApp() {
           <BillsScreen
             bills={wallet.bills}
             onAddBill={wallet.addBill}
+            onUpdateBill={wallet.updateBill}
             onDeleteBill={wallet.deleteBill}
             onMarkPaid={wallet.markBillPaid}
             onMarkUnpaid={wallet.markBillUnpaid}

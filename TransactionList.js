@@ -39,6 +39,8 @@ const categoryConfig = {
   Education: { icon: 'school', color: '#A78BFA' },
   Freelance: { icon: 'laptop', color: '#34D399' },
   Groceries: { icon: 'cart', color: '#FB923C' },
+  Fuel: { icon: 'flame', color: '#F97316' },
+  Savings: { icon: 'wallet', color: '#34D399' },
   Transport: { icon: 'car', color: '#4ECDC4' },
   Investment: { icon: 'trending-up', color: '#60A5FA' },
   Bonus: { icon: 'gift', color: '#FCD34D' },

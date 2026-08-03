@@ -381,7 +381,7 @@ function AlertBanner({ icon, message, color, bg, border }) {
 }
 
 // ─── Premium Bill Card ─────────────────────────────────────────────────────────
-function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
+function BillCard({ bill, onPay, onUnpay, onEdit, onDelete, C }) {
   const { status, daysUntil, dueDate, periodKey } = getBillingPeriod(bill);
   const isPaid  = status === 'paid';
   const cycle   = bill.cycle || 1;
@@ -422,6 +422,7 @@ function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onEdit?.(bill); }}
         style={[
           billStyles.card,
           { backgroundColor: C.card, borderColor: status === 'overdue' ? 'rgba(239,68,68,0.30)' : isPaid ? 'rgba(34,197,94,0.15)' : C.border },
@@ -488,9 +489,14 @@ function BillCard({ bill, onPay, onUnpay, onDelete, C }) {
                 {isPaid ? 'Unmark' : 'Pay'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(bill)} style={{ padding: 6 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <Ionicons name="trash-outline" size={14} color={C.text3} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <TouchableOpacity onPress={() => onEdit?.(bill)} style={{ padding: 6 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Ionicons name="create-outline" size={14} color={C.text3} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onDelete(bill)} style={{ padding: 6 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Ionicons name="trash-outline" size={14} color={C.text3} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Pressable>
@@ -524,9 +530,10 @@ const billStyles = StyleSheet.create({
   },
 });
 
-// ─── Add Bill Modal ────────────────────────────────────────────────────────────
-function AddBillModal({ visible, onClose, onAdd }) {
+// ─── Add / Edit Bill Modal ─────────────────────────────────────────────────────
+function AddBillModal({ visible, onClose, onAdd, onUpdate, editingBill = null }) {
   const { C } = useTheme();
+  const isEditing = !!editingBill;
   const [step,           setStep]           = useState('preset');
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [name,           setName]           = useState('');
@@ -557,6 +564,43 @@ function AddBillModal({ visible, onClose, onAdd }) {
     setCatFilter('All');
   };
 
+  const hydrateFromBill = (bill) => {
+    const matched = BILL_PRESETS.find((p) => p.name === bill.name)
+      || {
+        name: 'Custom',
+        icon: bill.icon || 'receipt',
+        color: bill.color || '#94A3B8',
+        category: bill.category || 'Bills',
+        fa5Brand: bill.fa5Brand || null,
+        brandLetter: bill.brandLetter || null,
+        letterColor: bill.letterColor || null,
+        letterBg: bill.letterBg || null,
+      };
+    setSelectedPreset(matched);
+    setName(bill.name || '');
+    setAmount(bill.amount != null ? String(bill.amount) : '');
+    setNotes(bill.notes || '');
+    setCatFilter('All');
+    const unit = bill.cycleUnit === 'days' ? 'days' : 'months';
+    setCycleUnit(unit);
+    if (unit === 'days') {
+      setCycleDays(String(bill.cycle || 30));
+      setCycle(1);
+      setDueDay('1');
+    } else {
+      setCycle(bill.cycle || 1);
+      setDueDay(String(bill.dueDay || 1));
+      setCycleDays('30');
+    }
+    setStep('details');
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    if (editingBill) hydrateFromBill(editingBill);
+    else reset();
+  }, [visible, editingBill]);
+
   const handleClose = () => { reset(); onClose(); };
 
   const selectPreset = (preset) => {
@@ -566,7 +610,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
     setStep('details');
   };
 
-  const handleAdd = () => {
+  const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) { Alert.alert('Name required', 'Enter a bill name.'); return; }
     const amt = parseFloat(amount);
@@ -586,26 +630,47 @@ function AddBillModal({ visible, onClose, onAdd }) {
       if (!isFinite(day) || day < 1 || day > 31) { Alert.alert('Invalid due day', 'Enter a day between 1 and 31.'); return; }
     }
 
+    const visual = {
+      icon:        selectedPreset?.icon        || editingBill?.icon        || 'receipt',
+      color:       selectedPreset?.color       || editingBill?.color       || '#94A3B8',
+      // When a preset is selected, take its brand fields as-is (including null)
+      // so switching e.g. Spotify → Electricity does not keep the old brand logo.
+      fa5Brand:    selectedPreset ? (selectedPreset.fa5Brand || null) : (editingBill?.fa5Brand || null),
+      brandLetter: selectedPreset ? (selectedPreset.brandLetter || null) : (editingBill?.brandLetter || null),
+      letterColor: selectedPreset ? (selectedPreset.letterColor || null) : (editingBill?.letterColor || null),
+      letterBg:    selectedPreset ? (selectedPreset.letterBg || null) : (editingBill?.letterBg || null),
+      category:    selectedPreset?.category    || editingBill?.category    || 'Bills',
+    };
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onAdd({
-      id:          String(Date.now()),
-      name:        trimmedName,
-      amount:      amt,
-      dueDay:      day,
-      cycle:       cycleValue,
-      cycleUnit,
-      icon:        selectedPreset?.icon        || 'receipt',
-      color:       selectedPreset?.color       || '#94A3B8',
-      fa5Brand:    selectedPreset?.fa5Brand    || null,
-      brandLetter: selectedPreset?.brandLetter || null,
-      letterColor: selectedPreset?.letterColor || null,
-      letterBg:    selectedPreset?.letterBg    || null,
-      category:    selectedPreset?.category    || 'Bills',
-      notes:       notes.trim(),
-      isActive:    true,
-      paidMonths:  {},
-      createdAt:   new Date().toISOString(),
-    });
+
+    if (isEditing) {
+      if (!onUpdate) return;
+      onUpdate({
+        ...editingBill,
+        name: trimmedName,
+        amount: amt,
+        dueDay: day,
+        cycle: cycleValue,
+        cycleUnit,
+        ...visual,
+        notes: notes.trim(),
+      });
+    } else {
+      onAdd({
+        id: String(Date.now()),
+        name: trimmedName,
+        amount: amt,
+        dueDay: day,
+        cycle: cycleValue,
+        cycleUnit,
+        ...visual,
+        notes: notes.trim(),
+        isActive: true,
+        paidMonths: {},
+        createdAt: new Date().toISOString(),
+      });
+    }
     reset();
     onClose();
   };
@@ -622,8 +687,12 @@ function AddBillModal({ visible, onClose, onAdd }) {
 
           {step === 'preset' ? (
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Add Bill</Text>
-              <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 16, marginTop: 2 }}>Choose Bill Type</Text>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                {isEditing ? 'Edit Bill' : 'Add Bill'}
+              </Text>
+              <Text style={{ color: C.text1, fontSize: 22, fontFamily: 'DMSans_900Black', marginBottom: 16, marginTop: 2 }}>
+                {isEditing ? 'Change Bill Type' : 'Choose Bill Type'}
+              </Text>
 
               {/* Category filter pills */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16, paddingBottom: 2 }}>
@@ -662,14 +731,18 @@ function AddBillModal({ visible, onClose, onAdd }) {
               {/* Back */}
               <TouchableOpacity onPress={() => setStep('preset')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
                 <Ionicons name="chevron-back" size={18} color={C.text3} />
-                <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>Back</Text>
+                <Text style={{ color: C.text3, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>
+                  {isEditing ? 'Change type' : 'Back'}
+                </Text>
               </TouchableOpacity>
 
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 22 }}>
                 <BrandLogo fa5Brand={preset.fa5Brand} brandLetter={preset.brandLetter} letterColor={preset.letterColor} letterBg={preset.letterBg} icon={preset.icon} color={preset.color} size={26} bgSize={54} />
                 <View>
-                  <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>New Bill</Text>
+                  <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                    {isEditing ? 'Edit Bill' : 'New Bill'}
+                  </Text>
                   <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black' }}>Bill Details</Text>
                 </View>
               </View>
@@ -686,7 +759,7 @@ function AddBillModal({ visible, onClose, onAdd }) {
                     keyboardType="decimal-pad"
                     value={amount}
                     onChangeText={setAmount}
-                    autoFocus
+                    autoFocus={!isEditing}
                   />
                 </View>
               </View>
@@ -806,7 +879,8 @@ function AddBillModal({ visible, onClose, onAdd }) {
                     />
                   </View>
                   <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold' }}>
-                    Repeats every {parseInt(cycleDays, 10) || '—'} day{(parseInt(cycleDays, 10) || 0) === 1 ? '' : 's'} starting today
+                    Repeats every {parseInt(cycleDays, 10) || '—'} day{(parseInt(cycleDays, 10) || 0) === 1 ? '' : 's'}
+                    {isEditing ? '' : ' starting today'}
                   </Text>
                 </View>
               )}
@@ -823,12 +897,14 @@ function AddBillModal({ visible, onClose, onAdd }) {
 
               {/* Save */}
               <TouchableOpacity
-                onPress={handleAdd}
+                onPress={handleSave}
                 style={[formStyles.saveBtn, { backgroundColor: preset.color, shadowColor: preset.color }]}
                 activeOpacity={0.85}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#000" />
-                <Text style={{ color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' }}>Add Bill</Text>
+                <Text style={{ color: '#000', fontSize: 16, fontFamily: 'DMSans_900Black' }}>
+                  {isEditing ? 'Save Changes' : 'Add Bill'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -939,9 +1015,10 @@ function EmptyState({ onAdd, C }) {
 }
 
 // ─── Bills Screen ──────────────────────────────────────────────────────────────
-export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid, onMarkUnpaid }) {
+export default function BillsScreen({ bills, onAddBill, onUpdateBill, onDeleteBill, onMarkPaid, onMarkUnpaid }) {
   const { C }          = useTheme();
   const [showModal, setShowModal] = useState(false);
+  const [editingBill, setEditingBill] = useState(null);
   const [filter,    setFilter]    = useState('all');
 
   const enriched = useMemo(() => bills.map(b => ({ ...b, _status: getBillStatus(b) })), [bills]);
@@ -969,6 +1046,22 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
     const dueSoon   = bills.filter(b => getBillingPeriod(b).status === 'due-soon').length;
     return { total, paid, unpaid, overdue, dueSoon, paidCount: paidBills.length };
   }, [bills]);
+
+  const openAdd = useCallback(() => {
+    setEditingBill(null);
+    setShowModal(true);
+  }, []);
+
+  const openEdit = useCallback((bill) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingBill(bill);
+    setShowModal(true);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setShowModal(false);
+    setEditingBill(null);
+  }, []);
 
   const handleDelete = useCallback((bill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1011,7 +1104,7 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
           <Text style={{ color: C.text1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 2 }}>Bills</Text>
         </View>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowModal(true); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openAdd(); }}
           style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Ionicons name="add" size={17} color={C.accent} />
@@ -1051,7 +1144,7 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
         </>
       )}
     </>
-  ), [bills, summary, filter, C]);
+  ), [bills, summary, filter, C, openAdd]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1067,16 +1160,23 @@ export default function BillsScreen({ bills, onAddBill, onDeleteBill, onMarkPaid
             bill={item}
             onPay={handlePay}
             onUnpay={handleUnpay}
+            onEdit={openEdit}
             onDelete={handleDelete}
             C={C}
           />
         )}
         ListEmptyComponent={
-          <EmptyState onAdd={() => setShowModal(true)} C={C} />
+          <EmptyState onAdd={openAdd} C={C} />
         }
       />
 
-      <AddBillModal visible={showModal} onClose={() => setShowModal(false)} onAdd={onAddBill} />
+      <AddBillModal
+        visible={showModal}
+        onClose={closeModal}
+        onAdd={onAddBill}
+        onUpdate={onUpdateBill}
+        editingBill={editingBill}
+      />
     </SafeAreaView>
   );
 }
