@@ -9,6 +9,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 let LocalAuthentication;
 try {
   LocalAuthentication = require('expo-local-authentication');
@@ -19,13 +23,39 @@ try {
     authenticateAsync: async () => ({ success: false }),
   };
 }
-import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const PIN_KEY = 'appPin';
 export const PIN_ENABLED_KEY = 'pinEnabled';
 
 const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 30000;
+
+/** Read PIN from SecureStore; migrate plaintext AsyncStorage PIN once. */
+export async function getStoredPin() {
+  try {
+    const secure = await SecureStore.getItemAsync(PIN_KEY);
+    if (secure) return secure;
+    const legacy = await AsyncStorage.getItem(PIN_KEY);
+    if (legacy) {
+      await SecureStore.setItemAsync(PIN_KEY, legacy);
+      await AsyncStorage.removeItem(PIN_KEY);
+      return legacy;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export async function setStoredPin(pin) {
+  await SecureStore.setItemAsync(PIN_KEY, pin);
+  try { await AsyncStorage.removeItem(PIN_KEY); } catch (_) {}
+}
+
+export async function clearStoredPin() {
+  try { await SecureStore.deleteItemAsync(PIN_KEY); } catch (_) {}
+  try { await AsyncStorage.removeItem(PIN_KEY); } catch (_) {}
+  await AsyncStorage.removeItem(PIN_ENABLED_KEY);
+}
 
 export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
   const [digits, setDigits] = useState([]);
@@ -33,26 +63,50 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
   const initialPhase = mode === 'setup' ? 'enter' : mode === 'change' ? 'verify' : 'check';
   const [phase, setPhase] = useState(initialPhase);
   const [error, setError] = useState('');
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+  const [lockRemain, setLockRemain] = useState(0);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const hasBiometrics = useRef(false);
+  const locked = lockUntil > Date.now();
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      hasBiometrics.current = compatible && enrolled;
-      if (mode === 'check' && hasBiometrics.current) {
-        tryBiometric();
-      }
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!cancelled && compatible && enrolled) {
+          setBioAvailable(true);
+          if (mode === 'check') tryBiometric();
+        }
+      } catch (_) {}
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  useEffect(() => {
+    if (!locked) { setLockRemain(0); return; }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setLockRemain(left);
+      if (left <= 0) setLockUntil(0);
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [lockUntil, locked]);
 
   const tryBiometric = async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock Thunder Wallet',
-      fallbackLabel: 'Use PIN',
-    });
-    if (result.success) onSuccess();
+    if (locked) return;
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Thunder Wallet',
+        fallbackLabel: 'Use PIN',
+        cancelLabel: 'Cancel',
+      });
+      if (result.success) onSuccess();
+    } catch (_) {}
   };
 
   const shake = () => {
@@ -66,8 +120,22 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
     ]).start();
   };
 
+  const registerFailure = () => {
+    const next = failedAttempts + 1;
+    setFailedAttempts(next);
+    shake();
+    if (next >= MAX_ATTEMPTS) {
+      setLockUntil(Date.now() + LOCKOUT_MS);
+      setFailedAttempts(0);
+      setError(`Too many attempts. Try again in ${LOCKOUT_MS / 1000}s.`);
+    } else {
+      setError(`Wrong PIN. Try again. (${MAX_ATTEMPTS - next} left)`);
+    }
+    setDigits([]);
+  };
+
   const handleKey = async (key) => {
-    if (key === '') return;
+    if (key === '' || locked) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (key === '⌫') {
@@ -88,7 +156,7 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
         setPhase('confirm');
       } else {
         if (pin === confirmDigits) {
-          await AsyncStorage.setItem(PIN_KEY, pin);
+          await setStoredPin(pin);
           await AsyncStorage.setItem(PIN_ENABLED_KEY, 'true');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onSuccess();
@@ -103,16 +171,15 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
 
     } else if (mode === 'change') {
       if (phase === 'verify') {
-        const saved = await AsyncStorage.getItem(PIN_KEY);
+        const saved = await getStoredPin();
         if (pin === saved) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setDigits([]);
           setError('');
+          setFailedAttempts(0);
           setPhase('enter');
         } else {
-          shake();
-          setError('Wrong PIN. Try again.');
-          setDigits([]);
+          registerFailure();
         }
       } else if (phase === 'enter') {
         setConfirmDigits(pin);
@@ -120,7 +187,7 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
         setPhase('confirm');
       } else {
         if (pin === confirmDigits) {
-          await AsyncStorage.setItem(PIN_KEY, pin);
+          await setStoredPin(pin);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onSuccess();
         } else {
@@ -133,14 +200,13 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
       }
 
     } else {
-      const saved = await AsyncStorage.getItem(PIN_KEY);
-      if (pin === saved) {
+      const saved = await getStoredPin();
+      if (saved && pin === saved) {
+        setFailedAttempts(0);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onSuccess();
       } else {
-        shake();
-        setError('Wrong PIN. Try again.');
-        setDigits([]);
+        registerFailure();
       }
     }
   };
@@ -172,16 +238,17 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
           ))}
         </Animated.View>
 
-        {!!error && <Text style={styles.error}>{error}</Text>}
+        {!!error && <Text style={styles.error}>{locked && lockRemain > 0 ? `Locked. Try again in ${lockRemain}s.` : error}</Text>}
 
         <View style={styles.keypad}>
           {KEYS.map((k, i) => (
             <TouchableOpacity
               key={i}
-              style={[styles.key, k === '' && { opacity: 0 }]}
+              style={[styles.key, (k === '' || locked) && { opacity: 0.35 }]}
               onPress={() => handleKey(k)}
-              disabled={k === ''}
+              disabled={k === '' || locked}
               activeOpacity={0.7}
+              accessibilityLabel={k === '⌫' ? 'Delete' : k === '' ? undefined : `Digit ${k}`}
             >
               <Text style={styles.keyText}>{k}</Text>
             </TouchableOpacity>
@@ -189,8 +256,8 @@ export default function PinScreen({ mode = 'check', onSuccess, onCancel }) {
         </View>
 
         <View style={styles.bottomRow}>
-          {hasBiometrics.current && mode === 'check' && (
-            <TouchableOpacity onPress={tryBiometric} style={styles.bioBtn}>
+          {bioAvailable && mode === 'check' && !locked && (
+            <TouchableOpacity onPress={tryBiometric} style={styles.bioBtn} accessibilityLabel="Unlock with biometrics">
               <Ionicons name="finger-print" size={26} color="#A78BFA" />
               <Text style={styles.bioBtnText}>Use Biometric</Text>
             </TouchableOpacity>
@@ -216,7 +283,7 @@ const styles = StyleSheet.create({
   dotsRow: { flexDirection: 'row', gap: 18 },
   pinDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'transparent' },
   pinDotFilled: { backgroundColor: '#A78BFA', borderColor: '#A78BFA' },
-  error: { color: '#F87171', fontSize: 13, fontFamily: 'DMSans_700Bold' },
+  error: { color: '#F87171', fontSize: 13, fontFamily: 'DMSans_700Bold', textAlign: 'center', paddingHorizontal: 12 },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, width: '100%', maxWidth: 300 },
   key: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center' },
   keyText: { color: '#F9FAFB', fontSize: 26, fontFamily: 'DMSans_700Bold' },

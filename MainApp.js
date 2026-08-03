@@ -228,16 +228,12 @@ const confettiStyles = StyleSheet.create({
 // ─── Animated Balance Number ──────────────────────────────────────────────────
 function AnimatedBalance({ value, color, fontSize = 38 }) {
   const animVal = useRef(new Animated.Value(value)).current;
-  const displayVal = useRef(value);
   const [displayed, setDisplayed] = useState(value);
 
   useEffect(() => {
+    const id = animVal.addListener(({ value: v }) => setDisplayed(v));
     Animated.timing(animVal, { toValue: value, duration: 600, useNativeDriver: false }).start();
-    animVal.addListener(({ value: v }) => {
-      displayVal.current = v;
-      setDisplayed(v);
-    });
-    return () => animVal.removeAllListeners();
+    return () => animVal.removeListener(id);
   }, [value]);
 
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(displayed);
@@ -1486,12 +1482,14 @@ function CustomTabBar({ state, navigation }) {
   ).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.30, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1,    duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   const handleCardPress = () => {
@@ -1918,14 +1916,18 @@ function MainApp() {
     ]);
   };
 
-  // Check if any goal just hit completion
+  // Check if any goal just hit completion (single batch write)
   useEffect(() => {
-    goals.forEach((g) => {
-      if (g.savedAmount >= g.target && !g.celebratedAt) {
-        setConfettiGoal(g);
-        persistGoals(goals.map((goal) => goal.id === g.id ? { ...goal, celebratedAt: new Date().toISOString() } : goal));
-      }
-    });
+    const newlyDone = goals.filter((g) => g.savedAmount >= g.target && !g.celebratedAt);
+    if (!newlyDone.length) return;
+    setConfettiGoal(newlyDone[0]);
+    persistGoals(
+      goals.map((goal) =>
+        newlyDone.some((n) => n.id === goal.id)
+          ? { ...goal, celebratedAt: new Date().toISOString() }
+          : goal
+      )
+    );
   }, [goals]);
 
   const resetAllData = async () => {
@@ -1937,6 +1939,8 @@ function MainApp() {
         AsyncStorage.removeItem(CAT_BUDGETS_KEY),
         AsyncStorage.removeItem(BILLS_KEY),
         AsyncStorage.removeItem(SAVINGS_KEY),
+        AsyncStorage.removeItem(HIDE_BALANCE_KEY),
+        AsyncStorage.removeItem(DAILY_LIMIT_KEY),
       ]);
       setTransactions([]);
       setMonthlyBudget(DEFAULT_MONTHLY_BUDGET);
@@ -1944,6 +1948,8 @@ function MainApp() {
       setCategoryBudgets({});
       setBills([]);
       setSavings([]);
+      setHideBalanceFeature(false);
+      setDailySpendLimit(0);
     } catch { Alert.alert('Reset error', 'Could not reset data.'); }
   };
 

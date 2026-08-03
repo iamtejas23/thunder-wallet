@@ -110,7 +110,7 @@ async function deleteOneCard(cards, idx) {
 
 // ── Input formatters ───────────────────────────────────────────────────────────
 function formatCardNumber(val) {
-  const digits = val.replace(/\D/g, '').slice(0, 16);
+  const digits = val.replace(/\D/g, '').slice(0, 19);
   return digits.replace(/(.{4})/g, '$1 ').trim();
 }
 function formatExpiry(val) {
@@ -171,12 +171,14 @@ function VirtualCard({ card, flipped = false, onFlip }) {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         Animated.timing(glowAnim, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   useEffect(() => {
@@ -414,7 +416,7 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
               if (manualType) setManualType(null);
             }}
             keyboardType="number-pad"
-            maxLength={19}
+            maxLength={23}
             secureTextEntry={!showNum}
           />
         </FormField>

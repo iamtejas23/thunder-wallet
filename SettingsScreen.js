@@ -23,7 +23,7 @@ import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
 import MeshBackground from './MeshBackground';
 import UpdateModal from './UpdateModal';
-import PinScreen, { PIN_ENABLED_KEY, PIN_KEY } from './PinScreen';
+import PinScreen, { PIN_ENABLED_KEY, clearStoredPin } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
 
 const BACKUP_KEYS = ['transactions', 'monthlyBudget', 'savingsGoals', 'categoryBudgets', 'bills_v2', 'savings_v1', 'hideBalanceFeature', 'dailySpendLimit'];
@@ -155,7 +155,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove PIN', style: 'destructive', onPress: async () => {
-            await AsyncStorage.multiRemove([PIN_ENABLED_KEY, PIN_KEY]);
+            await clearStoredPin();
             setPinEnabled(false);
           },
         },
@@ -210,9 +210,13 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
               if (result.canceled) { setIsRestoring(false); return; }
               const content = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.UTF8 });
               const parsed = JSON.parse(content);
-              if (!parsed.version || !parsed.data) throw new Error('invalid');
+              if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('invalid');
               const d = parsed.data;
-              const pairs = Object.entries(d).map(([k, v]) => [k, String(v)]);
+              // Only restore known keys — never write arbitrary AsyncStorage keys from a file
+              const pairs = BACKUP_KEYS
+                .filter((k) => d[k] != null)
+                .map((k) => [k, String(d[k])]);
+              if (!pairs.length) throw new Error('empty');
               await AsyncStorage.multiSet(pairs);
               onRestoreData?.({
                 transactions: d.transactions ? JSON.parse(d.transactions) : undefined,

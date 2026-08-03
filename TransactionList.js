@@ -145,7 +145,7 @@ const TransactionList = ({
     const q = searchQuery.trim().toLowerCase();
     return transactions.filter((t) => {
       const mf = activeFilter === 'all' || (activeFilter === 'income' && t.amount >= 0) || (activeFilter === 'expense' && t.amount < 0);
-      const ms = !q || t.category.toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q);
+      const ms = !q || (t.category || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q);
       return mf && ms;
     });
   }, [activeFilter, searchQuery, transactions]);
@@ -204,6 +204,11 @@ const TransactionList = ({
       // ── Format helpers ──────────────────────────────────────────────────────
       const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
       const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const esc = (s) => String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 
       // ── Category bar rows ───────────────────────────────────────────────────
       const maxCat = catRows[0]?.[1] || 1;
@@ -213,7 +218,7 @@ const TransactionList = ({
         return `
           <div class="cat-row">
             <div class="cat-meta">
-              <span class="cat-name">${cat}</span>
+              <span class="cat-name">${esc(cat)}</span>
               <span class="cat-amt">${fmt(amt)} <span class="cat-pct">${pct}%</span></span>
             </div>
             <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
@@ -230,8 +235,8 @@ const TransactionList = ({
             <tr style="background:${rowBg}">
               <td>${fmtDate(t.date)}</td>
               <td><span class="badge ${isIncome ? 'badge-in' : 'badge-ex'}">${isIncome ? 'Income' : 'Expense'}</span></td>
-              <td>${t.category}</td>
-              <td>${t.note || '—'}</td>
+              <td>${esc(t.category)}</td>
+              <td>${esc(t.note || '—')}</td>
               <td class="${isIncome ? 'amt-in' : 'amt-ex'}">${isIncome ? '+' : '-'}${fmt(Math.abs(t.amount))}</td>
             </tr>`;
         }).join('');

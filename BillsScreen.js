@@ -365,12 +365,14 @@ function UpcomingTimeline({ bills, C }) {
 function AlertBanner({ icon, message, color, bg, border }) {
   const scaleAnim = useRef(new Animated.Value(0.96)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(scaleAnim, { toValue: 1, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
         Animated.timing(scaleAnim, { toValue: 0.96, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
   return (
     <Animated.View style={[{ backgroundColor: bg, borderColor: border, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, marginBottom: 8 }, { transform: [{ scale: scaleAnim }] }]}>
@@ -982,12 +984,14 @@ function FilterTabs({ filter, setFilter, summary, billCount, C }) {
 function EmptyState({ onAdd, C }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.04, duration: 1000, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   return (
@@ -1033,7 +1037,7 @@ export default function BillsScreen({ bills, onAddBill, onUpdateBill, onDeleteBi
     const order = { overdue: 0, 'due-soon': 1, upcoming: 2, paid: 3 };
     return [...filtered].sort((a, b) => {
       const od = order[a._status] - order[b._status];
-      return od !== 0 ? od : a.dueDay - b.dueDay;
+      return od !== 0 ? od : (a.dueDay || 0) - (b.dueDay || 0);
     });
   }, [filtered]);
 
