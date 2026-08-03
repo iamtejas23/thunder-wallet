@@ -6,12 +6,12 @@
 
   <!-- ═══ PRIMARY SEO ═══════════════════════════════════════════════════════ -->
   <title>Thunder Wallet – Free Expense Manager &amp; Budget Tracker App for Android</title>
-  <meta name="description" content="Thunder Wallet is a free offline expense manager and budget tracker for Android. Track daily expenses, manage recurring bills, store cards securely, get spending analytics &amp; PDF reports — no account, no cloud, no ads." />
+  <meta name="description" content="Thunder Wallet is a free offline expense manager and budget tracker for Android. Track daily expenses, edit recurring bills on any cycle, store cards securely, backup your data, get spending analytics &amp; PDF reports — no account, no cloud, no ads." />
   <meta name="keywords" content="expense manager, expense tracker, budget tracker, money manager app, personal finance app, expense manager android, free expense tracker, offline expense manager, budget app android, money tracker app, bill tracker, spending tracker, finance app, daily expense tracker, household budget app, expense manager without internet, monthly budget planner, income expense tracker, best expense tracker android, expense manager app" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="author" content="Tejas Mane" />
   <meta name="application-name" content="Thunder Wallet" />
-  <meta name="generator" content="Thunder Wallet v1.0.67" />
+  <meta name="generator" content="Thunder Wallet v2.0.0" />
   <link rel="canonical" href="https://thunder.cloudgrains.com/" />
 
   <!-- ═══ OPEN GRAPH ════════════════════════════════════════════════════════ -->
@@ -76,7 +76,7 @@
         },
         "url": "https://thunder.cloudgrains.com/",
         "downloadUrl": "https://github.com/iamtejas23/thunder-wallet/releases/latest",
-        "softwareVersion": "1.0.67",
+        "softwareVersion": "2.0.0",
         "releaseNotes": "https://github.com/iamtejas23/thunder-wallet/releases",
         "screenshot": "https://thunder.cloudgrains.com/icon.png",
         "image": "https://thunder.cloudgrains.com/icon.png",
@@ -84,12 +84,15 @@
         "featureList": [
           "Offline expense tracking — no internet required",
           "Daily, weekly, monthly budget tracking",
+          "Editable bills with monthly or custom day-based cycles",
           "Bill reminders and recurring bill management",
           "Hardware-backed card security (Android Keystore)",
+          "PIN stored in SecureStore with biometric unlock",
+          "Local JSON backup and restore",
           "Spending analytics with donut charts",
           "PDF financial report export",
           "Savings goals with confetti celebration",
-          "Per-category budget limits",
+          "Per-category budget limits including Fuel and Savings",
           "PIN and biometric fingerprint lock",
           "What-If spending simulator",
           "Financial health score 0-100",
@@ -172,7 +175,7 @@
             "name": "How do I track my daily expenses with Thunder Wallet?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Open the app, tap '+' for Income or '−' for Expense, choose a category (Food, Transport, Shopping, etc.), enter the amount and a note, and tap Save. Your balance updates instantly with a smooth counter animation."
+              "text": "Open the app, tap '+' for Income or '−' for Expense, choose a category (Food, Fuel, Savings, Shopping, etc.), enter the amount and a note, and tap Save. Your balance updates instantly with a smooth counter animation."
             }
           },
           {
@@ -180,7 +183,7 @@
             "name": "Is my financial data secure in Thunder Wallet?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Card numbers and CVVs are stored in Android Keystore (hardware-backed security chip) via expo-secure-store. The app is protected by a 4-digit PIN and biometric fingerprint lock. All data stays on your device — nothing is ever uploaded to a server."
+              "text": "Yes. Card numbers and CVVs are stored in Android Keystore (hardware-backed security chip) via expo-secure-store. Your PIN is stored in SecureStore. The app is protected by a 4-digit PIN and biometric fingerprint lock with lockout after failed attempts. All data stays on your device — nothing is ever uploaded to a server."
             }
           },
           {
@@ -188,7 +191,15 @@
             "name": "Can Thunder Wallet track my monthly bills?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. The Bills screen lets you add recurring bills like Netflix, Jio, Rent, and Electricity with brand icons. You get local notifications the day before and on the due date. Tapping 'Pay' automatically logs the expense transaction."
+              "text": "Yes. The Bills screen lets you add and edit recurring bills like Netflix, Jio, Rent, and Electricity with brand icons. Set monthly, quarterly, yearly, or custom day-based cycles (for example every 15 days). You get local notifications the day before and on the due date. Tapping 'Pay' automatically logs the expense transaction."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I back up my Thunder Wallet data?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Settings lets you export a local JSON backup of transactions, budgets, bills, goals, and savings, and restore it later — still fully offline, with no cloud account required."
             }
           },
           {
@@ -1125,7 +1136,7 @@
     <div class="hero-left">
       <div class="badge hr-1">
         <div class="badge-dot">⚡</div>
-        <span id="badge-version">v1.0.67</span> · Open Source · Android · iOS Soon
+        <span id="badge-version">v2.0.0</span> · Open Source · Android · iOS Soon
       </div>
 
       <h1 class="hr-2">
@@ -1174,7 +1185,7 @@
       </div>
 
       <div class="version-pill hr-6">
-        <span class="tag" id="version-tag">v1.0.67</span>
+        <span class="tag" id="version-tag">v2.0.0</span>
         <span style="color:var(--t3)">·</span>
         <span>React Native 0.81 · Expo SDK 54</span>
         <span class="cursor"></span>
@@ -1318,14 +1329,14 @@
 <section class="section" style="padding-bottom:0">
   <div class="section-inner">
     <div class="whats-new reveal">
-      <div class="wn-tag">v1.0.67</div>
+      <div class="wn-tag">v2.0.0</div>
       <div class="wn-items">
-        <div class="wn-item"><div class="dot"></div>In-app update checker — notified when new version drops</div>
-        <div class="wn-item"><div class="dot"></div>Dark mesh grid background on every screen</div>
-        <div class="wn-item"><div class="dot"></div>Day in Review notifications fixed (Android 12+ exact alarms)</div>
-        <div class="wn-item"><div class="dot"></div>Premium dark splash screen — breathing mesh animation</div>
-        <div class="wn-item"><div class="dot"></div>Pure black bottom nav with circular spotlight active state</div>
-        <div class="wn-item"><div class="dot"></div>Check for Updates button in Settings</div>
+        <div class="wn-item"><div class="dot"></div>Edit bills anytime — change amount, due day, or cycle without recreating</div>
+        <div class="wn-item"><div class="dot"></div>Custom day-based billing cycles — every 7, 15, 30 days or any number you type</div>
+        <div class="wn-item"><div class="dot"></div>Fuel &amp; Savings expense categories across budgets, analytics, and reports</div>
+        <div class="wn-item"><div class="dot"></div>Local JSON backup &amp; restore from Settings — still 100% offline</div>
+        <div class="wn-item"><div class="dot"></div>PIN moved to SecureStore with biometric unlock + lockout after failed attempts</div>
+        <div class="wn-item"><div class="dot"></div>Automated release versioning — Settings always shows the latest build</div>
       </div>
     </div>
   </div>
@@ -1358,11 +1369,11 @@
       <div class="b-card b-span-4" style="--hue: var(--gold)">
         <div class="b-icon" style="background:var(--gold2)">🔔</div>
         <div class="b-title">Bill Due Notifications</div>
-        <div class="b-desc">Local notifications fire 1 day before and on the due day — at 9 AM. Monthly repeat, no server. Add a bill once, get reminded every month automatically.</div>
+        <div class="b-desc">Local notifications fire 1 day before and on the due day — at 9 AM. Works for monthly bills and custom day-based cycles. No server required.</div>
         <div class="b-tags">
           <div class="b-tag" style="background:var(--gold2);border-color:rgba(245,166,35,0.2);color:var(--gold)">Day before</div>
           <div class="b-tag" style="background:var(--gold2);border-color:rgba(245,166,35,0.2);color:var(--gold)">Due day</div>
-          <div class="b-tag" style="background:var(--gold2);border-color:rgba(245,166,35,0.2);color:var(--gold)">Monthly repeat</div>
+          <div class="b-tag" style="background:var(--gold2);border-color:rgba(245,166,35,0.2);color:var(--gold)">Any cycle</div>
         </div>
       </div>
 
@@ -1430,19 +1441,25 @@
       <div class="b-card b-span-4" style="--hue: var(--red)">
         <div class="b-icon" style="background:var(--red2)">🗂</div>
         <div class="b-title">Per-Category Budgets</div>
-        <div class="b-desc">Set monthly limits per category. Color-coded bars warn before you overspend on Food, Shopping, Travel, Bills and more.</div>
+        <div class="b-desc">Set monthly limits per category. Color-coded bars warn before you overspend on Food, Fuel, Savings, Shopping, Travel, Bills and more.</div>
       </div>
 
       <div class="b-card b-span-4" style="--hue: var(--purple)">
         <div class="b-icon" style="background:var(--purple2)">👆</div>
         <div class="b-title">PIN + Biometric</div>
-        <div class="b-desc">4-digit PIN with fingerprint/face unlock on app open. Card details additionally protected by biometric before revealing.</div>
+        <div class="b-desc">4-digit PIN stored in SecureStore, with fingerprint/face unlock on app open and lockout after failed attempts. Card details need biometrics before reveal.</div>
       </div>
 
       <div class="b-card b-span-4" style="--hue: var(--orange)">
         <div class="b-icon" style="background:rgba(251,146,60,0.12)">📋</div>
         <div class="b-title">Bills Tracker</div>
-        <div class="b-desc">Add Netflix, Jio, Rent, Electricity with brand icons. Marks overdue / due-soon / paid status. Tapping "Pay" auto-logs the expense transaction.</div>
+        <div class="b-desc">Add Netflix, Jio, Rent, Electricity with brand icons. Edit anytime. Monthly or custom day cycles. Overdue / due-soon / paid status. Pay auto-logs the expense.</div>
+      </div>
+
+      <div class="b-card b-span-4" style="--hue: var(--teal)">
+        <div class="b-icon" style="background:rgba(45,212,191,0.12)">💾</div>
+        <div class="b-title">Backup &amp; Restore</div>
+        <div class="b-desc">Export a local JSON backup of transactions, budgets, bills, goals, and savings — then restore on a new device. Still offline. No cloud account.</div>
       </div>
 
       <div class="b-card b-span-4" style="--hue: var(--blue)">
@@ -1582,9 +1599,9 @@
               <div style="flex:1;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.18);border-radius:7px;padding:7px;text-align:center;"><div class="mp-label">Paid</div><div style="font-size:10px;font-weight:900;color:var(--green);">₹2.4k</div></div>
               <div style="flex:1;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.18);border-radius:7px;padding:7px;text-align:center;"><div class="mp-label">Unpaid</div><div style="font-size:10px;font-weight:900;color:var(--red);">₹1.2k</div></div>
             </div>
-            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(229,9,20,0.15);">📺</div><div><div class="mp-bill-name">Netflix</div><div class="mp-bill-due" style="color:var(--gold);">Due tomorrow · 5th</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;"><div class="mp-bill-amt" style="color:var(--red);">₹799</div><div style="background:rgba(229,9,20,0.15);border-radius:3px;padding:1px 4px;font-size:5.5px;font-weight:800;color:var(--red);">Pay</div></div></div>
-            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(29,185,84,0.15);">🎵</div><div><div class="mp-bill-name">Spotify</div><div class="mp-bill-due">Due 10th</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;"><div class="mp-bill-amt" style="color:var(--red);">₹119</div><div style="background:rgba(29,185,84,0.15);border-radius:3px;padding:1px 4px;font-size:5.5px;font-weight:800;color:var(--green);">Pay</div></div></div>
-            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(52,211,153,0.15);">✅</div><div><div class="mp-bill-name">Jio</div><div class="mp-bill-due" style="color:var(--green);">Paid Jun 2</div></div><div class="mp-bill-amt" style="color:var(--green);">₹349</div></div>
+            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(229,9,20,0.15);">📺</div><div><div class="mp-bill-name">Netflix</div><div class="mp-bill-due" style="color:var(--gold);">Due tomorrow · 5th</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;"><div class="mp-bill-amt" style="color:var(--red);">₹799</div><div style="display:flex;gap:2px;"><div style="background:rgba(96,165,250,0.15);border-radius:3px;padding:1px 4px;font-size:5.5px;font-weight:800;color:var(--blue);">Edit</div><div style="background:rgba(229,9,20,0.15);border-radius:3px;padding:1px 4px;font-size:5.5px;font-weight:800;color:var(--red);">Pay</div></div></div></div>
+            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(249,115,22,0.15);">⛽</div><div><div class="mp-bill-name">Fuel Top-up</div><div class="mp-bill-due">Every 15d</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;"><div class="mp-bill-amt" style="color:var(--red);">₹2,000</div><div style="background:rgba(249,115,22,0.15);border-radius:3px;padding:1px 4px;font-size:5.5px;font-weight:800;color:#FB923C;">Pay</div></div></div>
+            <div class="mp-bill"><div class="mp-bill-icon" style="background:rgba(52,211,153,0.15);">✅</div><div><div class="mp-bill-name">Jio</div><div class="mp-bill-due" style="color:var(--green);">Paid</div></div><div class="mp-bill-amt" style="color:var(--green);">₹349</div></div>
           </div>
         </div>
         <div class="screen-label">Bills</div>
@@ -1823,21 +1840,28 @@
       <details class="faq-item">
         <summary class="faq-q">How do I track daily expenses with Thunder Wallet?</summary>
         <div class="faq-a">
-          <p>Tap <strong>+</strong> for income or <strong>−</strong> for expense on the Home screen, pick a category (Food, Transport, Shopping, Health, etc.), enter the amount and an optional note, then tap Save. Your running balance updates instantly. The monthly summary and category breakdown update automatically on the Analytics screen.</p>
+          <p>Tap <strong>+</strong> for income or <strong>−</strong> for expense on the Home screen, pick a category (Food, Fuel, Savings, Shopping, Health, etc.), enter the amount and an optional note, then tap Save. Your running balance updates instantly. The monthly summary and category breakdown update automatically on the Analytics screen.</p>
         </div>
       </details>
 
       <details class="faq-item">
         <summary class="faq-q">Is my financial data secure in this budget app?</summary>
         <div class="faq-a">
-          <p>Your card numbers and CVVs are stored in Android Keystore — the hardware-backed security chip on your phone — via <code>expo-secure-store</code>. The app is protected by a 4-digit PIN and biometric fingerprint lock. Nothing is ever uploaded to a server, so there is nothing to breach remotely.</p>
+          <p>Your card numbers and CVVs are stored in Android Keystore — the hardware-backed security chip on your phone — via <code>expo-secure-store</code>. Your PIN is also stored in SecureStore. The app is protected by a 4-digit PIN and biometric fingerprint lock, with lockout after too many failed attempts. Nothing is ever uploaded to a server, so there is nothing to breach remotely.</p>
         </div>
       </details>
 
       <details class="faq-item">
         <summary class="faq-q">Can Thunder Wallet remind me about monthly bills?</summary>
         <div class="faq-a">
-          <p>Yes. The Bills screen lets you add recurring bills — Netflix, Jio, Rent, Electricity, and more — with brand icons and a monthly due date. You receive a local notification one day before and again on the due date. Tapping <strong>Pay</strong> automatically logs the expense transaction, keeping your balance accurate.</p>
+          <p>Yes. The Bills screen lets you <strong>add and edit</strong> recurring bills — Netflix, Jio, Rent, Electricity, and more — with brand icons. Choose monthly, quarterly, yearly, or a <strong>custom day-based cycle</strong> (e.g. every 15 days). You receive a local notification one day before and again on the due date. Tapping <strong>Pay</strong> automatically logs the expense transaction, keeping your balance accurate.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Can I back up my expense data?</summary>
+        <div class="faq-a">
+          <p>Yes. In Settings you can export a local JSON backup of transactions, budgets, bills, goals, and savings, then restore it later on the same or another device. Backup stays on your phone or wherever you save the file — no cloud account required.</p>
         </div>
       </details>
 
@@ -1858,7 +1882,7 @@
       <details class="faq-item">
         <summary class="faq-q">How does Thunder Wallet compare to other expense manager apps?</summary>
         <div class="faq-a">
-          <p>Most expense trackers sync to the cloud, require account sign-up, show ads, or lock features behind a paywall. Thunder Wallet stores everything on your device with hardware-level card encryption, requires no account, has zero ads, and includes premium features like a What-If simulator, savings goals with confetti, a financial health score, and PDF export — all completely free and open source.</p>
+          <p>Most expense trackers sync to the cloud, require account sign-up, show ads, or lock features behind a paywall. Thunder Wallet stores everything on your device with hardware-level card encryption, requires no account, has zero ads, and includes premium features like editable day-based bills, local backup &amp; restore, a What-If simulator, savings goals with confetti, a financial health score, and PDF export — all completely free and open source.</p>
         </div>
       </details>
 
@@ -1955,7 +1979,7 @@ details[open] .faq-q::after {
       </div>
     </div>
     <div class="footer-bottom">
-      <span class="footer-copy">© 2026 Thunder Wallet · <span id="footer-version">v1.0.67</span> · MIT License.</span>
+      <span class="footer-copy">© 2026 Thunder Wallet · <span id="footer-version">v2.0.0</span> · MIT License.</span>
       <span class="footer-made">Built by <a href="https://github.com/iamtejas23" target="_blank" rel="noopener">Tejas Mane</a> · All data stays on your device.</span>
     </div>
   </div>
@@ -2094,7 +2118,7 @@ details[open] .faq-q::after {
     if (wnTag) wnTag.textContent = ver;
   }
   function setLatest(release) {
-    const ver = release.tag_name || 'v1.0.67';
+    const ver = release.tag_name || 'v2.0.0';
     const url = apkUrl(release);
     setVersion(ver);
     const map = [
