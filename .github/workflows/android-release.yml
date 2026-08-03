@@ -59,6 +59,40 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify release version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          GRADLE_NAME=$(grep -oE 'versionName\s+"[^"]+"' android/app/build.gradle | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          GRADLE_CODE=$(grep -oE 'versionCode\s+[0-9]+' android/app/build.gradle | head -1 | grep -oE '[0-9]+$')
+          APP_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+
+          echo "tag version:     $TAG"
+          echo "app.json:        $APP_VERSION (code $APP_CODE)"
+          echo "package.json:    $PKG_VERSION"
+          echo "build.gradle:    $GRADLE_NAME (code $GRADLE_CODE)"
+
+          FAIL=0
+          if [[ "$APP_VERSION" != "$TAG" ]]; then
+            echo "::error::app.json version ($APP_VERSION) does not match tag ($TAG). Run: npm run release -- $TAG"
+            FAIL=1
+          fi
+          if [[ "$PKG_VERSION" != "$TAG" ]]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag ($TAG)."
+            FAIL=1
+          fi
+          if [[ "$GRADLE_NAME" != "$TAG" ]]; then
+            echo "::error::android versionName ($GRADLE_NAME) does not match tag ($TAG)."
+            FAIL=1
+          fi
+          if [[ "$GRADLE_CODE" != "$APP_CODE" ]]; then
+            echo "::error::android versionCode ($GRADLE_CODE) does not match app.json ($APP_CODE)."
+            FAIL=1
+          fi
+          exit $FAIL
+
       - name: Build lightweight APK
         working-directory: android
         run: |

@@ -119,8 +119,8 @@ android {
         applicationId 'com.tejas8787.thunderwallet'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 13
-        versionName "1.0.70"
+        versionCode 14
+        versionName "1.0.71"
         ndk {
             abiFilters(*reactNativeArchitectures())
         }

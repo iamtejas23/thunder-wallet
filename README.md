@@ -101,19 +101,25 @@ npx expo start --clear
 
 ## Building a Release APK
 
-Builds are automated via GitHub Actions. Push a version tag and the APK is published to GitHub Releases automatically:
+One command bumps every version field, commits, tags, and pushes — CI builds the APK and publishes it to GitHub Releases:
 
 ```bash
-# 1. Bump version in app.json (version + versionCode)
-# 2. Commit and push
-git push origin master
-
-# 3. Tag and push — CI does the rest
-git tag v1.0.65
-git push origin v1.0.65
+npm run release              # patch: 1.0.71 → 1.0.72
+npm run release -- minor     # 1.0.71 → 1.1.0
+npm run release -- major     # 1.0.71 → 2.0.0
+npm run release -- 1.2.0     # explicit version
 ```
 
-The workflow (`.github/workflows/android-release.yml`) builds a lightweight `arm64-v8a` APK and attaches it to the GitHub Release.
+This updates `app.json`, `package.json`, `package-lock.json`, and `android/app/build.gradle` (`version` + `versionCode`), then creates tag `vX.Y.Z` and pushes. Settings and the APK always show the same version.
+
+Preview without writing:
+```bash
+npm run release:dry
+# or
+npm run release -- patch --dry-run
+```
+
+The workflow (`.github/workflows/android-release.yml`) builds a lightweight `arm64-v8a` APK, verifies the tag matches the app version, and attaches it to the GitHub Release.
 
 **Manual local build:**
 ```bash
