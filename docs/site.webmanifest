@@ -1,0 +1,26 @@
+{
+  "name": "Thunder Wallet – Offline Expense Manager",
+  "short_name": "Thunder Wallet",
+  "description": "Free offline expense manager and budget tracker for Android. Track expenses, bills, cards, and budgets — no account, no cloud, no ads.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07080F",
+  "theme_color": "#07080F",
+  "lang": "en",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
