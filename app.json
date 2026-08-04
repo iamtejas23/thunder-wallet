@@ -19,7 +19,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.tejas8787.thunderwallet",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Use Face ID to unlock Thunder Wallet",
+        "NSFaceIDUsageDescription": "Use Face ID to unlock Thunder Wallet and protect your saved card details",
         "NSCameraUsageDescription": "Used for biometric authentication",
         "ITSAppUsesNonExemptEncryption": false
       }

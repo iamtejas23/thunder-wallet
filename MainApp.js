@@ -81,6 +81,48 @@ const normalizeTransaction = (t) => {
 const localDateStr = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+const toLocalDate = (value) => {
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/** Top categories for charts; folds the rest into "Other" so the donut always closes. */
+const buildCategoryPie = (transactions, { monthOnly = false } = {}) => {
+  const now = new Date();
+  const cm = now.getMonth();
+  const cy = now.getFullYear();
+  const cats = {};
+  let total = 0;
+
+  transactions.forEach((t) => {
+    if (!(t.amount < 0)) return;
+    const d = toLocalDate(t.date);
+    if (!d) return;
+    if (monthOnly && (d.getMonth() !== cm || d.getFullYear() !== cy)) return;
+    const abs = Math.abs(t.amount);
+    const cat = t.category || 'Other';
+    cats[cat] = (cats[cat] || 0) + abs;
+    total += abs;
+  });
+
+  const entries = Object.entries(cats).sort(([, a], [, b]) => b - a);
+  let rows = entries;
+  if (entries.length > 6) {
+    const top = entries.slice(0, 5);
+    const otherAmount = entries.slice(5).reduce((s, [, amount]) => s + amount, 0);
+    rows = [...top, ['Other', otherAmount]];
+  }
+
+  const pieData = rows.map(([category, amount], i) => ({
+    category,
+    amount,
+    percentage: total ? (amount / total) * 100 : 0,
+    color: category === 'Other' ? '#94A3B8' : CHART_COLORS[i % CHART_COLORS.length],
+  }));
+
+  return { pieData, pieTotal: total };
+};
+
 const polarToCartesian = (c, r, deg) => {
   const rad = ((deg - 90) * Math.PI) / 180;
   return { x: c + r * Math.cos(rad), y: c + r * Math.sin(rad) };
@@ -91,6 +133,32 @@ const describeArc = (c, r, s, e) => {
   const end = polarToCartesian(c, r, s);
   const flag = e - s <= 180 ? '0' : '1';
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${flag} 0 ${end.x} ${end.y}`;
+};
+
+/** Filled donut wedge — much better tap target than a stroked arc. */
+const describeDonutSlice = (cx, cy, rOuter, rInner, startAngle, endAngle) => {
+  const sweep = endAngle - startAngle;
+  if (sweep <= 0) return null;
+  const large = sweep <= 180 ? '0' : '1';
+  const so = polarToCartesian(cx, rOuter, endAngle);
+  const eo = polarToCartesian(cx, rOuter, startAngle);
+  const si = polarToCartesian(cx, rInner, endAngle);
+  const ei = polarToCartesian(cx, rInner, startAngle);
+  return [
+    `M ${so.x} ${so.y}`,
+    `A ${rOuter} ${rOuter} 0 ${large} 0 ${eo.x} ${eo.y}`,
+    `L ${ei.x} ${ei.y}`,
+    `A ${rInner} ${rInner} 0 ${large} 1 ${si.x} ${si.y}`,
+    'Z',
+  ].join(' ');
+};
+
+/** Convert touch point to degrees where 0 = top, clockwise (matches donut). */
+const touchToDonutAngle = (x, y, cx, cy) => {
+  let deg = (Math.atan2(y - cy, x - cx) * 180) / Math.PI + 90;
+  if (deg < 0) deg += 360;
+  if (deg >= 360) deg -= 360;
+  return deg;
 };
 
 // ─── Streak ───────────────────────────────────────────────────────────────────
@@ -115,17 +183,17 @@ function calculateStreak(transactions, monthlyBudget) {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 function generateSmartInsights(transactions) {
   if (!transactions.length) return [];
-  const expenses = transactions.filter((t) => t.amount < 0);
+  const expenses = transactions.filter((t) => t.amount < 0 && toLocalDate(t.date));
   if (!expenses.length) return [];
   const insights = [];
 
   const dowSpend = {};
-  expenses.forEach((t) => { const dow = new Date(t.date).getDay(); dowSpend[dow] = (dowSpend[dow] || 0) + Math.abs(t.amount); });
+  expenses.forEach((t) => { const dow = toLocalDate(t.date).getDay(); dowSpend[dow] = (dowSpend[dow] || 0) + Math.abs(t.amount); });
   const [peakDow] = Object.entries(dowSpend).sort(([, a], [, b]) => b - a);
   if (peakDow) insights.push({ icon: 'calendar', color: '#60A5FA', title: 'Peak Spending Day', body: `${DAY_NAMES[+peakDow[0]]}s are your biggest spending days. Plan ahead!` });
 
-  const wEnd = expenses.filter((t) => [0, 6].includes(new Date(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const wDay = expenses.filter((t) => ![0, 6].includes(new Date(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const wEnd = expenses.filter((t) => [0, 6].includes(toLocalDate(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const wDay = expenses.filter((t) => ![0, 6].includes(toLocalDate(t.date).getDay())).reduce((s, t) => s + Math.abs(t.amount), 0);
   if (wEnd > wDay * 0.6) insights.push({ icon: 'sunny', color: '#FB923C', title: 'Weekend Spender', body: 'You spend more on weekends. Consider setting a weekend limit.' });
   else if (expenses.length > 5) insights.push({ icon: 'briefcase', color: '#A78BFA', title: 'Disciplined Weekends', body: 'Great job — your weekend spending stays controlled.' });
 
@@ -524,30 +592,277 @@ function CategoryBudgetModal({ visible, onClose, categoryBudgets, onSave, C }) {
 
 // ─── Interactive Donut Chart ──────────────────────────────────────────────────
 function InteractiveDonutChart({ data, total, selectedSegment, onSelectSegment, C }) {
-  const CX = 120, R = 82, SW = 32, EXPLODE = 20;
-  let startAngle = 0;
-  if (!data.length || total <= 0) {
-    return <Svg width={240} height={240}><Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" /></Svg>;
+  const SIZE = 240;
+  const CX = 120;
+  const R_OUTER = 104;
+  const R_INNER = 62;
+  const EXPLODE = 10;
+  const GAP = 2.5;
+
+  const slices = useMemo(() => {
+    if (!data.length || total <= 0) return [];
+    const ringTotal = data.reduce((s, item) => s + item.amount, 0) || total;
+    let startAngle = 0;
+    return data.map((item, i) => {
+      const segAngle = (item.amount / ringTotal) * 360;
+      const gap = data.length > 1 && segAngle > GAP * 2 ? GAP : 0;
+      const arcStart = startAngle + gap / 2;
+      const arcEnd = startAngle + segAngle - gap / 2;
+      const mid = startAngle + segAngle / 2;
+      const midRad = ((mid - 90) * Math.PI) / 180;
+      const slice = {
+        ...item,
+        index: i,
+        arcStart,
+        arcEnd: Math.min(arcEnd, 359.99),
+        mid,
+        midRad,
+        segAngle,
+      };
+      startAngle += segAngle;
+      return slice;
+    }).filter((s) => s.segAngle > 0 && s.arcEnd > s.arcStart);
+  }, [data, total]);
+
+  const handleTap = (locationX, locationY) => {
+    if (!slices.length) return;
+    const dx = locationX - CX;
+    const dy = locationY - CX;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Only register taps on the ring (not the hollow center / outside)
+    if (dist < R_INNER - 4 || dist > R_OUTER + 8) return;
+
+    const angle = touchToDonutAngle(locationX, locationY, CX, CX);
+    const hit = slices.find((s) => angle >= s.arcStart && angle <= s.arcEnd)
+      || slices.find((s) => angle >= s.arcStart - GAP / 2 && angle <= s.arcEnd + GAP / 2);
+    if (!hit) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelectSegment(selectedSegment === hit.index ? null : hit.index);
+  };
+
+  if (!slices.length) {
+    return (
+      <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={SIZE} height={SIZE}>
+          <Circle cx={CX} cy={CX} r={(R_OUTER + R_INNER) / 2} stroke={C.cardInner} strokeWidth={R_OUTER - R_INNER} fill="none" />
+        </Svg>
+      </View>
+    );
   }
+
   return (
-    <Svg width={240} height={240}>
-      <Circle cx={CX} cy={CX} r={R} stroke={C.cardInner} strokeWidth={SW + 4} fill="none" />
-      {data.map((item, i) => {
-        const segAngle = (item.amount / total) * 360;
-        const endAngle = startAngle + segAngle;
-        const midRad = (((startAngle + segAngle / 2) - 90) * Math.PI) / 180;
-        const isSel = selectedSegment === i;
-        const dx = isSel ? (Math.cos(midRad) * EXPLODE).toFixed(2) : 0;
-        const dy = isSel ? (Math.sin(midRad) * EXPLODE).toFixed(2) : 0;
-        const arcPath = describeArc(CX, R, startAngle, Math.min(endAngle, 359.99));
-        startAngle = endAngle;
+    <Pressable
+      style={{ width: SIZE, height: SIZE }}
+      onPress={(e) => {
+        const { locationX, locationY } = e.nativeEvent;
+        handleTap(locationX, locationY);
+      }}
+    >
+      <Svg width={SIZE} height={SIZE} pointerEvents="none">
+        <Circle cx={CX} cy={CX} r={(R_OUTER + R_INNER) / 2} stroke={C.cardInner} strokeWidth={R_OUTER - R_INNER} fill="none" />
+        {slices.map((slice) => {
+          const isSel = selectedSegment === slice.index;
+          const dx = isSel ? Math.cos(slice.midRad) * EXPLODE : 0;
+          const dy = isSel ? Math.sin(slice.midRad) * EXPLODE : 0;
+          const path = describeDonutSlice(CX, CX, R_OUTER, R_INNER, slice.arcStart, slice.arcEnd);
+          if (!path) return null;
+          return (
+            <G key={`${slice.category}-${slice.index}`} transform={`translate(${dx}, ${dy})`}>
+              <Path
+                d={path}
+                fill={slice.color}
+                fillOpacity={selectedSegment !== null && !isSel ? 0.28 : 1}
+                stroke={C.card}
+                strokeWidth={1.5}
+              />
+            </G>
+          );
+        })}
+      </Svg>
+    </Pressable>
+  );
+}
+
+// ─── Month spending heatmap (calendar map) ────────────────────────────────────
+function SpendingHeatmap({ transactions, C }) {
+  const [picked, setPicked] = useState(null);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const monthLabel = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+  const dayTotals = useMemo(() => {
+    const map = {};
+    transactions.forEach((t) => {
+      if (!(t.amount < 0)) return;
+      const d = toLocalDate(t.date);
+      if (!d) return;
+      if (d.getMonth() !== month || d.getFullYear() !== year) return;
+      const day = d.getDate();
+      map[day] = (map[day] || 0) + Math.abs(t.amount);
+    });
+    return map;
+  }, [transactions, month, year]);
+
+  const maxSpend = Math.max(...Object.values(dayTotals), 1);
+  const monthTotal = Object.values(dayTotals).reduce((s, v) => s + v, 0);
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push({ empty: true, key: `e${i}` });
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ empty: false, day, amount: dayTotals[day] || 0, key: `d${day}` });
+  }
+
+  const heatColor = (amount) => {
+    if (!amount) return C.cardInner;
+    const t = Math.min(amount / maxSpend, 1);
+    const r = Math.round(167 + (244 - 167) * t);
+    const g = Math.round(139 + (114 - 139) * t);
+    const b = Math.round(250 + (182 - 250) * t);
+    const a = 0.22 + t * 0.78;
+    return `rgba(${r},${g},${b},${a.toFixed(2)})`;
+  };
+
+  return (
+    <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, padding: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+          <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+            <Ionicons name="map" size={15} color={C.purple} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Spending Map</Text>
+            <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{monthLabel}</Text>
+          </View>
+        </View>
+        <Text style={{ color: C.purple, fontSize: 14, fontFamily: 'DMSans_900Black' }}>{compactCurrency.format(monthTotal)}</Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+          <Text key={`${d}${i}`} style={{ color: C.text3, flex: 1, fontSize: 10, fontFamily: 'DMSans_700Bold', textAlign: 'center' }}>{d}</Text>
+        ))}
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+        {cells.map((cell) => {
+          if (cell.empty) {
+            return <View key={cell.key} style={{ width: '14.28%', padding: 2 }}><View style={{ aspectRatio: 1 }} /></View>;
+          }
+          const isToday = cell.day === today;
+          const isPicked = picked === cell.day;
+          return (
+            <TouchableOpacity
+              key={cell.key}
+              style={{ width: '14.28%', padding: 2 }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setPicked(isPicked ? null : cell.day);
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={{
+                aspectRatio: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                backgroundColor: heatColor(cell.amount),
+                borderWidth: isToday || isPicked ? 1.5 : 0,
+                borderColor: isPicked ? C.purple : isToday ? C.amber : 'transparent',
+              }}>
+                <Text style={{
+                  color: cell.amount ? C.text1 : C.text3,
+                  fontSize: 11,
+                  fontFamily: isToday || isPicked ? 'DMSans_900Black' : 'DMSans_600SemiBold',
+                }}>{cell.day}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
+        <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold' }}>Low</Text>
+        {[0.15, 0.35, 0.55, 0.75, 1].map((t) => (
+          <View key={t} style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: heatColor(t * maxSpend) }} />
+        ))}
+        <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold' }}>High</Text>
+      </View>
+
+      {picked != null && (
+        <View style={{ backgroundColor: C.cardInner, borderRadius: 12, marginTop: 12, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>
+            {new Date(year, month, picked).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </Text>
+          <Text style={{ color: dayTotals[picked] ? C.expense : C.text3, fontSize: 15, fontFamily: 'DMSans_900Black' }}>
+            {dayTotals[picked] ? currency.format(dayTotals[picked]) : 'No spend'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Vertical monthly history bars ────────────────────────────────────────────
+function MonthlyHistoryChart({ data, C }) {
+  const chrono = [...data].reverse();
+  const max = Math.max(...chrono.map((m) => m.total), 1);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 140, paddingTop: 8 }}>
+      {chrono.map((m) => {
+        const h = Math.max((m.total / max) * 100, m.total ? 8 : 2);
+        const isLatest = m.key === data[0]?.key;
         return (
-          <G key={i} transform={`translate(${dx}, ${dy})`}>
-            <Path d={arcPath} stroke={item.color} strokeWidth={isSel ? SW + 10 : SW - 2} strokeOpacity={selectedSegment !== null && !isSel ? 0.3 : 1} strokeLinecap="butt" fill="none" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectSegment(isSel ? null : i); }} />
-          </G>
+          <View key={m.key} style={{ flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+            <Text style={{ color: isLatest ? C.blue : C.text3, fontSize: 9, fontFamily: 'DMSans_800ExtraBold', marginBottom: 4 }} numberOfLines={1}>
+              {compactCurrency.format(m.total)}
+            </Text>
+            <View style={{ backgroundColor: C.cardInner, borderRadius: 8, height: 100, justifyContent: 'flex-end', overflow: 'hidden', width: '100%' }}>
+              <View style={{
+                backgroundColor: isLatest ? C.blue : `${C.blue}88`,
+                borderRadius: 8,
+                height: `${h}%`,
+                width: '100%',
+                opacity: isLatest ? 1 : 0.55,
+              }} />
+            </View>
+            <Text style={{ color: isLatest ? C.text1 : C.text3, fontSize: 10, fontFamily: isLatest ? 'DMSans_900Black' : 'DMSans_600SemiBold', marginTop: 6 }} numberOfLines={1}>
+              {m.label.split(' ')[0]}
+            </Text>
+          </View>
         );
       })}
-    </Svg>
+    </View>
+  );
+}
+
+// ─── Weekday spending bars with amounts ───────────────────────────────────────
+function WeekdaySpendChart({ dowData, C }) {
+  return (
+    <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 6, height: 120 }}>
+      {dowData.map((day) => (
+        <View key={day.label} style={{ alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' }}>
+          {day.total > 0 && (
+            <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 8, fontFamily: 'DMSans_800ExtraBold', marginBottom: 4 }} numberOfLines={1}>
+              {compactCurrency.format(day.total)}
+            </Text>
+          )}
+          <View style={{ backgroundColor: C.cardInner, borderRadius: 8, flex: 1, justifyContent: 'flex-end', overflow: 'hidden', width: '100%', maxHeight: 88 }}>
+            <View style={{
+              backgroundColor: day.isPeak ? C.purple : C.accent,
+              borderRadius: 8,
+              height: `${Math.max(day.pct * 100, day.total ? 10 : 3)}%`,
+              opacity: day.total ? (day.isPeak ? 1 : 0.45) : 0.12,
+              width: '100%',
+            }} />
+          </View>
+          <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 10, fontFamily: day.isPeak ? 'DMSans_900Black' : 'DMSans_600SemiBold', marginTop: 6 }}>{day.label}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -965,38 +1280,61 @@ function AnalyticsScreen({ wallet }) {
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [simulateMode, setSimulateMode] = useState(false);
   const [simOverrides, setSimOverrides] = useState({});
+  const [piePeriod, setPiePeriod] = useState('month'); // 'month' | 'all'
 
-  const pieData = stats.topCategories.map((item, i) => ({ ...item, color: CHART_COLORS[i % CHART_COLORS.length] }));
-  const hasPieData = pieData.length > 0;
   const smartInsights = useMemo(() => generateSmartInsights(transactions), [transactions]);
+  const health = useMemo(() => getHealthScoreDetails(stats, monthlyBudget), [stats, monthlyBudget]);
+  const scoreColor = health.score >= 70 ? C.income : health.score >= 40 ? C.amber : C.expense;
+
+  const { pieData, pieTotal } = useMemo(
+    () => buildCategoryPie(transactions, { monthOnly: piePeriod === 'month' }),
+    [transactions, piePeriod],
+  );
+
+  // What-If must always use this month — never all-time totals labeled as "/month"
+  const { pieData: monthPieData } = useMemo(
+    () => buildCategoryPie(transactions, { monthOnly: true }),
+    [transactions],
+  );
+  const hasPieData = pieData.length > 0;
+  const hasMonthPie = monthPieData.length > 0;
+
+  useEffect(() => {
+    setSelectedSegment(null);
+    setSimOverrides({});
+    setSimulateMode(false);
+  }, [piePeriod]);
+
+  useEffect(() => {
+    if (selectedSegment != null && selectedSegment >= pieData.length) {
+      setSelectedSegment(null);
+    }
+  }, [pieData, selectedSegment]);
 
   const monthlyBreakdown = useMemo(() => {
     const groups = {};
     transactions.forEach((t) => {
-      if (t.amount < 0) {
-        const d = new Date(t.date);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-        if (!groups[key]) groups[key] = { key, label, total: 0 };
-        groups[key].total += Math.abs(t.amount);
-      }
+      if (!(t.amount < 0)) return;
+      const d = toLocalDate(t.date);
+      if (!d) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+      if (!groups[key]) groups[key] = { key, label, total: 0 };
+      groups[key].total += Math.abs(t.amount);
     });
     return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6);
   }, [transactions]);
 
-  const maxMonthSpend = Math.max(...monthlyBreakdown.map((m) => m.total), 1);
-
   const simSavings = useMemo(() => {
     if (!simulateMode) return null;
     let saved = 0;
-    pieData.forEach((item) => {
+    monthPieData.forEach((item) => {
       const override = simOverrides[item.category];
       if (override !== undefined) saved += Math.max(item.amount - override, 0);
     });
     return saved;
-  }, [simulateMode, simOverrides, pieData]);
+  }, [simulateMode, simOverrides, monthPieData]);
 
-  // ── Month vs Last Month ─────────────────────────────────────────────────────
   const monthComparison = useMemo(() => {
     const now = new Date();
     const curM = now.getMonth(), curY = now.getFullYear();
@@ -1004,7 +1342,8 @@ function AnalyticsScreen({ wallet }) {
     const prevY = curM === 0 ? curY - 1 : curY;
     let curIncome = 0, curExpense = 0, prevIncome = 0, prevExpense = 0;
     transactions.forEach((t) => {
-      const d = new Date(t.date);
+      const d = toLocalDate(t.date);
+      if (!d) return;
       const m = d.getMonth(), y = d.getFullYear();
       if (m === curM && y === curY) { if (t.amount >= 0) curIncome += t.amount; else curExpense += Math.abs(t.amount); }
       if (m === prevM && y === prevY) { if (t.amount >= 0) prevIncome += t.amount; else prevExpense += Math.abs(t.amount); }
@@ -1023,36 +1362,50 @@ function AnalyticsScreen({ wallet }) {
     };
   }, [transactions]);
 
-  // ── Spending by Day of Week ─────────────────────────────────────────────────
   const dowData = useMemo(() => {
     const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const totals = Array(7).fill(0);
     transactions.forEach((t) => {
-      if (t.amount < 0) totals[new Date(t.date).getDay()] += Math.abs(t.amount);
+      if (!(t.amount < 0)) return;
+      const d = toLocalDate(t.date);
+      if (!d) return;
+      totals[d.getDay()] += Math.abs(t.amount);
     });
     const maxVal = Math.max(...totals, 1);
     const peakIdx = totals.indexOf(Math.max(...totals));
-    return DAY_SHORT.map((label, i) => ({ label, total: totals[i], pct: totals[i] / maxVal, isPeak: i === peakIdx }));
+    return DAY_SHORT.map((label, i) => ({
+      label,
+      full: DAY_NAMES[i],
+      total: totals[i],
+      pct: totals[i] / maxVal,
+      isPeak: i === peakIdx && totals[i] > 0,
+    }));
   }, [transactions]);
 
-  // ── Top 5 largest expenses this month ──────────────────────────────────────
   const topExpenses = useMemo(() => {
     const now = new Date();
     const curM = now.getMonth(), curY = now.getFullYear();
     return transactions
-      .filter((t) => { const d = new Date(t.date); return t.amount < 0 && d.getMonth() === curM && d.getFullYear() === curY; })
+      .filter((t) => {
+        if (!(t.amount < 0)) return false;
+        const d = toLocalDate(t.date);
+        return d && d.getMonth() === curM && d.getFullYear() === curY;
+      })
       .sort((a, b) => a.amount - b.amount)
       .slice(0, 5);
   }, [transactions]);
 
-  // ── Category budget adherence ───────────────────────────────────────────────
   const catBudgetRows = useMemo(() => {
     if (!categoryBudgets || !Object.keys(categoryBudgets).length) return [];
     return Object.entries(categoryBudgets)
-      .map(([cat, budget]) => ({ cat, budget, spent: stats.categorySpend[cat] || 0 }))
+      .map(([cat, budget]) => ({ cat, budget, spent: stats.categorySpend?.[cat] || 0 }))
       .filter((r) => r.budget > 0)
-      .sort((a, b) => b.spent / b.budget - a.spent / a.budget);
+      .sort((a, b) => (b.spent / b.budget) - (a.spent / a.budget));
   }, [categoryBudgets, stats.categorySpend]);
+
+  const flowMax = Math.max(stats.monthIncome, stats.monthExpense, 1);
+  const netMonth = stats.monthIncome - stats.monthExpense;
+  const peakDay = dowData.find((d) => d.isPeak);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1064,16 +1417,16 @@ function AnalyticsScreen({ wallet }) {
             <Text style={{ color: C.text1, fontSize: 28, fontFamily: 'DMSans_900Black', letterSpacing: -0.5, marginTop: 2 }}>Spending Map</Text>
           </View>
           <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 20, height: 42, justifyContent: 'center', width: 42 }}>
-            <Ionicons name="pie-chart" size={20} color={C.purple} />
+            <Ionicons name="map" size={20} color={C.purple} />
           </View>
         </View>
 
-        {/* ── Quick Stats Row ── */}
+        {/* Quick Stats */}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
           {[
             { icon: 'receipt', color: C.blue, bg: C.blueBg, label: 'Transactions', value: stats.count },
             { icon: 'trending-down', color: C.expense, bg: C.expenseBg, label: 'Avg / Day', value: compactCurrency.format(stats.dailyAverageExpense) },
-            { icon: 'flame', color: C.amber, bg: C.amberBg, label: 'Top Category', value: stats.topCategory?.category || '—' },
+            { icon: 'flame', color: C.amber, bg: C.amberBg, label: 'Top Category', value: monthPieData[0]?.category || stats.topCategory?.category || '—' },
           ].map((s) => (
             <View key={s.label} style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 14, borderWidth: 1, flex: 1, padding: 12 }}>
               <View style={{ alignItems: 'center', backgroundColor: s.bg, borderRadius: 9, height: 28, justifyContent: 'center', marginBottom: 8, width: 28 }}>
@@ -1085,14 +1438,71 @@ function AnalyticsScreen({ wallet }) {
           ))}
         </View>
 
-        {/* Donut */}
+        {/* Calendar spending heatmap */}
+        <View style={{ marginBottom: 12 }}>
+          <SpendingHeatmap transactions={transactions} C={C} />
+        </View>
+
+        {/* Health score breakdown */}
+        <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginBottom: 12, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: health.factors.length ? 14 : 0 }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', width: 64, height: 64 }}>
+              <Svg width={64} height={64}>
+                <Circle cx={32} cy={32} r={26} stroke={C.cardInner} strokeWidth={6} fill="none" />
+                <Circle cx={32} cy={32} r={26} stroke={scoreColor} strokeWidth={6} fill="none"
+                  strokeDasharray={`${(health.score / 100) * 163.4} 163.4`}
+                  strokeLinecap="round" rotation="-90" origin="32,32" />
+              </Svg>
+              <Text style={{ position: 'absolute', color: scoreColor, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{health.score}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Financial Health</Text>
+              <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black', marginTop: 2 }}>{health.label}</Text>
+              <Text style={{ color: C.text2, fontSize: 12, marginTop: 4 }}>Score from savings, budget, balance & income this month.</Text>
+            </View>
+          </View>
+          {health.factors.map((f) => (
+            <View key={f.label} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_700Bold' }}>{f.label}</Text>
+                <Text style={{ color: C.text1, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{f.pts}/{f.max}</Text>
+              </View>
+              <View style={{ backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: scoreColor, borderRadius: 4, height: 6, width: `${(f.pts / f.max) * 100}%`, opacity: 0.85 }} />
+              </View>
+              <Text style={{ color: C.text3, fontSize: 10, marginTop: 3 }}>{f.hint}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Category donut + period toggle */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 22, borderWidth: 1, padding: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Categories</Text>
+              <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black', marginTop: 2 }}>Where money goes</Text>
+            </View>
+            <View style={{ flexDirection: 'row', backgroundColor: C.cardInner, borderRadius: 10, padding: 3 }}>
+              {[['month', 'Month'], ['all', 'All']].map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPiePeriod(key); setSelectedSegment(null); }}
+                  style={{ backgroundColor: piePeriod === key ? C.purpleBg : 'transparent', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+                >
+                  <Text style={{ color: piePeriod === key ? C.purple : C.text3, fontSize: 12, fontFamily: 'DMSans_800ExtraBold' }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <InteractiveDonutChart data={pieData} total={stats.expense} selectedSegment={selectedSegment} onSelectSegment={setSelectedSegment} C={C} />
+            <InteractiveDonutChart data={pieData} total={pieTotal} selectedSegment={selectedSegment} onSelectSegment={setSelectedSegment} C={C} />
             {selectedSegment === null && (
-              <View style={{ position: 'absolute', alignItems: 'center' }}>
-                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Spent</Text>
-                <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black', marginTop: 2 }}>{compactCurrency.format(stats.expense)}</Text>
+              <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center' }}>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {piePeriod === 'month' ? 'This Month' : 'All Time'}
+                </Text>
+                <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black', marginTop: 2 }}>{compactCurrency.format(pieTotal)}</Text>
                 {hasPieData && <Text style={{ color: C.text3, fontSize: 10, marginTop: 5 }}>Tap a slice</Text>}
               </View>
             )}
@@ -1103,7 +1513,7 @@ function AnalyticsScreen({ wallet }) {
               <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: pieData[selectedSegment].color, marginRight: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{pieData[selectedSegment].category}</Text>
-                <Text style={{ color: C.text2, fontSize: 12, marginTop: 3 }}>{Math.round(pieData[selectedSegment].percentage)}% of total spending</Text>
+                <Text style={{ color: C.text2, fontSize: 12, marginTop: 3 }}>{Math.round(pieData[selectedSegment].percentage)}% of spending</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ color: pieData[selectedSegment].color, fontSize: 18, fontFamily: 'DMSans_900Black' }}>{currency.format(pieData[selectedSegment].amount)}</Text>
@@ -1117,24 +1527,29 @@ function AnalyticsScreen({ wallet }) {
           {hasPieData ? (
             <View style={{ gap: 10, marginTop: 16 }}>
               {pieData.map((item, i) => (
-                <TouchableOpacity key={item.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedSegment(selectedSegment === i ? null : i); }}>
-                  <View style={{ borderRadius: 5, height: 10, width: 10, backgroundColor: item.color, opacity: selectedSegment === i ? 1 : 0.7 }} />
-                  <Text style={{ color: selectedSegment === i ? C.text1 : C.text2, flex: 1, fontSize: 14, fontFamily: selectedSegment === i ? 'DMSans_800ExtraBold' : 'DMSans_600SemiBold' }} numberOfLines={1}>{item.category}</Text>
-                  <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_600SemiBold', minWidth: 32, textAlign: 'right' }}>{Math.round(item.percentage)}%</Text>
-                  <Text style={{ color: item.color, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', minWidth: 52, textAlign: 'right' }}>{compactCurrency.format(item.amount)}</Text>
+                <TouchableOpacity key={item.category} style={{ gap: 6 }} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedSegment(selectedSegment === i ? null : i); }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ borderRadius: 5, height: 10, width: 10, backgroundColor: item.color, opacity: selectedSegment === i ? 1 : 0.7 }} />
+                    <Text style={{ color: selectedSegment === i ? C.text1 : C.text2, flex: 1, fontSize: 14, fontFamily: selectedSegment === i ? 'DMSans_800ExtraBold' : 'DMSans_600SemiBold' }} numberOfLines={1}>{item.category}</Text>
+                    <Text style={{ color: C.text2, fontSize: 12, fontFamily: 'DMSans_600SemiBold' }}>{Math.round(item.percentage)}%</Text>
+                    <Text style={{ color: item.color, fontSize: 13, fontFamily: 'DMSans_800ExtraBold', minWidth: 52, textAlign: 'right' }}>{compactCurrency.format(item.amount)}</Text>
+                  </View>
+                  <View style={{ backgroundColor: C.cardInner, borderRadius: 4, height: 5, overflow: 'hidden', marginLeft: 20 }}>
+                    <View style={{ backgroundColor: item.color, borderRadius: 4, height: 5, width: `${Math.max(item.percentage, 2)}%`, opacity: selectedSegment === i ? 1 : 0.7 }} />
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 28 }}>
               <Ionicons name="pie-chart-outline" size={36} color={C.text3} />
-              <Text style={{ color: C.text2, fontSize: 14, marginTop: 10, textAlign: 'center' }}>Add expenses to see your spending chart.</Text>
+              <Text style={{ color: C.text2, fontSize: 14, marginTop: 10, textAlign: 'center' }}>Add expenses to see your category map.</Text>
             </View>
           )}
         </View>
 
-        {/* What-If Projector */}
-        {hasPieData && (
+        {/* What-If Projector — always this-month data */}
+        {hasMonthPie && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: simulateMode ? 14 : 0 }}>
               <View>
@@ -1150,8 +1565,8 @@ function AnalyticsScreen({ wallet }) {
             </View>
             {simulateMode && (
               <>
-                <Text style={{ color: C.text2, fontSize: 13, marginBottom: 16 }}>Drag each category to see how much you'd save.</Text>
-                {pieData.map((item) => {
+                <Text style={{ color: C.text2, fontSize: 13, marginBottom: 16 }}>Adjust this month’s categories to project savings.</Text>
+                {monthPieData.map((item) => {
                   const override = simOverrides[item.category] ?? item.amount;
                   const diff = item.amount - override;
                   return (
@@ -1167,7 +1582,7 @@ function AnalyticsScreen({ wallet }) {
                           <Ionicons name="remove-circle" size={24} color={C.expense} />
                         </TouchableOpacity>
                         <View style={{ flex: 1, backgroundColor: C.cardInner, borderRadius: 4, height: 6, overflow: 'hidden' }}>
-                          <View style={{ backgroundColor: item.color, borderRadius: 4, height: 6, width: `${Math.min((override / item.amount) * 100, 100)}%` }} />
+                          <View style={{ backgroundColor: item.color, borderRadius: 4, height: 6, width: `${Math.min((override / Math.max(item.amount, 1)) * 100, 100)}%` }} />
                         </View>
                         <TouchableOpacity onPress={() => setSimOverrides((o) => ({ ...o, [item.category]: Math.min((o[item.category] ?? item.amount) + 500, item.amount) }))}>
                           <Ionicons name="add-circle" size={24} color={C.income} />
@@ -1192,7 +1607,7 @@ function AnalyticsScreen({ wallet }) {
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
-                <Text style={{ fontSize: 16 }}>🧠</Text>
+                <Ionicons name="bulb" size={16} color={C.purple} />
               </View>
               <View>
                 <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
@@ -1213,26 +1628,36 @@ function AnalyticsScreen({ wallet }) {
           </View>
         )}
 
-        {/* Income vs Expense */}
+        {/* Money flow this month */}
         <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-          <Text style={{ color: C.text1, fontSize: 17, fontFamily: 'DMSans_900Black', marginBottom: 14 }}>Income vs Expense</Text>
-          {[{ label: 'Income', amount: stats.monthIncome, color: C.income }, { label: 'Expense', amount: stats.monthExpense, color: C.expense }].map((bar) => {
-            const max = Math.max(stats.monthIncome, stats.monthExpense, 1);
-            return (
-              <View key={bar.label} style={{ marginBottom: 14 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{bar.label}</Text>
-                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(bar.amount)}</Text>
-                </View>
-                <View style={{ backgroundColor: C.cardInner, borderRadius: 6, height: 10, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: bar.color, borderRadius: 6, height: 10, width: `${Math.max((bar.amount / max) * 100, bar.amount ? 4 : 0)}%` }} />
-                </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <View>
+              <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>This Month</Text>
+              <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black', marginTop: 2 }}>Money Flow</Text>
+            </View>
+            <View style={{ backgroundColor: netMonth >= 0 ? C.incomeBg : C.expenseBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 }}>
+              <Text style={{ color: netMonth >= 0 ? C.income : C.expense, fontSize: 12, fontFamily: 'DMSans_900Black' }}>
+                Net {netMonth >= 0 ? '+' : '−'}{compactCurrency.format(Math.abs(netMonth))}
+              </Text>
+            </View>
+          </View>
+          {[
+            { label: 'Income', amount: stats.monthIncome, color: C.income },
+            { label: 'Expense', amount: stats.monthExpense, color: C.expense },
+          ].map((bar) => (
+            <View key={bar.label} style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{bar.label}</Text>
+                <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(bar.amount)}</Text>
               </View>
-            );
-          })}
+              <View style={{ backgroundColor: C.cardInner, borderRadius: 8, height: 14, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: bar.color, borderRadius: 8, height: 14, width: `${Math.max((bar.amount / flowMax) * 100, bar.amount ? 4 : 0)}%` }} />
+              </View>
+            </View>
+          ))}
         </View>
 
-        {/* ── Month vs Last Month ── */}
+        {/* Month vs Last Month */}
         {monthComparison.hasPrevData && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -1244,7 +1669,6 @@ function AnalyticsScreen({ wallet }) {
                 <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>{monthComparison.curMonthLabel} vs {monthComparison.prevMonthLabel}</Text>
               </View>
             </View>
-            {/* Column headers */}
             <View style={{ flexDirection: 'row', marginBottom: 10 }}>
               <View style={{ flex: 1 }} />
               <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold', width: 74, textAlign: 'right' }}>{monthComparison.prevMonthLabel}</Text>
@@ -1276,7 +1700,7 @@ function AnalyticsScreen({ wallet }) {
           </View>
         )}
 
-        {/* ── Spending by Day of Week ── */}
+        {/* Weekday map */}
         {transactions.some((t) => t.amount < 0) && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 }}>
@@ -1284,36 +1708,23 @@ function AnalyticsScreen({ wallet }) {
                 <Ionicons name="calendar" size={15} color={C.purple} />
               </View>
               <View>
-                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Patterns</Text>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Week Map</Text>
                 <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Spending by Weekday</Text>
               </View>
             </View>
-            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 6, height: 90 }}>
-              {dowData.map((day) => (
-                <View key={day.label} style={{ alignItems: 'center', flex: 1 }}>
-                  <View style={{ backgroundColor: C.cardInner, borderRadius: 6, flex: 1, justifyContent: 'flex-end', overflow: 'hidden', width: '100%' }}>
-                    <View style={{
-                      backgroundColor: day.isPeak ? C.purple : C.accent,
-                      borderRadius: 6,
-                      height: `${Math.max(day.pct * 100, day.total ? 8 : 2)}%`,
-                      opacity: day.total ? (day.isPeak ? 1 : 0.5) : 0.15,
-                      width: '100%',
-                    }} />
-                  </View>
-                  <Text style={{ color: day.isPeak ? C.purple : C.text3, fontSize: 10, fontFamily: day.isPeak ? 'DMSans_900Black' : 'DMSans_600SemiBold', marginTop: 6 }}>{day.label}</Text>
-                </View>
-              ))}
-            </View>
-            <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderColor: `${C.purple}30`, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 14, padding: 10 }}>
-              <Ionicons name="alert-circle" size={14} color={C.purple} />
-              <Text style={{ color: C.purple, fontSize: 12, fontFamily: 'DMSans_700Bold', flex: 1 }}>
-                {dowData.find((d) => d.isPeak)?.label}s are your highest-spend day
-              </Text>
-            </View>
+            <WeekdaySpendChart dowData={dowData} C={C} />
+            {peakDay && (
+              <View style={{ alignItems: 'center', backgroundColor: C.purpleBg, borderColor: `${C.purple}30`, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 14, padding: 10 }}>
+                <Ionicons name="alert-circle" size={14} color={C.purple} />
+                <Text style={{ color: C.purple, fontSize: 12, fontFamily: 'DMSans_700Bold', flex: 1 }}>
+                  {peakDay.full} is your highest-spend day
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* ── Top 5 Largest Expenses This Month ── */}
+        {/* Biggest expenses */}
         {topExpenses.length > 0 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -1340,7 +1751,7 @@ function AnalyticsScreen({ wallet }) {
           </View>
         )}
 
-        {/* ── Category Budget Adherence ── */}
+        {/* Budget vs Actual */}
         {catBudgetRows.length > 0 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -1379,21 +1790,19 @@ function AnalyticsScreen({ wallet }) {
           </View>
         )}
 
-        {/* Monthly History */}
+        {/* Monthly history bars */}
         {monthlyBreakdown.length > 1 && (
           <View style={{ backgroundColor: C.card, borderColor: C.border, borderRadius: 18, borderWidth: 1, marginTop: 12, padding: 16 }}>
-            <Text style={{ color: C.text1, fontSize: 17, fontFamily: 'DMSans_900Black', marginBottom: 14 }}>Monthly History</Text>
-            {monthlyBreakdown.map((m) => (
-              <View key={m.key} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ color: C.text2, fontSize: 13, fontFamily: 'DMSans_700Bold' }}>{m.label}</Text>
-                  <Text style={{ color: C.text1, fontSize: 13, fontFamily: 'DMSans_800ExtraBold' }}>{compactCurrency.format(m.total)}</Text>
-                </View>
-                <View style={{ backgroundColor: C.cardInner, borderRadius: 6, height: 8, overflow: 'hidden' }}>
-                  <View style={{ backgroundColor: C.blue, borderRadius: 6, height: 8, width: `${Math.max((m.total / maxMonthSpend) * 100, 3)}%` }} />
-                </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <View style={{ alignItems: 'center', backgroundColor: C.blueBg, borderRadius: 10, height: 32, justifyContent: 'center', width: 32 }}>
+                <Ionicons name="bar-chart" size={15} color={C.blue} />
               </View>
-            ))}
+              <View>
+                <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>History</Text>
+                <Text style={{ color: C.text1, fontSize: 16, fontFamily: 'DMSans_900Black' }}>Monthly Spend</Text>
+              </View>
+            </View>
+            <MonthlyHistoryChart data={monthlyBreakdown} C={C} />
           </View>
         )}
       </ScrollView>
@@ -2072,7 +2481,7 @@ function buildStats(transactions, monthlyBudget) {
     else {
       const abs = Math.abs(t.amount);
       s.expense += abs;
-      expCats[t.category] = (expCats[t.category] || 0) + abs;
+      expCats[t.category || 'Other'] = (expCats[t.category || 'Other'] || 0) + abs;
       if (itm) { s.monthExpense += abs; categorySpend[t.category] = (categorySpend[t.category] || 0) + abs; }
       if (weekMap[dk]) weekMap[dk].total += abs;
     }
@@ -2116,23 +2525,33 @@ function buildInsight(stats, monthlyBudget, count) {
 }
 
 function calculateHealthScore(stats, monthlyBudget) {
-  if (!stats.count) return 0;
-  let score = 0;
+  return getHealthScoreDetails(stats, monthlyBudget).score;
+}
 
-  // Savings rate: up to 40 pts (0% saves = 0, 40%+ saves = 40)
-  score += Math.min(Math.max(stats.savingsRate, 0) * 1.0, 40);
+function getHealthScoreDetails(stats, monthlyBudget) {
+  if (!stats.count) {
+    return { score: 0, label: 'No Data', factors: [] };
+  }
 
-  // Budget adherence: up to 30 pts
-  if (stats.budgetUsedPercent <= 80) score += 30;
-  else if (stats.budgetUsedPercent <= 100) score += Math.max(0, 30 - (stats.budgetUsedPercent - 80) * 1.5);
+  const savingsPts = Math.min(Math.max(stats.savingsRate, 0) * 1.0, 40);
+  let budgetPts = 0;
+  if (stats.budgetUsedPercent <= 80) budgetPts = 30;
+  else if (stats.budgetUsedPercent <= 100) budgetPts = Math.max(0, 30 - (stats.budgetUsedPercent - 80) * 1.5);
+  const balancePts = stats.balance > 0 ? 20 : 0;
+  const incomePts = stats.monthIncome > 0 ? 10 : 0;
+  const score = Math.min(100, Math.max(0, Math.round(savingsPts + budgetPts + balancePts + incomePts)));
+  const label = score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Needs Work';
 
-  // Positive balance: 20 pts
-  if (stats.balance > 0) score += 20;
-
-  // Has logged income: 10 pts
-  if (stats.monthIncome > 0) score += 10;
-
-  return Math.min(100, Math.max(0, Math.round(score)));
+  return {
+    score,
+    label,
+    factors: [
+      { label: 'Savings rate', pts: Math.round(savingsPts), max: 40, hint: `${Math.round(Math.max(stats.savingsRate, 0))}% of income` },
+      { label: 'Budget adherence', pts: Math.round(budgetPts), max: 30, hint: `${Math.round(stats.budgetUsedPercent)}% of budget used` },
+      { label: 'Positive balance', pts: balancePts, max: 20, hint: stats.balance > 0 ? 'In the green' : 'Balance is negative' },
+      { label: 'Income logged', pts: incomePts, max: 10, hint: stats.monthIncome > 0 ? 'Income recorded this month' : 'Add income entries' },
+    ],
+  };
 }
 
 export default MainApp;

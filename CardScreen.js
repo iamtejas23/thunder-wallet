@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  AppState,
   Clipboard,
   Easing,
   KeyboardAvoidingView,
@@ -21,12 +22,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as ScreenCapture from 'expo-screen-capture';
+import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from './ThemeContext';
 import MeshBackground from './MeshBackground';
 
 const CARDS_META_KEY   = 'cards_meta_v2';
 const CARDS_LEGACY_KEY = 'saved_cards_v1';
-const SECURE_PREFIX    = 'card_secure_';
+const SECURE_PREFIX    = 'twc_'; // short alphanumeric key prefix (matches PIN-style SecureStore usage)
+const CLIPBOARD_CLEAR_MS = 30000;
+const REVEAL_TTL_SEC = 30;
+
+/** Always normalize card ids — AsyncStorage JSON can turn them into numbers. */
+function normId(id) {
+  return String(id ?? '');
+}
+
+/**
+ * SecureStore keys: alphanumeric + . - _ only.
+ * Keep keys short — same simple style as PIN storage (no iOS-only options on Android).
+ */
+function secureKey(id) {
+  return `${SECURE_PREFIX}${normId(id).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+}
+
+function legacySecureKeys(id) {
+  const n = normId(id);
+  return [
+    secureKey(n),
+    `card_secure_${n}`,
+    `card_secure_${n.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+  ];
+}
 
 // ── Card type detection ────────────────────────────────────────────────────────
 function detectCardType(num) {
@@ -38,19 +65,102 @@ function detectCardType(num) {
   return 'CARD';
 }
 
-// ── SecureStore helpers ────────────────────────────────────────────────────────
-async function writeSecure(id, number, cvv) {
-  await SecureStore.setItemAsync(`${SECURE_PREFIX}${id}`, JSON.stringify({ number, cvv }));
+function digitsOnly(num) {
+  return (num || '').replace(/\D/g, '');
 }
+
+function last4Of(num) {
+  const d = digitsOnly(num);
+  return d.length >= 4 ? d.slice(-4) : '';
+}
+
+/** Luhn check — rejects typos / invalid PANs before they hit SecureStore. */
+function luhnValid(num) {
+  const d = digitsOnly(num);
+  if (d.length < 13 || d.length > 19) return false;
+  let sum = 0;
+  let alt = false;
+  for (let i = d.length - 1; i >= 0; i--) {
+    let n = parseInt(d[i], 10);
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+function toMeta(card) {
+  return {
+    id: normId(card.id),
+    holderName: card.holderName || '',
+    expiry: card.expiry || '',
+    type: card.type || detectCardType(card.number),
+    last4: card.last4 || last4Of(card.number),
+  };
+}
+
+function parseSecurePayload(raw) {
+  if (!raw) return { number: '', cvv: '' };
+  // New compact format: "number|cvv"
+  if (typeof raw === 'string' && raw.includes('|') && !raw.trim().startsWith('{')) {
+    const [number, cvv = ''] = raw.split('|');
+    return { number: digitsOnly(number), cvv: digitsOnly(cvv) };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      number: digitsOnly(parsed.number ?? parsed.n ?? ''),
+      cvv: digitsOnly(parsed.cvv ?? parsed.c ?? ''),
+    };
+  } catch {
+    return { number: digitsOnly(raw), cvv: '' };
+  }
+}
+
+// ── SecureStore helpers (same simple API style as PIN — no platform options) ───
+async function writeSecure(id, number, cvv) {
+  const key = secureKey(id);
+  const pan = digitsOnly(number);
+  const cvc = digitsOnly(cvv);
+  if (!pan) throw new Error('Card number is empty — nothing to store securely.');
+
+  const available = await SecureStore.isAvailableAsync();
+  if (!available) throw new Error('Secure storage is not available on this device.');
+
+  // Compact string value (PIN-style). Avoid JSON + iOS-only options that broke Android reads.
+  const payload = `${pan}|${cvc}`;
+  await SecureStore.setItemAsync(key, payload);
+
+  const verify = await SecureStore.getItemAsync(key);
+  const parsed = parseSecurePayload(verify);
+  if (parsed.number !== pan) {
+    throw new Error('Secure storage write verification failed. Please try again.');
+  }
+}
+
 async function readSecure(id) {
   try {
-    const raw = await SecureStore.getItemAsync(`${SECURE_PREFIX}${id}`);
-    if (raw) return JSON.parse(raw);
+    const available = await SecureStore.isAvailableAsync();
+    if (!available) return { number: '', cvv: '' };
+
+    for (const key of legacySecureKeys(id)) {
+      try {
+        const raw = await SecureStore.getItemAsync(key);
+        const parsed = parseSecurePayload(raw);
+        if (parsed.number || parsed.cvv) return parsed;
+      } catch {}
+    }
   } catch {}
   return { number: '', cvv: '' };
 }
+
 async function deleteSecure(id) {
-  try { await SecureStore.deleteItemAsync(`${SECURE_PREFIX}${id}`); } catch {}
+  for (const key of legacySecureKeys(id)) {
+    try { await SecureStore.deleteItemAsync(key); } catch {}
+  }
 }
 
 // ── Legacy migration (XOR decode, one-time) ───────────────────────────────────
@@ -65,47 +175,109 @@ function xorDecode(encoded, key) {
 async function migrateFromLegacy() {
   try {
     const raw = await AsyncStorage.getItem(CARDS_LEGACY_KEY);
-    if (!raw) return null;
+    if (!raw) return false;
     const KEY = 'tw_card_k3y_2025';
     const old = JSON.parse(raw);
-    const cards = old.map(c => ({
-      id:         c.id || String(Date.now() + Math.random()),
-      holderName: c.holderName || '',
-      expiry:     c.expiry || '',
-      type:       c.type || 'CARD',
-      number:     c._num ? xorDecode(c._num, KEY) : (c.number !== '****' ? c.number : ''),
-      cvv:        c._cvv ? xorDecode(c._cvv, KEY) : (c.cvv !== '***' ? c.cvv : ''),
-    }));
-    for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
-    const meta = cards.map(({ number, cvv, ...rest }) => rest);
+    const meta = [];
+    for (const c of old) {
+      const id = c.id || String(Date.now() + Math.random());
+      const number = c._num ? xorDecode(c._num, KEY) : (c.number !== '****' ? c.number : '');
+      const cvv = c._cvv ? xorDecode(c._cvv, KEY) : (c.cvv !== '***' ? c.cvv : '');
+      await writeSecure(id, number, cvv);
+      meta.push(toMeta({
+        id,
+        holderName: c.holderName || '',
+        expiry: c.expiry || '',
+        type: c.type || detectCardType(number),
+        number,
+      }));
+    }
     await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
     await AsyncStorage.removeItem(CARDS_LEGACY_KEY);
-    return cards;
-  } catch { return null; }
+    return true;
+  } catch { return false; }
 }
 
-// ── Storage helpers ────────────────────────────────────────────────────────────
-async function loadAllCards() {
+/**
+ * Load only non-sensitive metadata into React state.
+ * Full PAN/CVV stay in SecureStore until biometric reveal/edit.
+ */
+async function loadCardMeta() {
   try {
-    const migrated = await migrateFromLegacy();
-    if (migrated) return migrated;
+    await migrateFromLegacy();
     const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
     if (!metaRaw) return [];
     const meta = JSON.parse(metaRaw);
-    return Promise.all(meta.map(async m => ({ ...m, ...(await readSecure(m.id)) })));
+    let dirty = false;
+    const cleaned = [];
+    const seen = new Set();
+    for (const m of meta) {
+      const id = normId(m.id);
+      if (!id || seen.has(id)) {
+        dirty = true;
+        continue;
+      }
+      seen.add(id);
+      let last4 = m.last4 || '';
+      if (!last4) {
+        const sec = await readSecure(id);
+        last4 = last4Of(sec.number);
+        dirty = true;
+      }
+      if (String(m.id) !== id) dirty = true;
+      cleaned.push({
+        id,
+        holderName: m.holderName || '',
+        expiry: m.expiry || '',
+        type: m.type || 'CARD',
+        last4,
+      });
+    }
+    if (dirty) await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(cleaned));
+    return cleaned;
   } catch { return []; }
 }
-async function saveAllCards(cards) {
-  for (const c of cards) await writeSecure(c.id, c.number, c.cvv);
-  const meta = cards.map(({ number, cvv, ...rest }) => rest);
-  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+
+async function upsertCard(card) {
+  const id = normId(card.id);
+  await writeSecure(id, card.number, card.cvv);
+  const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
+  const meta = metaRaw ? JSON.parse(metaRaw) : [];
+  const entry = toMeta({ ...card, id });
+  const idx = meta.findIndex((m) => normId(m.id) === id);
+  if (idx >= 0) meta[idx] = entry;
+  else meta.push(entry);
+  // Drop any duplicate id variants (number vs string)
+  const deduped = [];
+  const seen = new Set();
+  for (const m of meta) {
+    const mid = normId(m.id);
+    if (seen.has(mid)) continue;
+    seen.add(mid);
+    deduped.push({ ...m, id: mid });
+  }
+  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(deduped));
+  return entry;
 }
+
 async function deleteOneCard(cards, idx) {
-  await deleteSecure(cards[idx].id);
-  const next = cards.filter((_, i) => i !== idx);
-  const meta = next.map(({ number, cvv, ...rest }) => rest);
-  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(meta));
+  const target = cards[idx];
+  if (!target) return cards;
+  await deleteSecure(target.id);
+  const next = cards.filter((_, i) => i !== idx).map((c) => toMeta({ ...c, id: normId(c.id) }));
+  await AsyncStorage.setItem(CARDS_META_KEY, JSON.stringify(next));
   return next;
+}
+
+async function isDuplicateNumber(number, excludeId, existingCards) {
+  const incoming = digitsOnly(number);
+  const exclude = excludeId != null ? normId(excludeId) : null;
+  for (const c of existingCards) {
+    if (exclude && normId(c.id) === exclude) continue;
+    const sec = await readSecure(c.id);
+    if (digitsOnly(sec.number) === incoming) return true;
+  }
+  return false;
 }
 
 // ── Input formatters ───────────────────────────────────────────────────────────
@@ -196,10 +368,9 @@ function VirtualCard({ card, flipped = false, onFlip }) {
   const frontOpacity = flipAnim.interpolate({ inputRange: [0.5, 0.501], outputRange: [1, 0], extrapolate: 'clamp' });
   const backOpacity  = flipAnim.interpolate({ inputRange: [0.499, 0.5], outputRange: [0, 1], extrapolate: 'clamp' });
 
-  const rawNum = (card.number || '').replace(/\s/g, '');
-  const first4 = rawNum.slice(0, 4).padEnd(4, '•');
-  const last4  = rawNum.length >= 4 ? rawNum.slice(-4) : '••••';
-  const groups = [first4, '••••', '••••', last4];
+  const last4 = (card.last4 || last4Of(card.number) || '••••').slice(-4).padStart(4, '•');
+  // Never show BIN/first digits until biometric reveal — last4 only on the face.
+  const groups = ['••••', '••••', '••••', last4];
 
   const cardType = card.type || detectCardType(card.number);
   const GRADIENT = {
@@ -208,8 +379,8 @@ function VirtualCard({ card, flipped = false, onFlip }) {
     CARD: ['#312E81', '#6D28D9'],
   };
   const [c1, c2] = GRADIENT[cardType] || GRADIENT.CARD;
-  // FIX: dots shown on back — real CVV only revealed after biometric auth in RevealedPanel
-  const cvvDots = '•'.repeat((card.cvv || '').length || 3);
+  // Real CVV never rendered on the flip face — only after biometric reveal.
+  const cvvDots = '•••';
 
   return (
     <Pressable onPress={onFlip} style={{ width: CARD_W, height: CARD_H }}>
@@ -317,6 +488,9 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
     if (digits.length < 13 || digits.length > 19) {
       Alert.alert('Invalid card number', 'Enter a valid card number (13–19 digits).'); return;
     }
+    if (!luhnValid(digits)) {
+      Alert.alert('Invalid card number', 'That card number failed validation. Please check the digits and try again.'); return;
+    }
     const [mm, yy] = expiry.split('/');
     const month = parseInt(mm, 10);
     const year  = parseInt(`20${yy}`, 10);
@@ -335,7 +509,7 @@ function CardForm({ initialCard, onSave, onCancel, saving = false }) {
       number: cardNumber,
       expiry, cvv,
       type: cardType,
-      id: initialCard?.id || String(Date.now()),
+      id: String(initialCard?.id || `${Date.now()}`),
     });
   };
 
@@ -498,38 +672,61 @@ function FormField({ label, C, children, right }) {
   );
 }
 
-// ── Biometric auth ─────────────────────────────────────────────────────────────
-async function authenticateWithBiometric() {
+// ── Biometric / device-credential gate ────────────────────────────────────────
+async function authenticateForCards(promptMessage = 'Verify your identity to access card details') {
   try {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
-    const isEnrolled  = await LocalAuthentication.isEnrolledAsync();
-    if (!hasHardware || !isEnrolled) {
-      Alert.alert('Biometrics not set up', 'Please enable fingerprint or face unlock in your device settings.');
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    if (!hasHardware && !isEnrolled) {
+      Alert.alert(
+        'Screen lock required',
+        'Set up a device PIN, fingerprint, or Face ID to view or edit card details.',
+      );
       return false;
     }
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage:         'Verify your identity to view card details',
-      cancelLabel:           'Cancel',
-      fallbackLabel:         'Use PIN',
+      promptMessage,
+      cancelLabel: 'Cancel',
+      fallbackLabel: 'Use device passcode',
       disableDeviceFallback: false,
+      biometricsSecurityLevel: 'strong',
     });
-    return result.success;
-  } catch { return false; }
+    if (!result.success) {
+      if (result.error && result.error !== 'user_cancel' && result.error !== 'system_cancel') {
+        Alert.alert('Authentication failed', 'Could not verify your identity. Try again.');
+      }
+      return false;
+    }
+    return true;
+  } catch {
+    Alert.alert('Authentication failed', 'Could not verify your identity. Try again.');
+    return false;
+  }
 }
 
-// ── Clipboard helper ───────────────────────────────────────────────────────────
+// ── Clipboard helper (auto-clears sensitive data) ──────────────────────────────
+let clipboardClearTimer = null;
 function copyToClipboard(label, value) {
   try {
-    Clipboard.setString(value || '');
+    const text = value || '';
+    Clipboard.setString(text);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (clipboardClearTimer) clearTimeout(clipboardClearTimer);
+    clipboardClearTimer = setTimeout(() => {
+      try { Clipboard.setString(''); } catch {}
+      clipboardClearTimer = null;
+    }, CLIPBOARD_CLEAR_MS);
+    Alert.alert('Copied', `${label} copied. Clipboard clears in ${CLIPBOARD_CLEAR_MS / 1000}s for security.`);
   } catch {}
 }
 
 // ── Revealed details panel ────────────────────────────────────────────────────
-function RevealedPanel({ card, onHide, C }) {
+function RevealedPanel({ card, secrets, onHide, C }) {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(REVEAL_TTL_SEC);
+  const onHideRef = useRef(onHide);
+  onHideRef.current = onHide;
 
   useEffect(() => {
     Animated.parallel([
@@ -539,24 +736,24 @@ function RevealedPanel({ card, onHide, C }) {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
+    const timer = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => { if (countdown === 0) onHide(); }, [countdown]);
+  useEffect(() => {
+    if (countdown === 0) onHideRef.current();
+  }, [countdown]);
 
-  const fullNum = (card.number || '').replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
-  // FIX: guard all potentially-undefined fields
+  const fullNum = formatCardNumber(secrets?.number || '');
   const rows = [
-    { label: 'Card Number', value: fullNum || '—',            icon: 'card-outline',        copyVal: (card.number || '').replace(/\s/g, '') },
-    { label: 'Card Holder', value: card.holderName || '—',   icon: 'person-outline',       copyVal: card.holderName || '' },
-    { label: 'Expiry Date', value: card.expiry    || '—',    icon: 'calendar-outline',     copyVal: card.expiry    || '' },
-    { label: 'CVV',         value: card.cvv       || '—',    icon: 'lock-closed-outline',  copyVal: card.cvv       || '' },
+    { label: 'Card Number', value: fullNum || '—',           icon: 'card-outline',        copyVal: digitsOnly(secrets?.number) },
+    { label: 'Card Holder', value: card.holderName || '—',  icon: 'person-outline',       copyVal: card.holderName || '' },
+    { label: 'Expiry Date', value: card.expiry || '—',      icon: 'calendar-outline',     copyVal: card.expiry || '' },
+    { label: 'CVV',         value: secrets?.cvv || '—',     icon: 'lock-closed-outline',  copyVal: secrets?.cvv || '' },
   ];
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-      {/* Countdown bar */}
       <View style={{ marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -566,11 +763,10 @@ function RevealedPanel({ card, onHide, C }) {
           <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_700Bold' }}>Hides in {countdown}s</Text>
         </View>
         <View style={{ height: 3, backgroundColor: C.border, borderRadius: 2 }}>
-          <View style={{ height: 3, borderRadius: 2, backgroundColor: '#7C3AED', width: `${(countdown / 30) * 100}%` }} />
+          <View style={{ height: 3, borderRadius: 2, backgroundColor: '#7C3AED', width: `${(countdown / REVEAL_TTL_SEC) * 100}%` }} />
         </View>
       </View>
 
-      {/* Detail rows */}
       <View style={{ borderRadius: 16, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', backgroundColor: 'rgba(124,58,237,0.06)', overflow: 'hidden', marginBottom: 10 }}>
         {rows.map(({ label, value, icon, copyVal }, i) => (
           <View
@@ -585,7 +781,7 @@ function RevealedPanel({ card, onHide, C }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_700Bold', marginBottom: 2 }}>{label}</Text>
-              <Text selectable style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold', letterSpacing: label === 'Card Number' ? 1.5 : 0 }}>
+              <Text style={{ color: C.text1, fontSize: 15, fontFamily: 'DMSans_800ExtraBold', letterSpacing: label === 'Card Number' ? 1.5 : 0 }}>
                 {value}
               </Text>
             </View>
@@ -614,6 +810,7 @@ function RevealedPanel({ card, onHide, C }) {
 // ── Main CardScreen ────────────────────────────────────────────────────────────
 export default function CardScreen() {
   const { C } = useTheme();
+  const isFocused = useIsFocused();
   const [cards,       setCards]       = useState([]);
   const [activeIdx,   setActiveIdx]   = useState(0);
   const [editing,     setEditing]     = useState(false);
@@ -621,17 +818,46 @@ export default function CardScreen() {
   const [flipped,     setFlipped]     = useState(false);
   const [loaded,      setLoaded]      = useState(false);
   const [revealed,    setRevealed]    = useState(false);
+  const [secrets,     setSecrets]     = useState(null); // ephemeral PAN/CVV after auth
+  const [editDraft,   setEditDraft]   = useState(null); // full card only while editing
   const [authLoading, setAuthLoading] = useState(false);
   const [saving,      setSaving]      = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  // FIX: spin animation for the loading icon during biometric auth
   const spinAnim = useRef(new Animated.Value(0)).current;
   const spinLoop = useRef(null);
 
-  useEffect(() => { loadCards(); }, []);
-  useEffect(() => { setRevealed(false); setFlipped(false); }, [activeIdx]);
+  const clearSecrets = useCallback(() => {
+    setSecrets(null);
+    setRevealed(false);
+  }, []);
+  const authLoadingRef = useRef(false);
 
-  // Start/stop spin when authLoading changes
+  useEffect(() => { loadCards(); }, []);
+  useEffect(() => { clearSecrets(); setFlipped(false); }, [activeIdx, clearSecrets]);
+
+  // Block screenshots / screen recording while Cards tab is focused
+  useEffect(() => {
+    if (!isFocused) {
+      ScreenCapture.allowScreenCaptureAsync('cards').catch(() => {});
+      clearSecrets();
+      setFlipped(false);
+      return undefined;
+    }
+    ScreenCapture.preventScreenCaptureAsync('cards').catch(() => {});
+    return () => { ScreenCapture.allowScreenCaptureAsync('cards').catch(() => {}); };
+  }, [isFocused, clearSecrets]);
+
+  // Auto-hide secrets when app backgrounds — but NOT during biometric prompt
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && !authLoadingRef.current) {
+        clearSecrets();
+        setFlipped(false);
+      }
+    });
+    return () => sub.remove();
+  }, [clearSecrets]);
+
   useEffect(() => {
     if (authLoading) {
       spinAnim.setValue(0);
@@ -649,7 +875,7 @@ export default function CardScreen() {
 
   const loadCards = async () => {
     try {
-      const data = await loadAllCards();
+      const data = await loadCardMeta();
       setCards(data);
     } catch {}
     setLoaded(true);
@@ -659,28 +885,35 @@ export default function CardScreen() {
   const handleSave = async (card) => {
     if (saving) return;
     setSaving(true);
+    const wasEditing = editing;
+    const prevCount = cards.length;
     try {
-      // FIX: duplicate card detection (skip when editing the same card)
-      if (!editing) {
-        const incomingDigits = card.number.replace(/\s/g, '');
-        const isDupe = cards.some(c => c.number.replace(/\s/g, '') === incomingDigits);
-        if (isDupe) {
-          Alert.alert('Duplicate Card', 'This card number is already saved in your vault.');
-          setSaving(false);
-          return;
-        }
+      const excludeId = wasEditing ? card.id : null;
+      if (await isDuplicateNumber(card.number, excludeId, cards)) {
+        Alert.alert('Duplicate Card', 'This card number is already saved in your vault.');
+        setSaving(false);
+        return;
       }
-      const next = editing
-        ? cards.map(c => c.id === card.id ? card : c)
-        : [...cards, card];
-      await saveAllCards(next);
-      setCards(next);
-      setActiveIdx(editing ? activeIdx : next.length - 1);
+      const entry = await upsertCard({
+        ...card,
+        number: digitsOnly(card.number),
+        cvv: digitsOnly(card.cvv),
+      });
+      setCards((prev) => {
+        const idx = prev.findIndex((c) => c.id === entry.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = entry;
+          return next;
+        }
+        return [...prev, entry];
+      });
+      if (!wasEditing) setActiveIdx(prevCount);
       setEditing(false);
       setAdding(false);
+      setEditDraft(null);
       setFlipped(false);
-      setRevealed(false);
-      // FIX: success haptic at the CardScreen level after storage write completes
+      clearSecrets();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert('Save Failed', 'Could not save your card. Please try again.');
@@ -696,13 +929,19 @@ export default function CardScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
+          setAuthLoading(true);
+          authLoadingRef.current = true;
+          const ok = await authenticateForCards('Verify to remove this card');
+          authLoadingRef.current = false;
+          setAuthLoading(false);
+          if (!ok) return;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           try {
             const next = await deleteOneCard(cards, idxToDelete);
             setCards(next);
             setActiveIdx(Math.max(0, idxToDelete - 1));
             setFlipped(false);
-            setRevealed(false);
+            clearSecrets();
           } catch {
             Alert.alert('Error', 'Could not remove the card. Please try again.');
           }
@@ -711,28 +950,103 @@ export default function CardScreen() {
     ]);
   };
 
+  const openRepairForm = (current) => {
+    setEditDraft({
+      ...current,
+      id: normId(current.id),
+      number: '',
+      cvv: '',
+    });
+    clearSecrets();
+    setFlipped(false);
+    setEditing(true);
+    setAdding(false);
+  };
+
   const handleReveal = async () => {
-    if (revealed) { setRevealed(false); return; }
+    if (revealed) { clearSecrets(); return; }
+    const current = cards[activeIdx];
+    if (!current) return;
     setAuthLoading(true);
-    const ok = await authenticateWithBiometric();
-    setAuthLoading(false);
-    if (ok) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    authLoadingRef.current = true;
+    const ok = await authenticateForCards('Verify your identity to view card details');
+    if (!ok) {
+      authLoadingRef.current = false;
+      setAuthLoading(false);
+      return;
+    }
+    try {
+      const sec = await readSecure(current.id);
+      if (!sec.number && !sec.cvv) {
+        // Broken older save — open form immediately so user can restore secrets
+        openRepairForm(current);
+        Alert.alert(
+          'Re-enter card details',
+          'This card was saved without the number in secure storage. Enter the full card number and CVV, then tap Save.',
+        );
+        return;
+      }
+      setSecrets(sec);
       setRevealed(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Could not unlock card details.');
+    } finally {
+      authLoadingRef.current = false;
+      setAuthLoading(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    const current = cards[activeIdx];
+    if (!current) return;
+    setAuthLoading(true);
+    authLoadingRef.current = true;
+    const ok = await authenticateForCards('Verify your identity to edit this card');
+    if (!ok) {
+      authLoadingRef.current = false;
+      setAuthLoading(false);
+      return;
+    }
+    try {
+      const sec = await readSecure(current.id);
+      if (!sec.number) {
+        openRepairForm(current);
+        Alert.alert(
+          'Re-enter card details',
+          'Secure details were missing. Enter the full card number and CVV, then tap Save.',
+        );
+        return;
+      }
+      setEditDraft({
+        ...current,
+        id: normId(current.id),
+        number: formatCardNumber(sec.number),
+        cvv: sec.cvv || '',
+      });
+      clearSecrets();
+      setFlipped(false);
+      setEditing(true);
+      setAdding(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Could not unlock card for editing.');
+    } finally {
+      authLoadingRef.current = false;
+      setAuthLoading(false);
     }
   };
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
   const showForm = adding || (cards.length === 0 && !editing) || editing;
-  const card     = cards[activeIdx];
+  const card = cards[activeIdx];
   if (!showForm && !card) return null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
       <MeshBackground blobs="cards" isDark={C.isDark} />
 
-      {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <View>
           <Text style={{ color: C.text3, fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Thunder Wallet</Text>
@@ -740,7 +1054,7 @@ export default function CardScreen() {
         </View>
         {!showForm && (
           <TouchableOpacity
-            onPress={() => { setAdding(true); setEditing(false); setFlipped(false); setRevealed(false); }}
+            onPress={() => { setAdding(true); setEditing(false); setEditDraft(null); setFlipped(false); clearSecrets(); }}
             style={{ alignItems: 'center', backgroundColor: C.accentBg, borderColor: C.accentBorder, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 8 }}
           >
             <Ionicons name="add" size={16} color={C.accent} />
@@ -752,15 +1066,14 @@ export default function CardScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         {showForm ? (
           <CardForm
-            initialCard={editing ? card : null}
+            initialCard={editing ? editDraft : null}
             onSave={handleSave}
-            onCancel={cards.length > 0 ? () => { setEditing(false); setAdding(false); } : null}
+            onCancel={cards.length > 0 ? () => { setEditing(false); setAdding(false); setEditDraft(null); } : null}
             saving={saving}
           />
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
 
-            {/* Virtual card */}
             <View style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 8, marginTop: 4 }}>
               <VirtualCard
                 key={card.id}
@@ -768,13 +1081,12 @@ export default function CardScreen() {
                 flipped={flipped}
                 onFlip={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setFlipped(v => !v);
-                  setRevealed(false);
+                  setFlipped((v) => !v);
+                  clearSecrets();
                 }}
               />
             </View>
 
-            {/* Dot pagination */}
             {cards.length > 1 && (
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
                 {cards.map((_, i) => (
@@ -794,7 +1106,6 @@ export default function CardScreen() {
 
             <View style={{ marginHorizontal: 24, marginBottom: 16 }}>
 
-              {/* View / hide details button */}
               <TouchableOpacity
                 onPress={handleReveal}
                 disabled={authLoading}
@@ -808,7 +1119,6 @@ export default function CardScreen() {
                   shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10,
                 }}
               >
-                {/* FIX: rotating spinner during auth loading */}
                 {authLoading ? (
                   <Animated.View style={{ transform: [{ rotate: spinDeg }] }}>
                     <Ionicons name="sync" size={20} color="#fff" />
@@ -821,35 +1131,31 @@ export default function CardScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {revealed && <RevealedPanel card={card} onHide={() => setRevealed(false)} C={C} />}
+              {revealed && secrets && (
+                <RevealedPanel card={card} secrets={secrets} onHide={clearSecrets} C={C} />
+              )}
 
-              {/* Masked info panel */}
               {!revealed && (
                 <View style={[ms.panel, { backgroundColor: C.card, borderColor: C.border }]}>
                   <Row label="Card Holder" value={card.holderName || '—'} C={C} />
-                  <Row label="Card Number" value={`•••• •••• •••• ${(card.number || '').replace(/\s/g, '').slice(-4) || '••••'}`} C={C} />
-                  <Row label="Expiry"      value={card.expiry || '—'} C={C} />
-                  {/* FIX: null guard on detectCardType */}
-                  <Row label="Network"     value={card.type || detectCardType(card.number)} C={C} last />
+                  <Row label="Card Number" value={`•••• •••• •••• ${card.last4 || '••••'}`} C={C} />
+                  <Row label="Expiry" value={card.expiry || '—'} C={C} />
+                  <Row label="Network" value={card.type || 'CARD'} C={C} last />
                 </View>
               )}
 
-              {/* Security badge */}
               <View style={[ms.secBadge, { backgroundColor: 'rgba(52,211,153,0.08)', borderColor: 'rgba(52,211,153,0.2)', marginTop: 12 }]}>
-                <Ionicons name="lock-closed" size={13} color="#34D399" />
+                <Ionicons name="shield-checkmark" size={13} color="#34D399" />
                 <Text style={{ color: '#34D399', fontSize: 11, fontFamily: 'DMSans_700Bold', marginLeft: 6, flex: 1 }}>
-                  Fingerprint required to view details · Auto-hides in 30s
+                  PAN & CVV in SecureStore · biometrics to unlock · screenshots blocked · clipboard auto-clears
                 </Text>
               </View>
 
-              {/* Edit / Delete actions */}
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                 <TouchableOpacity
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setEditing(true); setAdding(false); setFlipped(false); setRevealed(false);
-                  }}
-                  style={[ms.actionBtn, { backgroundColor: C.cardInner, borderColor: C.border, flex: 1 }]}
+                  onPress={handleEdit}
+                  disabled={authLoading}
+                  style={[ms.actionBtn, { backgroundColor: C.cardInner, borderColor: C.border, flex: 1, opacity: authLoading ? 0.6 : 1 }]}
                 >
                   <Ionicons name="pencil" size={16} color={C.text2} />
                   <Text style={{ color: C.text2, fontSize: 14, fontFamily: 'DMSans_800ExtraBold', marginLeft: 6 }}>Edit Card</Text>
@@ -857,7 +1163,8 @@ export default function CardScreen() {
 
                 <TouchableOpacity
                   onPress={handleDelete}
-                  style={[ms.actionBtn, { backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', flex: 1 }]}
+                  disabled={authLoading}
+                  style={[ms.actionBtn, { backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', flex: 1, opacity: authLoading ? 0.6 : 1 }]}
                 >
                   <Ionicons name="trash-outline" size={16} color="#EF4444" />
                   <Text style={{ color: '#EF4444', fontSize: 14, fontFamily: 'DMSans_800ExtraBold', marginLeft: 6 }}>Remove</Text>
@@ -865,15 +1172,13 @@ export default function CardScreen() {
               </View>
             </View>
 
-            {/* All Cards list */}
             {cards.length > 1 && (
               <View style={{ marginHorizontal: 24 }}>
                 <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
                   All Cards
                 </Text>
                 {cards.map((c, i) => {
-                  const cType  = c.type || detectCardType(c.number);
-                  // FIX: mini thumbnail uses the card's own brand colour
+                  const cType = c.type || 'CARD';
                   const miniBg = CARD_BG[cType] || CARD_BG.CARD;
                   return (
                     <TouchableOpacity
@@ -881,7 +1186,7 @@ export default function CardScreen() {
                       onPress={() => { setActiveIdx(i); setFlipped(false); }}
                       style={[ms.cardRow, {
                         backgroundColor: i === activeIdx ? C.accentBg : C.card,
-                        borderColor:     i === activeIdx ? C.accentBorder : C.border,
+                        borderColor: i === activeIdx ? C.accentBorder : C.border,
                       }]}
                     >
                       <View style={{ width: 36, height: 24, borderRadius: 5, backgroundColor: miniBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -892,7 +1197,7 @@ export default function CardScreen() {
                           {c.holderName || '—'}
                         </Text>
                         <Text style={{ color: C.text3, fontSize: 11, fontFamily: 'DMSans_600SemiBold', marginTop: 1 }}>
-                          •••• {(c.number || '').replace(/\s/g, '').slice(-4) || '••••'} · {c.expiry || '—'}
+                          •••• {c.last4 || '••••'} · {c.expiry || '—'}
                         </Text>
                       </View>
                       {i === activeIdx && <Ionicons name="checkmark-circle" size={18} color={C.accent} />}
