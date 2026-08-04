@@ -15,7 +15,7 @@
   <meta name="publisher" content="Thunder Wallet" />
   <meta name="application-name" content="Thunder Wallet" />
   <meta name="apple-mobile-web-app-title" content="Thunder Wallet" />
-  <meta name="generator" content="Thunder Wallet v2.0.0" />
+  <meta name="generator" content="Thunder Wallet v2.1.0" />
   <meta name="rating" content="General" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta name="format-detection" content="telephone=no" />
@@ -131,9 +131,9 @@
         "url": "https://thunder.cloudgrains.com/",
         "downloadUrl": "https://github.com/iamtejas23/thunder-wallet/releases/latest",
         "installUrl": "https://github.com/iamtejas23/thunder-wallet/releases/latest",
-        "softwareVersion": "2.0.0",
+        "softwareVersion": "2.1.0",
         "datePublished": "2025-06-01",
-        "dateModified": "2026-08-04",
+        "dateModified": "2026-08-05",
         "releaseNotes": "https://github.com/iamtejas23/thunder-wallet/releases",
         "screenshot": "https://thunder.cloudgrains.com/icon.png",
         "image": "https://thunder.cloudgrains.com/icon.png",
@@ -143,16 +143,17 @@
           "Daily, weekly, monthly budget tracking",
           "Editable bills with monthly or custom day-based cycles",
           "Bill reminders and recurring bill management",
-          "Hardware-backed card security (Android Keystore)",
+          "Card vault with SecureStore PAN/CVV and biometric unlock",
+          "Screenshot blocking and clipboard auto-clear on Cards",
           "PIN stored in SecureStore with biometric unlock",
           "Local JSON backup and restore",
-          "Spending analytics with donut charts",
+          "Spending calendar heatmap and weekday maps",
+          "Interactive category donut with Month/All toggle",
+          "Financial health score with factor breakdown",
           "PDF financial report export",
           "Savings goals with confetti celebration",
           "Per-category budget limits including Fuel and Savings",
-          "PIN and biometric fingerprint lock",
           "What-If spending simulator",
-          "Financial health score 0-100",
           "No cloud sync — all data stays on device",
           "No ads, no account required",
           "Free and open source (MIT license)"
@@ -203,7 +204,7 @@
           "@type": "ImageObject",
           "url": "https://thunder.cloudgrains.com/icon.png"
         },
-        "dateModified": "2026-08-04",
+        "dateModified": "2026-08-05",
         "inLanguage": "en",
         "speakable": {
           "@type": "SpeakableSpecification",
@@ -316,7 +317,7 @@
             "name": "Is my financial data secure in Thunder Wallet?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Card numbers and CVVs are stored in Android Keystore via expo-secure-store. Your PIN is stored in SecureStore. Thunder Wallet is protected by a 4-digit PIN and biometric lock with lockout after failed attempts. Nothing is uploaded to a server."
+              "text": "Yes. Card numbers and CVVs stay in SecureStore (hardware-backed) and are never held in normal app memory until you unlock with biometrics. Viewing, editing, or deleting a card requires fingerprint/Face ID or device passcode. Screenshots are blocked on the Cards tab, and copied details auto-clear from the clipboard. Your PIN is also in SecureStore. Nothing is uploaded to a server."
             }
           },
           {
@@ -1281,7 +1282,7 @@
     <div class="hero-left">
       <div class="badge hr-1">
         <div class="badge-dot">⚡</div>
-        <span id="badge-version">v2.0.0</span> · Open Source · Android · iOS Soon
+        <span id="badge-version">v2.1.0</span> · Open Source · Android · iOS Soon
       </div>
 
       <h1 class="hr-2">
@@ -1330,7 +1331,7 @@
       </div>
 
       <div class="version-pill hr-6">
-        <span class="tag" id="version-tag">v2.0.0</span>
+        <span class="tag" id="version-tag">v2.1.0</span>
         <span style="color:var(--t3)">·</span>
         <span>React Native 0.81 · Expo SDK 54</span>
         <span class="cursor"></span>
@@ -1474,14 +1475,14 @@
 <section class="section" style="padding-bottom:0">
   <div class="section-inner">
     <div class="whats-new reveal">
-      <div class="wn-tag">v2.0.0</div>
+      <div class="wn-tag">v2.1.0</div>
       <div class="wn-items">
-        <div class="wn-item"><div class="dot"></div>Edit bills anytime — change amount, due day, or cycle without recreating</div>
-        <div class="wn-item"><div class="dot"></div>Custom day-based billing cycles — every 7, 15, 30 days or any number you type</div>
-        <div class="wn-item"><div class="dot"></div>Fuel &amp; Savings expense categories across budgets, analytics, and reports</div>
-        <div class="wn-item"><div class="dot"></div>Local JSON backup &amp; restore from Settings — still 100% offline</div>
-        <div class="wn-item"><div class="dot"></div>PIN moved to SecureStore with biometric unlock + lockout after failed attempts</div>
-        <div class="wn-item"><div class="dot"></div>Automated release versioning — Settings always shows the latest build</div>
+        <div class="wn-item"><div class="dot"></div>Spending Map — calendar heatmap, weekday bars, and Month/All category charts</div>
+        <div class="wn-item"><div class="dot"></div>Financial Health score with savings, budget, balance &amp; income breakdown</div>
+        <div class="wn-item"><div class="dot"></div>Card vault hardened — biometrics to view/edit/remove, secrets only in SecureStore</div>
+        <div class="wn-item"><div class="dot"></div>Cards tab blocks screenshots &amp; auto-clears clipboard after copy</div>
+        <div class="wn-item"><div class="dot"></div>Edit bills anytime + custom day-based billing cycles</div>
+        <div class="wn-item"><div class="dot"></div>Fuel &amp; Savings categories · local backup · PIN in SecureStore</div>
       </div>
     </div>
   </div>
@@ -1495,13 +1496,13 @@
       <h2 class="section-h" id="about-heading">What is Thunder Wallet?</h2>
       <div class="seo-about">
         <p><strong>Thunder Wallet</strong> is a free, open-source <strong>offline expense manager</strong> and <strong>budget tracker for Android</strong>, built by <a href="https://github.com/iamtejas23" target="_blank" rel="noopener">Tejas Mane</a>. It is designed for people who want full control of their money without creating an account or syncing personal finance data to the cloud.</p>
-        <p>With <strong>Thunder Wallet</strong> you can log income and expenses (including categories like Food, Fuel, and Savings), set monthly and per-category budgets, track and <em>edit</em> recurring bills on monthly or custom day-based cycles, store payment cards in Android Keystore, view spending analytics, export PDF reports, and back up your data locally — all on your device.</p>
+        <p>With <strong>Thunder Wallet</strong> you can log income and expenses (including categories like Food, Fuel, and Savings), set monthly and per-category budgets, track and <em>edit</em> recurring bills on monthly or custom day-based cycles, store payment cards in a biometric SecureStore vault, view spending maps &amp; analytics, export PDF reports, and back up your data locally — all on your device.</p>
         <p>Thunder Wallet is <strong>not</strong> a cryptocurrency or Lightning Network wallet. It is a personal finance / expense tracking app. Download the official Thunder Wallet APK from <a href="https://github.com/iamtejas23/thunder-wallet/releases/latest" target="_blank" rel="noopener">GitHub Releases</a> or visit the project at <a href="https://github.com/iamtejas23/thunder-wallet" target="_blank" rel="noopener">github.com/iamtejas23/thunder-wallet</a>.</p>
         <ul class="seo-about-list">
           <li><strong>Thunder Wallet expense manager</strong> — track daily spending offline</li>
           <li><strong>Thunder Wallet budget tracker</strong> — monthly limits + category budgets</li>
           <li><strong>Thunder Wallet bills</strong> — reminders, edit bills, day-based cycles</li>
-          <li><strong>Thunder Wallet security</strong> — PIN in SecureStore, biometric unlock, Keystore cards</li>
+          <li><strong>Thunder Wallet security</strong> — biometric card vault, PIN in SecureStore, screenshot blocking</li>
         </ul>
       </div>
     </div>
@@ -1521,14 +1522,12 @@
 
       <div class="b-card b-span-8" style="--hue: var(--purple)">
         <div class="b-icon" style="background:var(--purple2)">🔐</div>
-        <div class="b-title">Hardware-Backed Card Security</div>
-        <div class="b-desc">Card numbers and CVVs are stored in <strong>Android Keystore / iOS Secure Enclave</strong> via expo-secure-store — the same hardware chip that protects your fingerprints. Even if the device is rooted, the raw data cannot be extracted. All other card metadata lives in AsyncStorage.</div>
+        <div class="b-title">Biometric Card Vault</div>
+        <div class="b-desc">Card numbers and CVVs live <strong>only in SecureStore</strong> — never in normal app memory until you unlock. View, edit, and remove require fingerprint / Face ID or device passcode. Screenshots are blocked on the Cards tab; copied details auto-clear from the clipboard.</div>
         <div class="code-block">
-          <span class="c-comment">// Sensitive data → hardware security chip</span><br/>
-          <span class="c-key">await</span> SecureStore.<span class="c-key">setItemAsync</span>(<br/>
-          &nbsp;&nbsp;<span class="c-str">`card_secure_${id}`</span>,<br/>
-          &nbsp;&nbsp;<span class="c-key">JSON</span>.stringify({ number, cvv })<br/>
-          );&nbsp;<span class="c-comment">// Android Keystore · Secure Enclave</span>
+          <span class="c-comment">// Secrets stay out of React state until biometrics succeed</span><br/>
+          <span class="c-key">await</span> authenticateForCards(<span class="c-str">'Verify to view card details'</span>);<br/>
+          <span class="c-key">const</span> sec = <span class="c-key">await</span> SecureStore.<span class="c-key">getItemAsync</span>(<span class="c-str">`twc_${id}`</span>);
         </div>
       </div>
 
@@ -1545,8 +1544,8 @@
 
       <div class="b-card b-span-4" style="--hue: var(--purple)">
         <div class="b-icon" style="background:var(--purple2)">📈</div>
-        <div class="b-title">Analytics Tab</div>
-        <div class="b-desc">Interactive donut chart, day-of-week heatmap, month vs. last month comparison, top 5 biggest expenses, and category budget adherence bars.</div>
+        <div class="b-title">Analytics &amp; Spending Map</div>
+        <div class="b-desc">Calendar heatmap, weekday bars, tappable category donut (Month/All), financial health score breakdown, month comparison, and biggest expenses.</div>
       </div>
 
       <div class="b-card b-span-4" style="--hue: var(--teal)">
@@ -1830,10 +1829,10 @@
         <div style="margin-bottom:24px;">
           <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;font-family:'JetBrains Mono',monospace;">Storage Architecture</div>
           <div class="code-block" style="margin-top:0;">
-            <span class="c-comment">// AsyncStorage — non-sensitive metadata</span><br/>
-            cards_meta_v2: [{ id, name, expiry, type }]<br/><br/>
-            <span class="c-comment">// expo-secure-store — sensitive data</span><br/>
-            card_secure_<span class="c-gold">&lt;id&gt;</span>: { number, cvv }<br/>
+            <span class="c-comment">// AsyncStorage — non-sensitive metadata only</span><br/>
+            cards_meta_v2: [{ id, name, expiry, type, last4 }]<br/><br/>
+            <span class="c-comment">// expo-secure-store — PAN + CVV only</span><br/>
+            twc_<span class="c-gold">&lt;id&gt;</span>: <span class="c-str">"number|cvv"</span><br/>
             <span class="c-comment">↑ Android Keystore · iOS Secure Enclave</span><br/><br/>
             <span class="c-comment">// Biometric gate before revealing</span><br/>
             LocalAuth.<span class="c-key">authenticateAsync</span>()<br/>
@@ -2020,7 +2019,7 @@
       <details class="faq-item">
         <summary class="faq-q">Is my financial data secure in this budget app?</summary>
         <div class="faq-a">
-          <p>Your card numbers and CVVs are stored in Android Keystore — the hardware-backed security chip on your phone — via <code>expo-secure-store</code>. Your PIN is also stored in SecureStore. The app is protected by a 4-digit PIN and biometric fingerprint lock, with lockout after too many failed attempts. Nothing is ever uploaded to a server, so there is nothing to breach remotely.</p>
+          <p>Your card numbers and CVVs are stored in SecureStore and loaded only after biometric / device-passcode unlock. Viewing, editing, or deleting a card requires authentication. Screenshots are blocked on the Cards tab, and copied details auto-clear from the clipboard. Your app PIN is also in SecureStore, with lockout after failed attempts. Nothing is ever uploaded to a server.</p>
         </div>
       </details>
 
@@ -2161,7 +2160,7 @@ details[open] .faq-q::after {
       </div>
     </div>
     <div class="footer-bottom">
-      <span class="footer-copy">© 2026 Thunder Wallet · <span id="footer-version">v2.0.0</span> · MIT License.</span>
+      <span class="footer-copy">© 2026 Thunder Wallet · <span id="footer-version">v2.1.0</span> · MIT License.</span>
       <span class="footer-made">Built by <a href="https://github.com/iamtejas23" target="_blank" rel="noopener">Tejas Mane</a> · All data stays on your device.</span>
     </div>
   </div>
@@ -2300,7 +2299,7 @@ details[open] .faq-q::after {
     if (wnTag) wnTag.textContent = ver;
   }
   function setLatest(release) {
-    const ver = release.tag_name || 'v2.0.0';
+    const ver = release.tag_name || 'v2.1.0';
     const url = apkUrl(release);
     setVersion(ver);
     const map = [
