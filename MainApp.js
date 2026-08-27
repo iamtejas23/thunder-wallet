@@ -320,7 +320,7 @@ function AppHeader({ onSettingsPress }) {
         </View>
         <View>
           <Text style={{ color: C.text1, fontSize: 20, fontFamily: 'DMSans_900Black' }}>Thunder Wallet</Text>
-          <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Your money, under control</Text>
+          <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }}>Know where your money goes.</Text>
         </View>
       </View>
       <TouchableOpacity

@@ -336,7 +336,7 @@ function SplashScreen() {
           transform: [{ translateY: subY }],
         }}>
           <View style={s.divider} />
-          <Text style={s.tagline}>PREMIUM FINANCIAL COMPANION</Text>
+          <Text style={s.tagline}>YOUR MONEY. YOUR CONTROL.</Text>
         </Animated.View>
       </View>
 
