@@ -18,11 +18,18 @@ jobs:
   build-release-apk:
     name: Build lightweight release APK
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     env:
       NODE_ENV: production
       EXPO_UNSTABLE_CORE_AUTOLINKING: '1'
+      GRADLE_OPTS: >-
+        -Dorg.gradle.daemon=true
+        -Dorg.gradle.parallel=true
+        -Dorg.gradle.caching=true
+        -Dorg.gradle.jvmargs="-Xmx4g -XX:+UseParallelGC"
 
     steps:
       - name: Checkout repository
@@ -41,23 +48,21 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
-      - name: Cache Gradle wrapper distribution
+      - name: Restore Gradle build cache
         uses: actions/cache@v4
         with:
-          path: ~/.gradle/wrapper
-          key: gradle-wrapper-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-wrapper-
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches
-          key: gradle-caches-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-caches-
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.gradle/build-cache
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline
 
       - name: Verify release version matches tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -75,42 +80,51 @@ jobs:
           echo "build.gradle:    $GRADLE_NAME (code $GRADLE_CODE)"
 
           FAIL=0
-          if [[ "$APP_VERSION" != "$TAG" ]]; then
-            echo "::error::app.json version ($APP_VERSION) does not match tag ($TAG). Run: npm run release -- $TAG"
+
+          [[ "$APP_VERSION" != "$TAG" ]] && {
+            echo "::error::app.json version mismatch"
             FAIL=1
-          fi
-          if [[ "$PKG_VERSION" != "$TAG" ]]; then
-            echo "::error::package.json version ($PKG_VERSION) does not match tag ($TAG)."
+          }
+
+          [[ "$PKG_VERSION" != "$TAG" ]] && {
+            echo "::error::package.json version mismatch"
             FAIL=1
-          fi
-          if [[ "$GRADLE_NAME" != "$TAG" ]]; then
-            echo "::error::android versionName ($GRADLE_NAME) does not match tag ($TAG)."
+          }
+
+          [[ "$GRADLE_NAME" != "$TAG" ]] && {
+            echo "::error::android versionName mismatch"
             FAIL=1
-          fi
-          if [[ "$GRADLE_CODE" != "$APP_CODE" ]]; then
-            echo "::error::android versionCode ($GRADLE_CODE) does not match app.json ($APP_CODE)."
+          }
+
+          [[ "$GRADLE_CODE" != "$APP_CODE" ]] && {
+            echo "::error::android versionCode mismatch"
             FAIL=1
-          fi
+          }
+
           exit $FAIL
 
       - name: Build lightweight APK
         working-directory: android
         run: |
           chmod +x ./gradlew
+
           SUCCESS=0
+
           for attempt in 1 2 3; do
-            if ./gradlew clean assembleRelease \
+            if ./gradlew assembleRelease \
               -PreactNativeArchitectures=arm64-v8a \
               -Pexpo.useLegacyPackaging=true \
-              --no-daemon; then
+              --build-cache \
+              --parallel; then
               SUCCESS=1
               break
             fi
-            echo "Attempt $attempt failed, retrying in 15s..."
+
+            echo "Attempt $attempt failed, retrying..."
             sleep 15
           done
+
           if [ $SUCCESS -ne 1 ]; then
-            echo "All Gradle build attempts failed."
             exit 1
           fi
 
@@ -118,6 +132,7 @@ jobs:
         id: release
         run: |
           MANUAL_TAG="${{ inputs.release_tag }}"
+
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
           elif [[ -n "$MANUAL_TAG" ]]; then
@@ -132,8 +147,8 @@ jobs:
       - name: Prepare APK asset
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/release/app-release.apk "release/${{ steps.release.outputs.apk_name }}"
-          ls -lh release
+          cp android/app/build/outputs/apk/release/app-release.apk \
+          "release/${{ steps.release.outputs.apk_name }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
