@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  Modal,
   PanResponder,
   Share,
   StyleSheet,
@@ -51,6 +52,55 @@ const getCfg = (cat) => categoryConfig[cat] || categoryConfig.Other;
 
 const OPEN_X = -128;
 const SNAP_THRESHOLD = -52; // swipe past this → snap open
+
+const isValidDate = (value) => {
+  const d = new Date(value);
+  return value !== null && value !== undefined && !Number.isNaN(d.getTime());
+};
+
+const normalizeNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const isValidAmount = (value) => Number.isFinite(Number(value));
+
+const getMonthInfoFromDate = (value) => {
+  if (!isValidDate(value)) return null;
+  const d = new Date(value);
+  return {
+    key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    label: d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+  };
+};
+
+const buildMonthGroupsFromTransactions = (source) => {
+  const groups = {};
+  source.forEach((t) => {
+    const monthInfo = getMonthInfoFromDate(t?.date);
+    if (!monthInfo) return;
+    const { key, label } = monthInfo;
+    if (!groups[key]) groups[key] = { key, label, items: [], income: 0, expense: 0 };
+    groups[key].items.push(t);
+    const amount = normalizeNumber(t.amount);
+    if (amount >= 0) groups[key].income += amount;
+    else groups[key].expense += Math.abs(amount);
+  });
+  return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
+};
+
+const getUniqueExportPath = async (baseFileName) => {
+  const fullBase = `${FileSystem.documentDirectory}${baseFileName}.pdf`;
+  let candidate = fullBase;
+  let attempt = 1;
+
+  while (true) {
+    const info = await FileSystem.getInfoAsync(candidate).catch(() => ({ exists: false }));
+    if (!info.exists) return candidate;
+    candidate = `${FileSystem.documentDirectory}${baseFileName}-${attempt}.pdf`;
+    attempt += 1;
+  }
+};
 
 function SwipeableRow({ children, onEdit, onDelete }) {
   const translateX = useRef(new Animated.Value(0)).current;
@@ -137,6 +187,7 @@ const TransactionList = ({
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     return new Set([key]);
   });
+  const [exportModalVisible, setExportModalVisible] = useState(false);
 
   const formatTs = (date) =>
     new Date(date).toLocaleString('en-IN', { day: 'numeric', hour: 'numeric', minute: 'numeric', month: 'short', year: 'numeric' });
@@ -155,19 +206,8 @@ const TransactionList = ({
   [visible]);
   const net = summary.income - summary.expense;
 
-  const monthGroups = useMemo(() => {
-    const groups = {};
-    visible.forEach((t) => {
-      const d = new Date(t.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-      if (!groups[key]) groups[key] = { key, label, items: [], income: 0, expense: 0 };
-      groups[key].items.push(t);
-      if (t.amount >= 0) groups[key].income += t.amount;
-      else groups[key].expense += Math.abs(t.amount);
-    });
-    return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
-  }, [visible]);
+  const monthGroups = useMemo(() => buildMonthGroupsFromTransactions(visible), [visible]);
+  const exportMonthGroups = useMemo(() => buildMonthGroupsFromTransactions(transactions), [transactions]);
 
   const toggleMonth = (key) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -179,31 +219,73 @@ const TransactionList = ({
     });
   };
 
-  const generatePDF = async () => {
-    if (!transactions.length) { Alert.alert('Nothing to export', 'Add a transaction first.'); return; }
+  const generatePDF = async (sourceTransactions = transactions, reportOptions = {}) => {
+    const validSourceTransactions = Array.isArray(sourceTransactions)
+      ? sourceTransactions.filter((t) => t && typeof t === 'object')
+      : [];
+
+    if (!validSourceTransactions.length) { Alert.alert('Nothing to export', 'Add a transaction first.'); return; }
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      const { monthKey, monthLabel } = reportOptions;
       const now = new Date();
+      const monthParts = monthKey ? String(monthKey).split('-') : [];
+      const parsedYear = Number(monthParts[0]);
+      const parsedMonth = Number(monthParts[1]);
+      const selectedMonthDate = monthKey && Number.isFinite(parsedYear) && Number.isFinite(parsedMonth)
+        ? new Date(parsedYear, parsedMonth - 1, 1)
+        : now;
+      const selectedMonthLabel = monthLabel || selectedMonthDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
       const reportDate = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-      const curM = now.getMonth(), curY = now.getFullYear();
+      const curM = selectedMonthDate.getMonth();
+      const curY = selectedMonthDate.getFullYear();
+      const reportTitle = `${selectedMonthLabel} Financial Report`;
+
+      const safeCategory = (value) => {
+        const text = typeof value === 'string' ? value.trim() : '';
+        return text || 'Other';
+      };
+      const safeNote = (value) => {
+        const text = typeof value === 'string' ? value.trim() : '';
+        return text || '—';
+      };
+      const validTransactions = validSourceTransactions.filter((t) => isValidDate(t.date) && isValidAmount(t.amount));
+
+      if (!validTransactions.length) {
+        Alert.alert('Nothing to export', 'No valid transactions are available for this month.');
+        return;
+      }
+
+      const baseFileName = `thunder-wallet-${curY}-${String(curM + 1).padStart(2, '0')}`;
+      const dest = await getUniqueExportPath(baseFileName);
+      const actualFileName = dest.split('/').pop();
 
       // ── Compute summary ─────────────────────────────────────────────────────
-      const allIncome  = transactions.filter((t) => t.amount >= 0).reduce((s, t) => s + t.amount, 0);
-      const allExpense = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-      const mTx        = transactions.filter((t) => { const d = new Date(t.date); return d.getMonth() === curM && d.getFullYear() === curY; });
-      const mIncome    = mTx.filter((t) => t.amount >= 0).reduce((s, t) => s + t.amount, 0);
-      const mExpense   = mTx.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+      const allIncome  = validTransactions.filter((t) => Number(t.amount) >= 0).reduce((s, t) => s + Number(t.amount), 0);
+      const allExpense = validTransactions.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+      const mTx        = validTransactions.filter((t) => {
+        const d = new Date(t.date);
+        return d.getMonth() === curM && d.getFullYear() === curY;
+      });
+      const mIncome    = mTx.filter((t) => Number(t.amount) >= 0).reduce((s, t) => s + Number(t.amount), 0);
+      const mExpense   = mTx.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
       const savingsRate = mIncome > 0 ? Math.round(((mIncome - mExpense) / mIncome) * 100) : 0;
 
       // ── Category breakdown ──────────────────────────────────────────────────
       const catMap = {};
-      transactions.filter((t) => t.amount < 0).forEach((t) => { catMap[t.category] = (catMap[t.category] || 0) + Math.abs(t.amount); });
+      validTransactions.filter((t) => Number(t.amount) < 0).forEach((t) => {
+        const categoryName = safeCategory(t.category);
+        catMap[categoryName] = (catMap[categoryName] || 0) + Math.abs(Number(t.amount));
+      });
       const catRows = Object.entries(catMap).sort(([, a], [, b]) => b - a).slice(0, 8);
 
       // ── Format helpers ──────────────────────────────────────────────────────
       const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
-      const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const fmtDate = (d) => {
+        const dt = new Date(d);
+        return isValidDate(d) ? dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Invalid date';
+      };
       const esc = (s) => String(s ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -213,7 +295,7 @@ const TransactionList = ({
       // ── Category bar rows ───────────────────────────────────────────────────
       const maxCat = catRows[0]?.[1] || 1;
       const catHTML = catRows.map(([cat, amt]) => {
-        const pct = Math.round((amt / allExpense) * 100);
+        const pct = allExpense > 0 ? Math.round((amt / allExpense) * 100) : 0;
         const barW = Math.round((amt / maxCat) * 100);
         return `
           <div class="cat-row">
@@ -226,18 +308,19 @@ const TransactionList = ({
       }).join('');
 
       // ── Transaction table rows ──────────────────────────────────────────────
-      const txHTML = [...transactions]
+      const txHTML = [...validTransactions]
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .map((t, i) => {
-          const isIncome = t.amount >= 0;
+          const amount = Number(t.amount);
+          const isIncome = amount >= 0;
           const rowBg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
           return `
             <tr style="background:${rowBg}">
               <td>${fmtDate(t.date)}</td>
               <td><span class="badge ${isIncome ? 'badge-in' : 'badge-ex'}">${isIncome ? 'Income' : 'Expense'}</span></td>
-              <td>${esc(t.category)}</td>
-              <td>${esc(t.note || '—')}</td>
-              <td class="${isIncome ? 'amt-in' : 'amt-ex'}">${isIncome ? '+' : '-'}${fmt(Math.abs(t.amount))}</td>
+              <td>${esc(safeCategory(t.category))}</td>
+              <td>${esc(safeNote(t.note))}</td>
+              <td class="${isIncome ? 'amt-in' : 'amt-ex'}">${isIncome ? '+' : '-'}${fmt(Math.abs(amount))}</td>
             </tr>`;
         }).join('');
 
@@ -346,30 +429,30 @@ const TransactionList = ({
       </div>
     </div>
     <div class="report-meta">
-      <div class="report-title">Financial Report</div>
+      <div class="report-title">${reportTitle}</div>
       <div class="report-date">Generated ${reportDate}</div>
     </div>
   </div>
 
   <div class="body">
 
-    <!-- All-time summary -->
-    <div class="section-title">All-Time Overview</div>
+    <!-- Monthly summary -->
+    <div class="section-title">Monthly Overview</div>
     <div class="summary-grid">
       <div class="stat-card card-income">
         <div class="stat-label">Total Income</div>
         <div class="stat-value col-income">${fmt(allIncome)}</div>
-        <div class="stat-sub">${transactions.filter((t) => t.amount >= 0).length} entries</div>
+        <div class="stat-sub">${validTransactions.filter((t) => Number(t.amount) >= 0).length} entries</div>
       </div>
       <div class="stat-card card-expense">
         <div class="stat-label">Total Spent</div>
         <div class="stat-value col-expense">${fmt(allExpense)}</div>
-        <div class="stat-sub">${transactions.filter((t) => t.amount < 0).length} entries</div>
+        <div class="stat-sub">${validTransactions.filter((t) => Number(t.amount) < 0).length} entries</div>
       </div>
       <div class="stat-card card-balance">
         <div class="stat-label">Net Balance</div>
         <div class="stat-value col-balance">${fmt(allIncome - allExpense)}</div>
-        <div class="stat-sub">${transactions.length} total entries</div>
+        <div class="stat-sub">${validTransactions.length} total entries</div>
       </div>
       <div class="stat-card card-savings">
         <div class="stat-label">This Month Savings</div>
@@ -378,8 +461,8 @@ const TransactionList = ({
       </div>
     </div>
 
-    <!-- This month -->
-    <div class="section-title">This Month — ${now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
+    <!-- Selected month summary -->
+    <div class="section-title">${selectedMonthLabel} Summary</div>
     <div class="month-strip">
       <div class="month-stat">
         <div class="month-stat-label">Income</div>
@@ -419,7 +502,7 @@ const TransactionList = ({
     <!-- Footer -->
     <div class="footer">
       <div class="footer-left">Thunder Wallet · All data stored locally on your device · No cloud sync</div>
-      <div class="footer-right">thunder-wallet-report-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.pdf</div>
+      <div class="footer-right">${actualFileName}</div>
     </div>
 
   </div>
@@ -427,16 +510,34 @@ const TransactionList = ({
 </html>`;
 
       const { uri } = await Print.printToFileAsync({ html, base64: false });
-      const dest = `${FileSystem.documentDirectory}thunder-wallet-${curY}${String(curM + 1).padStart(2, '0')}.pdf`;
       await FileSystem.moveAsync({ from: uri, to: dest });
+
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(dest, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        try {
+          await Sharing.shareAsync(dest, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        } catch (shareErr) {
+          Alert.alert('PDF saved', `The PDF was saved as ${actualFileName}, but sharing failed. ${shareErr.message || 'Please try again manually.'}`);
+        }
       } else {
-        Alert.alert('PDF saved', 'Report saved to app documents.');
+        Alert.alert('PDF saved', `Report saved to app documents as ${actualFileName}`);
       }
     } catch (err) {
       Alert.alert('Export failed', err.message || 'Could not generate PDF.');
     }
+  };
+
+  const handleExportPDF = () => {
+    if (!exportMonthGroups.length) {
+      Alert.alert('Nothing to export', 'Add a transaction first.');
+      return;
+    }
+
+    setExportModalVisible(true);
+  };
+
+  const handleSelectExportMonth = (group) => {
+    setExportModalVisible(false);
+    generatePDF(group.items, { monthKey: group.key, monthLabel: group.label });
   };
 
   const shareSummary = async () => {
@@ -580,7 +681,7 @@ const TransactionList = ({
           <Text style={[styles.title, { color: C.text1 }]}>Transactions</Text>
         </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={generatePDF} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
+          <TouchableOpacity onPress={handleExportPDF} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}> 
             <Ionicons name="document-text-outline" size={18} color={C.income} />
           </TouchableOpacity>
           <TouchableOpacity onPress={shareSummary} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
@@ -649,24 +750,66 @@ const TransactionList = ({
     </View>
   );
 
-  if (listData.length === 0) {
+  const renderContent = () => {
+    if (listData.length === 0) {
+      return (
+        <>
+          <ListHeader />
+          <ListEmpty />
+        </>
+      );
+    }
+
     return (
-      <>
-        <ListHeader />
-        <ListEmpty />
-      </>
+      <FlatList
+        data={listData}
+        keyExtractor={(row, i) => row.type + (row.item?.id || row.group?.key || i)}
+        renderItem={renderItem}
+        ListHeaderComponent={<ListHeader />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      />
     );
-  }
+  };
 
   return (
-    <FlatList
-      data={listData}
-      keyExtractor={(row, i) => row.type + (row.item?.id || row.group?.key || i)}
-      renderItem={renderItem}
-      ListHeaderComponent={<ListHeader />}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
-    />
+    <>
+      {renderContent()}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={exportModalVisible}
+        onRequestClose={() => setExportModalVisible(false)}
+      >
+        <View style={styles.exportModalBackdrop}>
+          <View style={[styles.exportModalCard, { backgroundColor: C.card, borderColor: C.border }]}> 
+            <Text style={[styles.exportModalTitle, { color: C.text1 }]}>Export report</Text>
+            <Text style={[styles.exportModalSubtitle, { color: C.text3 }]}>Choose a month</Text>
+            <FlatList
+              data={exportMonthGroups}
+              keyExtractor={(group) => group.key}
+              style={styles.exportModalList}
+              contentContainerStyle={styles.exportModalListContent}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.exportMonthItem, { borderColor: C.border, backgroundColor: C.cardInner }]}
+                  onPress={() => handleSelectExportMonth(item)}
+                >
+                  <Text style={[styles.exportMonthText, { color: C.text1 }]}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.exportModalCancel, { borderColor: C.border }]}
+              onPress={() => setExportModalVisible(false)}
+            >
+              <Text style={[styles.exportModalCancelText, { color: C.text2 }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -712,6 +855,16 @@ const styles = StyleSheet.create({
   emptyIconWrap: { alignItems: 'center', borderRadius: 28, borderWidth: 1, height: 68, justifyContent: 'center', width: 68 },
   emptyTitle: { fontSize: 16, fontFamily: 'DMSans_900Black', marginTop: 14 },
   emptyText: { fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: 'center' },
+  exportModalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'center', padding: 20 },
+  exportModalCard: { borderRadius: 18, borderWidth: 1, maxHeight: '70%', padding: 18 },
+  exportModalTitle: { fontSize: 18, fontFamily: 'DMSans_900Black' },
+  exportModalSubtitle: { fontSize: 12, fontFamily: 'DMSans_600SemiBold', marginTop: 4, marginBottom: 12 },
+  exportModalList: { maxHeight: 300 },
+  exportModalListContent: { paddingBottom: 8 },
+  exportMonthItem: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  exportMonthText: { fontSize: 14, fontFamily: 'DMSans_800ExtraBold' },
+  exportModalCancel: { alignItems: 'center', borderRadius: 12, borderWidth: 1, marginTop: 8, paddingVertical: 10 },
+  exportModalCancelText: { fontSize: 13, fontFamily: 'DMSans_800ExtraBold' },
 });
 
 export default TransactionList;
