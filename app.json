@@ -65,8 +65,7 @@
       ],
       "expo-local-authentication",
       "expo-secure-store",
-      "expo-document-picker",
-      "expo-screen-capture"
+      "expo-document-picker"
     ],
     "extra": {
       "eas": {
