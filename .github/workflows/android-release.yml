@@ -64,6 +64,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline
 
+      - name: Restore CI release keystore cache
+        uses: actions/cache@v4
+        with:
+          path: android/ci-release.keystore
+          key: thunder-wallet-ci-keystore-v1
+
       - name: Configure release signing
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -71,19 +77,43 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [[ -z "$RELEASE_KEYSTORE_BASE64" ]]; then
-            echo "::error::RELEASE_KEYSTORE_BASE64 secret is not configured. Release APKs must not be signed with the debug certificate."
-            exit 1
+          set -euo pipefail
+
+          if [[ -n "$RELEASE_KEYSTORE_BASE64" ]]; then
+            echo "Using production release keystore from GitHub secrets."
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/thunder-wallet-release.keystore
+            printf '%s\n' \
+              "storeFile=../thunder-wallet-release.keystore" \
+              "storePassword=${RELEASE_KEYSTORE_PASSWORD}" \
+              "keyAlias=${RELEASE_KEY_ALIAS}" \
+              "keyPassword=${RELEASE_KEY_PASSWORD}" \
+              > android/keystore.properties
+          else
+            echo "::warning::RELEASE_KEYSTORE_BASE64 is not set. Using cached CI release keystore (SHA-256). Add repository secrets for your production signing key."
+            CI_KEYSTORE="android/ci-release.keystore"
+            CI_STORE_PASS="thunder-wallet-ci-build"
+            CI_ALIAS="thunder-wallet-ci"
+
+            if [[ ! -f "$CI_KEYSTORE" ]]; then
+              keytool -genkeypair -v \
+                -storetype PKCS12 \
+                -keystore "$CI_KEYSTORE" \
+                -alias "$CI_ALIAS" \
+                -keyalg RSA -keysize 2048 \
+                -sigalg SHA256withRSA \
+                -validity 10000 \
+                -dname "CN=Thunder Wallet CI, OU=Mobile, O=Thunder Wallet" \
+                -storepass "$CI_STORE_PASS" \
+                -keypass "$CI_STORE_PASS"
+            fi
+
+            printf '%s\n' \
+              "storeFile=../ci-release.keystore" \
+              "storePassword=${CI_STORE_PASS}" \
+              "keyAlias=${CI_ALIAS}" \
+              "keyPassword=${CI_STORE_PASS}" \
+              > android/keystore.properties
           fi
-
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/thunder-wallet-release.keystore
-
-          cat > android/keystore.properties <<EOF
-          storeFile=../thunder-wallet-release.keystore
-          storePassword=${RELEASE_KEYSTORE_PASSWORD}
-          keyAlias=${RELEASE_KEY_ALIAS}
-          keyPassword=${RELEASE_KEY_PASSWORD}
-          EOF
 
       - name: Verify release version matches tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -183,8 +213,10 @@ jobs:
             echo "::error::APK is signed with the Android Debug certificate."
             exit 1
           fi
-          if jarsigner -verify -verbose -certs "$APK" 2>&1 | grep -qi "SHA1withRSA"; then
-            echo "::warning::APK certificate may use SHA1withRSA — regenerate keystore with -sigalg SHA256withRSA"
+          if jarsigner -verify -verbose -certs "$APK" 2>&1 | grep -q "SHA256withRSA"; then
+            echo "APK signed with SHA256withRSA."
+          else
+            echo "::warning::APK certificate signature algorithm is not SHA256withRSA."
           fi
 
       - name: Upload APK artifact

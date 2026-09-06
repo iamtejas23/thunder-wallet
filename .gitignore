@@ -79,4 +79,5 @@ yarn-error.*
 android/keystore.properties
 android/*.keystore
 !android/app/debug.keystore
+android/ci-release.keystore
 android/local.properties
