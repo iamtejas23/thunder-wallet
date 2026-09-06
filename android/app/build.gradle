@@ -130,6 +130,15 @@ android {
             }
         }
     }
+
+    // Release signing: create android/keystore.properties from keystore.properties.example.
+    // NEVER commit keystore files or passwords. CI uses GitHub Actions secrets.
+    def keystorePropertiesFile = rootProject.file('keystore.properties')
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -137,15 +146,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                // Local dev only — CI/release builds must provide keystore.properties
+                signingConfig signingConfigs.debug
+                println 'WARNING: android/keystore.properties missing — release APK signed with debug key.'
+            }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

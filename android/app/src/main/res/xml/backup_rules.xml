@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Block Android Auto Backup / adb backup of all app data (PIN, cards, transactions). -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="root" path="." />
+</full-backup-content>

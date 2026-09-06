@@ -41,6 +41,14 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -57,7 +65,8 @@
       ],
       "expo-local-authentication",
       "expo-secure-store",
-      "expo-document-picker"
+      "expo-document-picker",
+      "expo-screen-capture"
     ],
     "extra": {
       "eas": {
@@ -66,6 +75,7 @@
     },
     "updates": {
       "enabled": false,
+      "checkAutomatically": "NEVER",
       "url": "https://u.expo.dev/20973568-e0e6-48b1-a5ee-2c55cd8b6f39"
     }
   }

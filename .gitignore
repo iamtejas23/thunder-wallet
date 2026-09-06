@@ -74,3 +74,9 @@ yarn-error.*
 *.tsbuildinfo
 
 # @end expo-cli
+
+# Android release signing (never commit)
+android/keystore.properties
+android/*.keystore
+!android/app/debug.keystore
+android/local.properties

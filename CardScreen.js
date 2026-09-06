@@ -269,6 +269,20 @@ async function deleteOneCard(cards, idx) {
   return next;
 }
 
+/** Wipe all card metadata and SecureStore PAN/CVV entries (used by app reset). */
+export async function clearAllCardData() {
+  try {
+    const metaRaw = await AsyncStorage.getItem(CARDS_META_KEY);
+    if (metaRaw) {
+      const meta = JSON.parse(metaRaw);
+      if (Array.isArray(meta)) {
+        await Promise.all(meta.map((c) => deleteSecure(c.id)));
+      }
+    }
+    await AsyncStorage.multiRemove([CARDS_META_KEY, CARDS_LEGACY_KEY]);
+  } catch {}
+}
+
 async function isDuplicateNumber(number, excludeId, existingCards) {
   const incoming = digitsOnly(number);
   const exclude = excludeId != null ? normId(excludeId) : null;

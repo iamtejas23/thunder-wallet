@@ -51,8 +51,10 @@ No cloud. No account. No ads. Your money stays on your device — always.
 
 **Security & Privacy**
 - 4-digit PIN + fingerprint/face unlock on app open
-- Zero network permissions — data cannot leave the device
-- 100% offline, works without internet forever
+- Card PAN/CVV in hardware-backed SecureStore; screenshots blocked on Cards tab
+- Android Auto Backup disabled; manual JSON backup excludes card secrets
+- Minimal network use: HTTPS update checks only (no wallet data transmitted)
+- 100% offline core functionality — works without internet forever
 
 **App Experience**
 - Dark mesh grid background across all screens
@@ -119,7 +121,31 @@ npm run release:dry
 npm run release -- patch --dry-run
 ```
 
-The workflow (`.github/workflows/android-release.yml`) builds a lightweight `arm64-v8a` APK, verifies the tag matches the app version, and attaches it to the GitHub Release.
+The workflow (`.github/workflows/android-release.yml`) builds a lightweight `arm64-v8a` APK, verifies the tag matches the app version, signs with your **release keystore** (not debug), and attaches it to the GitHub Release.
+
+### Release signing (required for CI)
+
+1. Generate a release keystore (SHA-256 signature — do **not** use the debug keystore):
+
+```bash
+keytool -genkeypair -v \
+  -storetype PKCS12 \
+  -keystore thunder-wallet-release.keystore \
+  -alias thunder-wallet \
+  -keyalg RSA -keysize 2048 \
+  -sigalg SHA256withRSA \
+  -validity 10000
+```
+
+2. Copy `android/keystore.properties.example` → `android/keystore.properties` for local builds (never commit).
+
+3. Add these GitHub Actions **repository secrets**:
+   - `RELEASE_KEYSTORE_BASE64` — `base64 -w0 thunder-wallet-release.keystore`
+   - `RELEASE_KEYSTORE_PASSWORD`
+   - `RELEASE_KEY_ALIAS`
+   - `RELEASE_KEY_PASSWORD`
+
+CI fails the build if release signing is not configured (prevents debug-signed production APKs).
 
 **Manual local build:**
 ```bash

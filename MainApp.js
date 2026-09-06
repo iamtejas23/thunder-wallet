@@ -29,7 +29,8 @@ import SettingsScreen from './SettingsScreen';
 import TransactionList from './TransactionList';
 import TransactionModal from './TransactionModal';
 import BillsScreen, { BILLS_KEY, getBillingPeriod } from './BillsScreen';
-import CardScreen from './CardScreen';
+import CardScreen, { clearAllCardData } from './CardScreen';
+import { clearStoredPin } from './PinScreen';
 import { scheduleDailyReview, scheduleBillReminders, requestNotificationPermission } from './NotificationService';
 import { useUpdateChecker } from './UpdateChecker';
 import UpdateModal from './UpdateModal';
@@ -2350,6 +2351,8 @@ function MainApp() {
         AsyncStorage.removeItem(SAVINGS_KEY),
         AsyncStorage.removeItem(HIDE_BALANCE_KEY),
         AsyncStorage.removeItem(DAILY_LIMIT_KEY),
+        clearStoredPin(),
+        clearAllCardData(),
       ]);
       setTransactions([]);
       setMonthlyBudget(DEFAULT_MONTHLY_BUDGET);
