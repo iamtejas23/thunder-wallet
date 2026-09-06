@@ -34,6 +34,8 @@ import { clearStoredPin } from './PinScreen';
 import { scheduleDailyReview, scheduleBillReminders, requestNotificationPermission } from './NotificationService';
 import { useUpdateChecker } from './UpdateChecker';
 import UpdateModal from './UpdateModal';
+import BackupReminderModal from './BackupReminderModal';
+import { shouldShowBackupReminder } from './BackupService';
 
 const Tab = createBottomTabNavigator();
 const STORAGE_KEY = 'transactions';
@@ -2086,6 +2088,7 @@ function MainApp() {
   const [confettiGoal, setConfettiGoal] = useState(null);
   const [hideBalanceFeature, setHideBalanceFeature] = useState(false);
   const [dailySpendLimit, setDailySpendLimit] = useState(0);
+  const [showBackupReminder, setShowBackupReminder] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -2118,6 +2121,13 @@ function MainApp() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    if (!transactions.length && !bills.length && !goals.length) return;
+    (async () => {
+      if (await shouldShowBackupReminder()) setShowBackupReminder(true);
+    })();
+  }, [transactions.length, bills.length, goals.length]);
 
   const stats = useMemo(() => buildStats(transactions, monthlyBudget), [monthlyBudget, transactions]);
   const insight = useMemo(() => buildInsight(stats, monthlyBudget, transactions.length), [monthlyBudget, stats, transactions.length]);
@@ -2461,6 +2471,11 @@ function MainApp() {
         latestVersion={latestVersion}
         downloadUrl={downloadUrl}
         onDismiss={dismiss}
+      />
+
+      <BackupReminderModal
+        visible={showBackupReminder && !hasUpdate}
+        onDismiss={() => setShowBackupReminder(false)}
       />
     </View>
   );

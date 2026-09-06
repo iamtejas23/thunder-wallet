@@ -17,6 +17,8 @@ No cloud. No account. No ads. Your money stays on your device — always.
 | Android | ✅ Available | [Latest APK →](https://github.com/iamtejas23/thunder-wallet/releases/latest) |
 | iOS | 🔜 Coming soon | Apple Developer account pending |
 
+> **Upgrading from v2.7.0 or older?** Back up in **Settings → Backup Data** before installing. If the update won’t install, you may need to uninstall the old app first — that **deletes all local data** unless you saved a backup file. v2.9.0+ uses a new release signing key.
+
 ---
 
 ## Features
@@ -178,7 +180,9 @@ thunder-wallet/
 ├── MainApp.js              # Tab navigator + all screens + business logic
 ├── MeshBackground.js       # SVG mesh grid + color blobs (shared background)
 ├── UpdateChecker.js        # GitHub Releases version check hook
-├── UpdateModal.js          # In-app update bottom sheet
+├── UpdateModal.js          # Update flow with mandatory backup gate
+├── BackupService.js        # Backup create/restore + reminder helpers
+├── BackupReminderModal.js  # Weekly backup nudge on app open
 ├── NotificationService.js  # Daily review + bill reminder scheduling
 ├── ThemeContext.js         # Dark / light theme provider
 ├── CardScreen.js           # Secure card vault

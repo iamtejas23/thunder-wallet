@@ -17,7 +17,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
@@ -25,8 +24,12 @@ import MeshBackground from './MeshBackground';
 import UpdateModal from './UpdateModal';
 import PinScreen, { PIN_ENABLED_KEY, clearStoredPin } from './PinScreen';
 import { isNotificationsEnabled, setNotificationsEnabled, requestNotificationPermission } from './NotificationService';
-
-const BACKUP_KEYS = ['transactions', 'monthlyBudget', 'savingsGoals', 'categoryBudgets', 'bills_v2', 'savings_v1', 'hideBalanceFeature', 'dailySpendLimit'];
+import {
+  createBackupAndShare,
+  formatLastBackupLabel,
+  getLastBackupAt,
+  parseRestorePayload,
+} from './BackupService';
 
 // ── Primitives ─────────────────────────────────────────────────────────────────
 
@@ -92,6 +95,12 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
   const [isRestoring, setIsRestoring] = useState(false);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [dailyLimitInput, setDailyLimitInput] = useState('');
+  const [lastBackupLabel, setLastBackupLabel] = useState('');
+
+  const refreshBackupLabel = useCallback(async () => {
+    const ts = await getLastBackupAt();
+    setLastBackupLabel(formatLastBackupLabel(ts));
+  }, []);
 
   const handleCheckUpdate = useCallback(async () => {
     setChecking(true);
@@ -130,8 +139,9 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
       setNotifEnabled(notif);
       setPinEnabled(pin === 'true');
       setHideBalanceEnabled(hideBalance === 'true');
+      await refreshBackupLabel();
     })();
-  }, []);
+  }, [refreshBackupLabel]);
 
   const handleNotifToggle = async (val) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -174,20 +184,9 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsBackingUp(true);
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('Backup failed', 'Sharing is not available on this device.');
-        return;
-      }
-      const pairs = await AsyncStorage.multiGet(BACKUP_KEYS);
-      const data = {};
-      pairs.forEach(([k, v]) => { if (v !== null) data[k] = v; });
-      const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
-      const dir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
-      if (!dir) throw new Error('No writable directory available on this device.');
-      const path = `${dir}thunder-wallet-backup-${Date.now()}.json`;
-      await FileSystem.writeAsStringAsync(path, payload, { encoding: FileSystem.EncodingType.UTF8 });
-      await Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Save Thunder Wallet Backup' });
+      await createBackupAndShare();
+      await refreshBackupLabel();
+      Alert.alert('Backup saved', 'Keep this file in Google Drive or Downloads. You will need it to restore after reinstalling.');
     } catch (e) {
       Alert.alert('Backup failed', e?.message ?? 'Could not create backup file.');
     } finally {
@@ -210,24 +209,10 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
               if (result.canceled) { setIsRestoring(false); return; }
               const content = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.UTF8 });
               const parsed = JSON.parse(content);
-              if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('invalid');
-              const d = parsed.data;
-              // Only restore known keys — never write arbitrary AsyncStorage keys from a file
-              const pairs = BACKUP_KEYS
-                .filter((k) => d[k] != null)
-                .map((k) => [k, String(d[k])]);
-              if (!pairs.length) throw new Error('empty');
+              const { pairs, restore } = parseRestorePayload(parsed);
               await AsyncStorage.multiSet(pairs);
-              onRestoreData?.({
-                transactions: d.transactions ? JSON.parse(d.transactions) : undefined,
-                monthlyBudget: d.monthlyBudget ? Number.parseFloat(d.monthlyBudget) : undefined,
-                goals: d.savingsGoals ? JSON.parse(d.savingsGoals) : undefined,
-                categoryBudgets: d.categoryBudgets ? JSON.parse(d.categoryBudgets) : undefined,
-                bills: d.bills_v2 ? JSON.parse(d.bills_v2) : undefined,
-                savings: d.savings_v1 ? JSON.parse(d.savings_v1) : undefined,
-                hideBalanceFeature: d.hideBalanceFeature === 'true',
-                dailySpendLimit: d.dailySpendLimit ? Number.parseFloat(d.dailySpendLimit) : 0,
-              });
+              onRestoreData?.(restore);
+              await refreshBackupLabel();
               Alert.alert('Restore complete', 'Your data has been restored successfully.');
             } catch {
               Alert.alert('Restore failed', 'Invalid or corrupted backup file. Please choose a valid Thunder Wallet backup.');
@@ -257,7 +242,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
       'Reset all data?',
-      'This will permanently delete all transactions, goals, bills, and savings. This cannot be undone.',
+      'This will permanently delete all transactions, goals, bills, and savings. Back up first if you want to keep a copy. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -487,7 +472,7 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
             iconColor="#60A5FA"
             iconBg="rgba(96,165,250,0.12)"
             label="Backup Data"
-            sublabel="Export all data as an encrypted JSON file"
+            sublabel={isBackingUp ? 'Creating backup…' : lastBackupLabel || 'Save a copy before any update'}
             onPress={isBackingUp ? undefined : handleBackup}
             right={
               isBackingUp

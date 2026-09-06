@@ -32,6 +32,12 @@ const SLIDES = [
     body: 'Set a limit and Thunder Wallet will guide you to stay under it every single day.',
   },
   {
+    icon: 'cloud-upload-outline',
+    iconColor: '#FBBF24',
+    title: 'Back up your data',
+    body: 'Everything stays on your phone. Use Settings → Backup Data regularly — especially before updates — so you never lose transactions.',
+  },
+  {
     icon: 'flash',
     iconColor: '#FCD34D',
     title: "You're all set.",
