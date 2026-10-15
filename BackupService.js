@@ -1,6 +1,7 @@
 import { Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+// SDK 57 moved the legacy URI functions behind the /legacy entry point.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 export const BACKUP_KEYS = [
@@ -86,31 +87,71 @@ export async function createBackupAndShare() {
     mimeType: 'application/json',
     dialogTitle: 'Save Thunder Wallet Backup',
   });
-  await markBackupCompleted();
   return path;
 }
 
 export function parseRestorePayload(parsed) {
-  if (!parsed?.version || !parsed.data || typeof parsed.data !== 'object') {
+  if (parsed?.version !== 1 || !parsed.data || typeof parsed.data !== 'object' || Array.isArray(parsed.data)) {
     throw new Error('invalid');
   }
   const d = parsed.data;
-  const pairs = BACKUP_KEYS
-    .filter((k) => d[k] != null)
-    .map((k) => [k, String(d[k])]);
-  if (!pairs.length) throw new Error('empty');
+
+  // Validate every supplied field before touching storage. Backups are JSON, but
+  // their values are themselves serialized JSON strings for compatibility.
+  for (const key of Object.keys(d)) {
+    if (!BACKUP_KEYS.includes(key) || typeof d[key] !== 'string') throw new Error('invalid');
+  }
+  if (!Object.keys(d).some((key) => BACKUP_KEYS.includes(key))) throw new Error('empty');
+  const parseJson = (key, fallback, predicate) => {
+    if (d[key] == null) return fallback;
+    let value;
+    try { value = JSON.parse(d[key]); } catch { throw new Error('invalid'); }
+    if (!predicate(value)) throw new Error('invalid');
+    return value;
+  };
+  const parseNumber = (key, fallback, allowZero = false) => {
+    if (d[key] == null) return fallback;
+    if (d[key].trim() === '') throw new Error('invalid');
+    const value = Number(d[key]);
+    if (!Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) throw new Error('invalid');
+    return value;
+  };
+  const parseBoolean = (key, fallback) => {
+    if (d[key] == null) return fallback;
+    if (d[key] !== 'true' && d[key] !== 'false') throw new Error('invalid');
+    return d[key] === 'true';
+  };
+
+  const transactions = parseJson('transactions', [], Array.isArray);
+  const goals = parseJson('savingsGoals', [], Array.isArray);
+  const categoryBudgets = parseJson('categoryBudgets', {}, (v) => v && typeof v === 'object' && !Array.isArray(v));
+  const bills = parseJson('bills_v2', [], Array.isArray);
+  const savings = parseJson('savings_v1', [], Array.isArray);
+  if (![...transactions, ...goals, ...bills, ...savings].every((item) => item && typeof item === 'object' && !Array.isArray(item))) throw new Error('invalid');
+  if (!Object.values(categoryBudgets).every((v) => Number.isFinite(Number(v)) && Number(v) >= 0)) throw new Error('invalid');
+
+  const monthlyBudget = parseNumber('monthlyBudget', 30000);
+  const dailySpendLimit = parseNumber('dailySpendLimit', 0, true);
+  const hideBalanceFeature = parseBoolean('hideBalanceFeature', false);
+  // Missing fields represent empty/default values, so the operation truly
+  // replaces local wallet data instead of silently retaining stale values.
+  const values = {
+    transactions: JSON.stringify(transactions),
+    monthlyBudget: String(monthlyBudget),
+    savingsGoals: JSON.stringify(goals),
+    categoryBudgets: JSON.stringify(categoryBudgets),
+    bills_v2: JSON.stringify(bills),
+    savings_v1: JSON.stringify(savings),
+    hideBalanceFeature: String(hideBalanceFeature),
+    dailySpendLimit: String(dailySpendLimit),
+  };
+  const pairs = BACKUP_KEYS.map((key) => [key, values[key]]);
 
   return {
     pairs,
     restore: {
-      transactions: d.transactions ? JSON.parse(d.transactions) : undefined,
-      monthlyBudget: d.monthlyBudget ? Number.parseFloat(d.monthlyBudget) : undefined,
-      goals: d.savingsGoals ? JSON.parse(d.savingsGoals) : undefined,
-      categoryBudgets: d.categoryBudgets ? JSON.parse(d.categoryBudgets) : undefined,
-      bills: d.bills_v2 ? JSON.parse(d.bills_v2) : undefined,
-      savings: d.savings_v1 ? JSON.parse(d.savings_v1) : undefined,
-      hideBalanceFeature: d.hideBalanceFeature === 'true',
-      dailySpendLimit: d.dailySpendLimit ? Number.parseFloat(d.dailySpendLimit) : 0,
+      transactions, monthlyBudget, goals, categoryBudgets, bills, savings,
+      hideBalanceFeature, dailySpendLimit,
     },
   };
 }

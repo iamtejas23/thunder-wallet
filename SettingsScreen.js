@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import Constants from 'expo-constants';
 import { useTheme } from './ThemeContext';
@@ -28,7 +28,9 @@ import {
   createBackupAndShare,
   formatLastBackupLabel,
   getLastBackupAt,
+  markBackupCompleted,
   parseRestorePayload,
+  BACKUP_KEYS,
 } from './BackupService';
 
 // ── Primitives ─────────────────────────────────────────────────────────────────
@@ -185,8 +187,22 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
     setIsBackingUp(true);
     try {
       await createBackupAndShare();
-      await refreshBackupLabel();
-      Alert.alert('Backup saved', 'Keep this file in Google Drive or Downloads. You will need it to restore after reinstalling.');
+      Alert.alert(
+        'Did you save the backup?',
+        'The share sheet has closed. Your backup is safe only if you chose a place such as Files, Downloads, or Drive and completed the save.',
+        [
+          { text: 'Not yet', style: 'cancel' },
+          { text: 'I saved it', onPress: async () => {
+            try {
+              await markBackupCompleted();
+              await refreshBackupLabel();
+              Alert.alert('Backup saved', 'Keep the file somewhere you can access after reinstalling. Card details and your PIN are not included.');
+            } catch {
+              Alert.alert('Could not update backup status', 'Your file may still be saved. Keep it somewhere safe.');
+            }
+          } },
+        ],
+      );
     } catch (e) {
       Alert.alert('Backup failed', e?.message ?? 'Could not create backup file.');
     } finally {
@@ -196,33 +212,60 @@ const SettingsScreen = ({ resetAllData, hideBalanceFeature, onHideBalanceChange,
 
   const handleRestore = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Restore from backup?',
-      'This will replace all current data with the backup. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Choose file', onPress: async () => {
-            setIsRestoring(true);
+    setIsRestoring(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri) throw new Error('Could not read the selected file.');
+      let preview;
+      let parsedBackup;
+      try {
+        const content = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+        parsedBackup = JSON.parse(content);
+        preview = parseRestorePayload(parsedBackup);
+      } catch {
+        throw new Error('This file is not a valid Thunder Wallet backup. Your current data has not been changed.');
+      }
+      const { pairs, restore } = preview;
+      const exportedAt = new Date(parsedBackup.exportedAt);
+      const dateLabel = Number.isNaN(exportedAt.getTime()) ? 'Date unavailable' : exportedAt.toLocaleString();
+      const summary = [
+        `${restore.transactions.length} transactions`,
+        `${restore.bills.length} bills`,
+        `${restore.goals.length} savings goals`,
+        `${restore.savings.length} savings entries`,
+      ].join(' · ');
+      Alert.alert(
+        'Review backup',
+        `Backup date: ${dateLabel}\nContains: ${summary}\n\nContinuing replaces your current transactions, budgets, bills, goals, and savings. This cannot be undone. Card details and your PIN are not included and will remain unchanged.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Replace my data', style: 'destructive', onPress: async () => {
             try {
-              const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
-              if (result.canceled) { setIsRestoring(false); return; }
-              const content = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.UTF8 });
-              const parsed = JSON.parse(content);
-              const { pairs, restore } = parseRestorePayload(parsed);
-              await AsyncStorage.multiSet(pairs);
+              const previous = await AsyncStorage.multiGet(BACKUP_KEYS);
+              try {
+                await AsyncStorage.multiSet(pairs);
+              } catch (writeError) {
+                await AsyncStorage.multiRemove(previous.filter(([, value]) => value == null).map(([key]) => key));
+                await AsyncStorage.multiSet(previous.filter(([, value]) => value != null).map(([key, value]) => [key, value]));
+                throw writeError;
+              }
               onRestoreData?.(restore);
               await refreshBackupLabel();
-              Alert.alert('Restore complete', 'Your data has been restored successfully.');
+              Alert.alert('Restore complete', 'Your wallet data has been restored.');
             } catch {
-              Alert.alert('Restore failed', 'Invalid or corrupted backup file. Please choose a valid Thunder Wallet backup.');
-            } finally {
-              setIsRestoring(false);
+              Alert.alert('Restore failed', 'Your data could not be restored. Please try again.');
             }
-          },
-        },
-      ]
-    );
+          } },
+        ],
+      );
+    } catch (error) {
+      if (error?.message) Alert.alert('Restore failed', error.message);
+      else Alert.alert('Restore failed', 'Could not open the selected backup file.');
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   const handleSaveDailyLimit = () => {

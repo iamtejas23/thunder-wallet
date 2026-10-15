@@ -23,9 +23,9 @@ import {
 const ONBOARDING_KEY = 'onboardingDone';
 const { width, height } = Dimensions.get('window');
 
-// ── Dark palette — no gold ────────────────────────────────────────────────────
-const BLUE   = '#60A5FA';
-const PURPLE = '#A78BFA';
+// ── Thunder Wallet brand palette ───────────────────────────────────────────────
+const AMBER = '#FFC928';
+const TEAL = '#27D6C4';
 const WHITE  = '#FFFFFF';
 const BG     = '#0A0E1A';
 
@@ -248,22 +248,22 @@ function SplashScreen() {
       <Animated.View style={{
         position: 'absolute',
         width: 72, height: 72, borderRadius: 36,
-        backgroundColor: '#E8F4FF',
+        backgroundColor: '#FFF5C8',
         opacity: flashOpacity,
         transform: [{ scale: flashScale }],
       }} />
 
-      {/* ── Expanding blue/purple pulse rings ── */}
+      {/* ── Expanding amber/teal pulse rings ── */}
       <Animated.View style={[s.ring, {
-        borderColor: `${BLUE}99`, borderWidth: 2,
+        borderColor: `${AMBER}99`, borderWidth: 2,
         opacity: r1Alpha, transform: [{ scale: r1Scale }],
       }]} />
       <Animated.View style={[s.ring, {
-        borderColor: `${BLUE}66`, borderWidth: 1.5,
+        borderColor: `${AMBER}66`, borderWidth: 1.5,
         opacity: r2Alpha, transform: [{ scale: r2Scale }],
       }]} />
       <Animated.View style={[s.ring, {
-        borderColor: `${PURPLE}33`, borderWidth: 1,
+        borderColor: `${TEAL}33`, borderWidth: 1,
         opacity: r3Alpha, transform: [{ scale: r3Scale }],
       }]} />
 
@@ -291,7 +291,7 @@ function SplashScreen() {
         position: 'absolute',
         width: 290, height: 290, borderRadius: 145,
         backgroundColor: 'rgba(96,165,250,0.045)',
-        shadowColor: BLUE,
+        shadowColor: AMBER,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.60,
         shadowRadius: 90,
@@ -299,7 +299,7 @@ function SplashScreen() {
         opacity: glowAlpha,
         transform: [{ scale: glowScale }],
       }} />
-      {/* Inner purple core */}
+      {/* Inner teal core */}
       <Animated.View style={{
         position: 'absolute',
         width: 155, height: 155, borderRadius: 77.5,
@@ -316,7 +316,7 @@ function SplashScreen() {
           opacity: logoAlpha,
           transform: [{ scale: logoFinalScale }],
         }}>
-          <Image source={require('./assets/logo.png')} style={s.logo} resizeMode="contain" />
+          <Image source={require('./assets/adaptive-icon.png')} style={s.logo} resizeMode="contain" />
         </Animated.View>
 
         {/* ── THUNDER WALLET title ── */}
@@ -341,7 +341,7 @@ function SplashScreen() {
       </View>
 
 
-      {/* ── Loading bar (blue) ── */}
+      {/* ── Loading bar ── */}
       <Animated.View style={{ position: 'absolute', bottom: 62, width: 190, opacity: loadAlpha }}>
         <View style={s.loadTrack}>
           <Animated.View style={[s.loadFill, {
@@ -450,43 +450,43 @@ const s = StyleSheet.create({
     width: 158, height: 158, borderRadius: 79,
   },
 
-  // Logo container — white/blue border
-  logo: { width: 110, height: 110 },
+  // Transparent app mark
+  logo: { width: 164, height: 164 },
 
   // Typography
   titleTop: {
     color: WHITE,
     fontFamily: 'DMSans_900Black',
-    fontSize: 36,
-    letterSpacing: 10,
-    textShadowColor: 'rgba(96,165,250,0.45)',
+    fontSize: 34,
+    letterSpacing: 8,
+    textShadowColor: 'rgba(255,201,40,0.35)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadowRadius: 20,
   },
   titleBot: {
     color: 'rgba(255,255,255,0.82)',
     fontFamily: 'DMSans_800ExtraBold',
-    fontSize: 36,
-    letterSpacing: 10,
+    fontSize: 34,
+    letterSpacing: 8,
     marginTop: 2,
-    textShadowColor: 'rgba(167,139,250,0.35)',
+    textShadowColor: 'rgba(39,214,196,0.30)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
+    textShadowRadius: 16,
   },
 
   divider: {
     width: 42, height: 1,
-    backgroundColor: 'rgba(96,165,250,0.40)',
+    backgroundColor: 'rgba(255,201,40,0.60)',
     marginBottom: 9,
   },
   tagline: {
-    color: 'rgba(255,255,255,0.32)',
+    color: 'rgba(255,255,255,0.48)',
     fontFamily: 'DMSans_600SemiBold',
     fontSize: 9,
-    letterSpacing: 3.8,
+    letterSpacing: 3.2,
   },
 
-  // Loading bar — blue
+  // Loading bar — amber
   loadTrack: {
     height: 2,
     backgroundColor: 'rgba(96,165,250,0.12)',
@@ -495,9 +495,9 @@ const s = StyleSheet.create({
   },
   loadFill: {
     height: 2,
-    backgroundColor: BLUE,
+    backgroundColor: AMBER,
     borderRadius: 1,
-    shadowColor: BLUE,
+    shadowColor: AMBER,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 5,

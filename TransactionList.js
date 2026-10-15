@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,6 +67,153 @@ const normalizeNumber = (value) => {
 };
 
 const isValidAmount = (value) => Number.isFinite(Number(value));
+
+const csvEscape = (value, isNumeric = false) => {
+  let text = String(value ?? '');
+  if (!isNumeric && /^[=+@\-\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+const makeCsv = (transactions) => {
+  const rows = [['date', 'type', 'amount', 'category', 'note', 'recurring']];
+  transactions.forEach((tx) => {
+    const amount = Number(tx.amount);
+    if (!isValidDate(tx.date) || !Number.isFinite(amount)) return;
+    const type = tx.type === 'income' || amount >= 0 ? 'income' : 'expense';
+    rows.push([
+      new Date(tx.date).toISOString(),
+      type,
+      Math.abs(amount).toString(),
+      tx.category || 'Other',
+      tx.note || '',
+      tx.recurring || '',
+    ]);
+  });
+  return `\uFEFF${rows.map((row) => row.map((cell, column) => csvEscape(cell, column === 2 && row !== rows[0])).join(',')).join('\r\n')}`;
+};
+
+const parseCsvRows = (source) => {
+  const text = source.replace(/^\uFEFF/, '');
+  const rows = [];
+  let row = [], field = '', quoted = false, line = 1, rowLine = 1;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') { field += '"'; i += 1; }
+      else if (char === '"') quoted = false;
+      else { field += char; if (char === '\n') line += 1; }
+    } else if (char === '"' && field.length === 0) quoted = true;
+    else if (char === ',') { row.push(field); field = ''; }
+    else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(field); field = '';
+      if (row.some((cell) => cell.trim())) rows.push({ cells: row, line: rowLine });
+      row = [];
+      if (char === '\n' || text[i] === '\n') line += 1;
+      rowLine = line;
+    } else field += char;
+  }
+  if (quoted) throw new Error('A quoted field is not closed.');
+  row.push(field);
+  if (row.some((cell) => cell.trim())) rows.push({ cells: row, line: rowLine });
+  return rows;
+};
+
+const headerKey = (value) => value.trim().toLowerCase().replace(/[\s_-]+/g, '');
+const findHeader = (headers, aliases) => headers.findIndex((key) => aliases.includes(key));
+
+const parseCsvTransactions = (text) => {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) throw new Error('The CSV needs a header row and at least one transaction.');
+  const headers = rows[0].cells.map(headerKey);
+  const dateIdx = findHeader(headers, ['date', 'transactiondate', 'txndate', 'posteddate']);
+  const amountIdx = findHeader(headers, ['amount', 'transactionamount']);
+  const typeIdx = findHeader(headers, ['type', 'transactiontype']);
+  const debitIdx = findHeader(headers, ['debit', 'debitamount', 'withdrawal', 'withdrawals']);
+  const creditIdx = findHeader(headers, ['credit', 'creditamount', 'deposit', 'deposits']);
+  const categoryIdx = findHeader(headers, ['category']);
+  const noteIdx = findHeader(headers, ['note', 'description', 'memo', 'merchant', 'particulars']);
+  const recurringIdx = findHeader(headers, ['recurring', 'frequency']);
+  if (dateIdx < 0 || (amountIdx < 0 && debitIdx < 0 && creditIdx < 0)) {
+    throw new Error('CSV needs a Date column and an Amount column (or Debit and Credit columns).');
+  }
+
+  const imported = [];
+  const errors = [];
+  rows.slice(1).forEach(({ cells, line }) => {
+    const valueAt = (idx) => idx < 0 ? '' : (cells[idx] ?? '').trim();
+    let date;
+    const rawDate = valueAt(dateIdx);
+    const dateParts = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const isoDateParts = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateParts) {
+      const [, day, month, year] = dateParts;
+      date = new Date(Number(year), Number(month) - 1, Number(day));
+      if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) date = null;
+    } else if (isoDateParts) {
+      const [, year, month, day] = isoDateParts;
+      date = new Date(Number(year), Number(month) - 1, Number(day));
+      if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) date = null;
+    } else {
+      const parsed = new Date(rawDate);
+      if (rawDate && !Number.isNaN(parsed.getTime())) date = parsed;
+    }
+
+    const rawAmount = valueAt(amountIdx).replace(/[₹,$\s]/g, '');
+    let amount = amountIdx >= 0 && rawAmount !== '' ? Number(rawAmount) : NaN;
+    let typeText = valueAt(typeIdx).toLowerCase();
+    if (!Number.isFinite(amount) && (debitIdx >= 0 || creditIdx >= 0)) {
+      const credit = Math.abs(Number(valueAt(creditIdx).replace(/[₹,$\s]/g, '')) || 0);
+      const debit = Math.abs(Number(valueAt(debitIdx).replace(/[₹,$\s]/g, '')) || 0);
+      if (credit > 0 && debit === 0) { amount = credit; typeText = 'income'; }
+      else if (debit > 0 && credit === 0) { amount = debit; typeText = 'expense'; }
+      else amount = NaN;
+    }
+    const validType = !typeText || ['income', 'credit', 'deposit', 'expense', 'debit', 'withdrawal'].includes(typeText);
+    const normalizedType = ['income', 'credit', 'deposit'].includes(typeText) ? 'income'
+      : ['expense', 'debit', 'withdrawal'].includes(typeText) ? 'expense' : (amount < 0 ? 'expense' : 'income');
+    const category = valueAt(categoryIdx).replace(/^'(?=[=+@\-\t\r])/, '') || 'Other';
+    const note = valueAt(noteIdx).replace(/^'(?=[=+@\-\t\r])/, '');
+    if (!date || !Number.isFinite(amount) || amount === 0 || !validType) {
+      errors.push(line);
+      return;
+    }
+    imported.push({
+      id: `csv_${Date.now()}_${imported.length}_${Math.random().toString(36).slice(2, 8)}`,
+      date: date.toISOString(),
+      amount: normalizedType === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+      type: normalizedType,
+      category,
+      note,
+      recurring: valueAt(recurringIdx) || null,
+    });
+  });
+  if (errors.length) {
+    const lines = errors.slice(0, 8).join(', ');
+    const extra = errors.length > 8 ? `, +${errors.length - 8} more` : '';
+    throw new Error(`Could not read transaction data on CSV row${errors.length === 1 ? '' : 's'} ${lines}${extra}. Fix the file and try again.`);
+  }
+  return imported;
+};
+
+const transactionFingerprint = (tx) => [
+  localDateKey(tx.date), Number(tx.amount), (tx.category || 'Other').trim().toLowerCase(), (tx.note || '').trim().toLowerCase(),
+].join('|');
+
+const parseDateFilter = (value) => {
+  if (!value.trim()) return null;
+  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, dayText, monthText, yearText] = match;
+  const date = new Date(Number(yearText), Number(monthText) - 1, Number(dayText));
+  if (date.getFullYear() !== Number(yearText) || date.getMonth() !== Number(monthText) - 1 || date.getDate() !== Number(dayText)) return null;
+  return `${yearText}-${monthText.padStart(2, '0')}-${dayText.padStart(2, '0')}`;
+};
+
+const localDateKey = (value) => {
+  const date = toLocalDate(value);
+  return date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : null;
+};
 
 const getMonthInfoFromDate = (value) => {
   const d = toLocalDate(value);
@@ -184,6 +332,7 @@ const TransactionList = ({
   setActiveFilter,
   searchQuery,
   setSearchQuery,
+  importTransactions,
 }) => {
   const { C } = useTheme();
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
@@ -193,6 +342,12 @@ const TransactionList = ({
     return new Set([key]);
   });
   const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   const formatTs = (date) => {
     const d = toLocalDate(date);
@@ -202,13 +357,107 @@ const TransactionList = ({
 
   const visible = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const from = parseDateFilter(dateFrom);
+    const to = parseDateFilter(dateTo);
+    const min = minAmount.trim() === '' ? null : Number(minAmount);
+    const max = maxAmount.trim() === '' ? null : Number(maxAmount);
+    const amountRangeValid = (min == null || (Number.isFinite(min) && min >= 0))
+      && (max == null || (Number.isFinite(max) && max >= 0))
+      && (min == null || max == null || min <= max);
     return safeTransactions.filter((t) => {
       const amount = normalizeNumber(t?.amount);
       const mf = activeFilter === 'all' || (activeFilter === 'income' && amount >= 0) || (activeFilter === 'expense' && amount < 0);
       const ms = !q || (t.category || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q);
-      return mf && ms;
+      const day = localDateKey(t.date);
+      const dateMatches = (!from || (day != null && day >= from)) && (!to || (day != null && day <= to));
+      const absoluteAmount = Math.abs(amount);
+      const amountMatches = !amountRangeValid || ((min == null || absoluteAmount >= min) && (max == null || absoluteAmount <= max));
+      return mf && ms && dateMatches && amountMatches;
     });
-  }, [activeFilter, searchQuery, safeTransactions]);
+  }, [activeFilter, searchQuery, safeTransactions, dateFrom, dateTo, minAmount, maxAmount]);
+
+  const invalidFrom = dateFrom.trim() !== '' && !parseDateFilter(dateFrom);
+  const invalidTo = dateTo.trim() !== '' && !parseDateFilter(dateTo);
+  const parsedMin = minAmount.trim() === '' ? null : Number(minAmount);
+  const parsedMax = maxAmount.trim() === '' ? null : Number(maxAmount);
+  const invalidAmountRange = (parsedMin != null && (!Number.isFinite(parsedMin) || parsedMin < 0))
+    || (parsedMax != null && (!Number.isFinite(parsedMax) || parsedMax < 0))
+    || (parsedMin != null && parsedMax != null && parsedMin > parsedMax);
+  const hasAdvancedFilters = !!(dateFrom || dateTo || minAmount || maxAmount);
+
+  const clearAdvancedFilters = () => {
+    setDateFrom(''); setDateTo(''); setMinAmount(''); setMaxAmount('');
+  };
+
+  const handleExportCSV = async () => {
+    const csv = makeCsv(visible);
+    if (!csv.includes('\r\n')) { Alert.alert('Nothing to export', 'There are no matching transactions to export.'); return; }
+    try {
+      const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      if (!dir) throw new Error('No writable folder is available on this device.');
+      const path = `${dir}thunder-wallet-transactions-${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Export Thunder Wallet CSV' });
+      } else {
+        Alert.alert('CSV created', `The file was created in the app documents folder: ${path.split('/').pop()}`);
+      }
+    } catch (error) {
+      Alert.alert('CSV export failed', error?.message || 'Could not create the CSV file.');
+    }
+  };
+
+  const handleImportCSV = async () => {
+    setIsImporting(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri || (asset.name && !asset.name.toLowerCase().endsWith('.csv'))) {
+        throw new Error('Choose a .csv file to import.');
+      }
+      if (asset.size > 10 * 1024 * 1024) throw new Error('CSV files must be smaller than 10 MB.');
+      const content = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      if (content.length > 10 * 1024 * 1024) throw new Error('CSV files must be smaller than 10 MB.');
+      const parsed = parseCsvTransactions(content);
+      const fingerprints = new Set(safeTransactions.map((tx) => {
+        try { return transactionFingerprint(tx); } catch { return null; }
+      }).filter(Boolean));
+      const additions = [];
+      let duplicates = 0;
+      parsed.forEach((tx) => {
+        const fingerprint = transactionFingerprint(tx);
+        if (fingerprints.has(fingerprint)) duplicates += 1;
+        else { fingerprints.add(fingerprint); additions.push(tx); }
+      });
+      const saveImport = async (items) => {
+        try {
+          await importTransactions?.(items);
+          Alert.alert('Import complete', `${items.length} transaction${items.length === 1 ? '' : 's'} added.`);
+        } catch (error) {
+          Alert.alert('Import failed', error?.message || 'Could not save the imported transactions.');
+        }
+      };
+      Alert.alert(
+        'Review CSV import',
+        duplicates
+          ? `${parsed.length} rows found. ${duplicates} match existing or earlier rows (same calendar day, amount, category and note). Some may be legitimate repeat purchases. Choose how to handle them; existing transactions will stay in place.`
+          : `${parsed.length} transactions will be added. Your existing transactions will stay in place.`,
+        duplicates ? [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Skip exact matches', onPress: () => saveImport(additions) },
+          { text: 'Import all', onPress: () => saveImport(parsed) },
+        ] : [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Import transactions', onPress: () => saveImport(parsed) },
+        ],
+      );
+    } catch (error) {
+      Alert.alert('CSV import failed', error?.message || 'Could not read this CSV file.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const summary = useMemo(() =>
     visible.reduce((s, t) => {
@@ -696,11 +945,17 @@ const TransactionList = ({
           <Text style={[styles.title, { color: C.text1 }]}>Transactions</Text>
         </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={handleExportPDF} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}> 
-            <Ionicons name="document-text-outline" size={18} color={C.income} />
+          <TouchableOpacity onPress={handleExportPDF} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]} accessibilityRole="button" accessibilityLabel="Export PDF">
+            <Ionicons name="document-text-outline" size={16} color={C.income} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={shareSummary} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]}>
-            <Ionicons name="share-social-outline" size={18} color={C.blue} />
+          <TouchableOpacity onPress={handleExportCSV} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]} accessibilityRole="button" accessibilityLabel="Export filtered transactions as CSV">
+            <Ionicons name="download-outline" size={16} color={C.blue} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleImportCSV} disabled={isImporting} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border, opacity: isImporting ? 0.55 : 1 }]} accessibilityRole="button" accessibilityLabel="Import transactions from CSV">
+            <Ionicons name={isImporting ? 'ellipsis-horizontal' : 'document-attach-outline'} size={16} color={C.purple} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={shareSummary} style={[styles.iconBtn, { backgroundColor: C.cardInner, borderColor: C.border }]} accessibilityRole="button" accessibilityLabel="Share monthly summary">
+            <Ionicons name="share-social-outline" size={16} color={C.blue} />
           </TouchableOpacity>
         </View>
       </View>
@@ -735,6 +990,71 @@ const TransactionList = ({
           </TouchableOpacity>
         ))}
       </View>
+
+      <View style={[styles.advancedToggle, { backgroundColor: hasAdvancedFilters ? C.accentBg : C.cardInner, borderColor: hasAdvancedFilters ? C.accentBorder : C.border }]}>
+        <TouchableOpacity
+          style={styles.advancedToggleAction}
+          onPress={() => setFiltersExpanded((expanded) => !expanded)}
+          accessibilityRole="button"
+          accessibilityLabel="Date and amount filters"
+        >
+          <Ionicons name="options-outline" size={14} color={hasAdvancedFilters ? C.accent : C.text2} />
+          <Text style={[styles.advancedToggleText, { color: hasAdvancedFilters ? C.accent : C.text2 }]}>
+            {hasAdvancedFilters ? 'Date & amount filters active' : 'Date & amount'}
+          </Text>
+          <Ionicons name={filtersExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={hasAdvancedFilters ? C.accent : C.text2} />
+        </TouchableOpacity>
+        {hasAdvancedFilters && <TouchableOpacity onPress={clearAdvancedFilters} hitSlop={8} accessibilityLabel="Clear date and amount filters"><Text style={[styles.resetFilterText, { color: C.accent }]}>Clear</Text></TouchableOpacity>}
+      </View>
+      {filtersExpanded && (
+        <View style={[styles.advancedPanel, { backgroundColor: C.cardInner, borderColor: C.border }]}>
+          <Text style={[styles.filterFieldLabel, { color: C.text2 }]}>DATE RANGE</Text>
+          <View style={styles.advancedFieldRow}>
+            <TextInput
+              style={[styles.advancedInput, { color: C.text1, backgroundColor: C.card, borderColor: invalidFrom ? C.expense : C.border }]}
+              placeholder="From · DD/MM/YYYY"
+              placeholderTextColor={C.text3}
+              value={dateFrom}
+              onChangeText={setDateFrom}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+            <TextInput
+              style={[styles.advancedInput, { color: C.text1, backgroundColor: C.card, borderColor: invalidTo ? C.expense : C.border }]}
+              placeholder="To · DD/MM/YYYY"
+              placeholderTextColor={C.text3}
+              value={dateTo}
+              onChangeText={setDateTo}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+          </View>
+          {(invalidFrom || invalidTo) && <Text style={[styles.filterError, { color: C.expense }]}>Enter dates as DD/MM/YYYY.</Text>}
+          {parseDateFilter(dateFrom) && parseDateFilter(dateTo) && parseDateFilter(dateFrom) > parseDateFilter(dateTo) && (
+            <Text style={[styles.filterError, { color: C.expense }]}>The start date must be on or before the end date.</Text>
+          )}
+          <Text style={[styles.filterFieldLabel, { color: C.text2, marginTop: 12 }]}>AMOUNT (₹)</Text>
+          <View style={styles.advancedFieldRow}>
+            <TextInput
+              style={[styles.advancedInput, { color: C.text1, backgroundColor: C.card, borderColor: invalidAmountRange ? C.expense : C.border }]}
+              placeholder="Minimum"
+              placeholderTextColor={C.text3}
+              value={minAmount}
+              onChangeText={setMinAmount}
+              keyboardType="decimal-pad"
+            />
+            <TextInput
+              style={[styles.advancedInput, { color: C.text1, backgroundColor: C.card, borderColor: invalidAmountRange ? C.expense : C.border }]}
+              placeholder="Maximum"
+              placeholderTextColor={C.text3}
+              value={maxAmount}
+              onChangeText={setMaxAmount}
+              keyboardType="decimal-pad"
+            />
+          </View>
+          {invalidAmountRange && <Text style={[styles.filterError, { color: C.expense }]}>Use positive amounts; minimum must not exceed maximum.</Text>}
+        </View>
+      )}
 
       {/* Summary Pills */}
       <View style={styles.pillRow}>
@@ -780,7 +1100,7 @@ const TransactionList = ({
         {filteredEmpty && (
           <TouchableOpacity
             style={[styles.clearFiltersBtn, { borderColor: C.border, backgroundColor: C.cardInner }]}
-            onPress={() => { setSearchQuery(''); setActiveFilter('all'); }}
+            onPress={() => { setSearchQuery(''); setActiveFilter('all'); clearAdvancedFilters(); }}
           >
             <Text style={[styles.clearFiltersText, { color: C.accent }]}>Clear filters</Text>
           </TouchableOpacity>
@@ -858,13 +1178,22 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
   eyebrow: { fontSize: 10, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1.2, textTransform: 'uppercase' },
   title: { fontSize: 22, fontFamily: 'DMSans_900Black', marginTop: 2 },
-  headerIcons: { flexDirection: 'row', gap: 8 },
-  iconBtn: { alignItems: 'center', borderRadius: 20, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
+  headerIcons: { flexDirection: 'row', gap: 5 },
+  iconBtn: { alignItems: 'center', borderRadius: 18, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },
   searchBox: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 44, paddingHorizontal: 12 },
   searchInput: { flex: 1, fontSize: 14 },
   filterRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   filterChip: { alignItems: 'center', borderRadius: 20, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 4, justifyContent: 'center', minHeight: 34 },
   filterText: { fontSize: 12, fontFamily: 'DMSans_800ExtraBold' },
+  advancedToggle: { alignItems: 'center', borderRadius: 11, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 9, minHeight: 38, paddingHorizontal: 10 },
+  advancedToggleAction: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 7, minHeight: 38 },
+  advancedToggleText: { flex: 1, fontSize: 12, fontFamily: 'DMSans_700Bold' },
+  resetFilterText: { fontSize: 11, fontFamily: 'DMSans_800ExtraBold', paddingHorizontal: 4 },
+  advancedPanel: { borderRadius: 12, borderWidth: 1, marginTop: 8, padding: 10 },
+  filterFieldLabel: { fontSize: 9, fontFamily: 'DMSans_800ExtraBold', letterSpacing: 1, marginBottom: 6 },
+  advancedFieldRow: { flexDirection: 'row', gap: 8 },
+  advancedInput: { borderRadius: 9, borderWidth: 1, flex: 1, fontSize: 12, minHeight: 40, paddingHorizontal: 9 },
+  filterError: { fontSize: 10, marginTop: 5 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10, marginTop: 12 },
   pill: { alignItems: 'center', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 4, minHeight: 28, paddingHorizontal: 9 },
   pillText: { fontSize: 11, fontFamily: 'DMSans_800ExtraBold' },

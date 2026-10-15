@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "thunderwallet",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0E1A"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -65,7 +60,18 @@
       ],
       "expo-local-authentication",
       "expo-secure-store",
-      "expo-document-picker"
+      "expo-document-picker",
+      "expo-font",
+      "expo-sharing",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/adaptive-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0E1A"
+        }
+      ]
     ],
     "extra": {
       "eas": {

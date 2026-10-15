@@ -1816,7 +1816,7 @@ function AnalyticsScreen({ wallet }) {
 // ─── Activity Screen ──────────────────────────────────────────────────────────
 function ActivityScreen({ wallet }) {
   const { C } = useTheme();
-  const { activeFilter, clearTransactions, deleteTransaction, editTransaction, openTransactionModal, searchQuery, setActiveFilter, setSearchQuery, transactions } = wallet;
+  const { activeFilter, clearTransactions, deleteTransaction, editTransaction, importTransactions, openTransactionModal, searchQuery, setActiveFilter, setSearchQuery, transactions } = wallet;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1853,6 +1853,7 @@ function ActivityScreen({ wallet }) {
         setActiveFilter={setActiveFilter}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        importTransactions={importTransactions}
       />
     </SafeAreaView>
   );
@@ -2171,6 +2172,10 @@ function MainApp() {
     setTransactions(next);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
+  const importTransactions = async (incoming) => {
+    const next = [...incoming.map(normalizeTransaction), ...transactions];
+    await persistTransactions(next);
+  };
   const persistGoals = async (next) => {
     setGoals(next);
     await AsyncStorage.setItem(GOALS_KEY, JSON.stringify(next));
@@ -2379,7 +2384,7 @@ function MainApp() {
     activeFilter, adjustMonthlyBudget, clearTransactions, deleteTransaction, editTransaction,
     deleteGoal, goals, insight, monthlyBudget, openTransactionModal, openGoalModal,
     openCategoryBudgetModal, categoryBudgets, searchQuery, setActiveFilter, setSearchQuery,
-    stats, streak, transactions,
+    stats, streak, transactions, importTransactions,
     bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid,
     savings, openSavingsModal,
     hideBalanceFeature, setHideBalanceFeature,
