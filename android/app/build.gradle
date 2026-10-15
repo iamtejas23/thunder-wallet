@@ -120,6 +120,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 28
         versionName "3.0.1"
+        buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
         ndk {
             abiFilters(*reactNativeArchitectures())
         }
