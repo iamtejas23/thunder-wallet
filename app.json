@@ -2,7 +2,7 @@
   "expo": {
     "name": "Thunder Wallet",
     "slug": "thunder-wallet",
-    "version": "2.10.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "thunderwallet",
@@ -25,7 +25,7 @@
         "backgroundColor": "#0A0E1A"
       },
       "package": "com.tejas8787.thunderwallet",
-      "versionCode": 26,
+      "versionCode": 27,
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
